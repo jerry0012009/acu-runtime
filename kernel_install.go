@@ -24,7 +24,7 @@ type kernelRelease struct {
 func releaseFor(platform, architecture string) (kernelRelease, error) {
 	releases := map[string]kernelRelease{
 		"windows/amd64": {"magpie-cli-windows-amd64.exe", "82e2e7c777b078abff0765f9d75c0c251aece637bb0649b1b85abf795e5523be"},
-		"windows/arm64": {"magpie-cli-windows-arm64.exe", "99a34f817da4200d1eb169156c63af5918a500b2a0b4189bdb712132516eaa0d"},
+		"windows/arm64": {"magpie-cli-windows-arm64.exe", "2cf24cba118f789f564109f54d2ff92dccb6bc32623b334dbc51d6a3f75d75cb"},
 		"darwin/amd64":  {"magpie-cli-darwin-amd64", "576f63c3606b1e111d5a0fcb23d47ae1d208854783a80c910900a9f071885e2a"},
 		"darwin/arm64":  {"magpie-cli-darwin-arm64", "6b42a9e39472fd42d9bf8fd05c4652de352e0a260754b083fd84ccad4bdfcc3f"},
 	}
