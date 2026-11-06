@@ -29,3 +29,12 @@
 当前应用内安装包只支持 Windows x64。Windows ARM64 与 macOS 还没有对应 Runtime 安装包；会报告平台不可用而不进行下载。后续发布这些平台的签名安装器后，才能开放一键安装。独立 Magpie 不受 Runtime 更新器管理。
 
 更新网络：优先使用显式 HTTP(S)_PROXY/NO_PROXY 环境设置，否则读取 Windows 手动系统代理。PAC 自动代理与国内镜像尚未接入。无法访问 GitHub 时保留现有安装，可稍后重试。
+
+## 0.1.16 在线更新验收
+
+- 本机真实 0.1.15 安装经正式 GitHub Release 检查、下载、校验后更新到 0.1.16；旧进程退出，新进程自动启动并返回 ready=true。
+- 更新后的 Runtime 可执行文件与发布构建摘要一致，备用内核摘要对应 Magpie 0.1.3150。
+- 更新前后 Codex、Claude、Magpie providers/settings 共 4 个关键配置文件 SHA-256 不变。
+- 旧版测试进程临时设置 HTTPS_PROXY 以使用本机已有代理；0.1.16 随后在无此临时环境变量的新进程中，通过 Windows 手动系统代理完成检查并报告 current。
+- Windows ARM64 桌面和 macOS amd64/arm64 服务端交叉编译通过；不代表其他平台的实机运行验收。
+- 0.1.15 已发布但不读取 Windows 手动系统代理，建议新用户安装 0.1.16。国内无 GitHub 网络的用户仍需后续官方镜像；当前未接入公共代理或镜像。
