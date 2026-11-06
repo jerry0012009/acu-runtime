@@ -37,7 +37,7 @@ async function setup(state, handler) {
   return { calls, timers, elements, listeners, run: command => vm.runInContext(command, context), select: (id, checked) => change({ dataset: { selectAgent: id }, checked }), change, refresh: () => vm.runInContext('refresh()', context) };
 }
 
-const posts = instance => instance.calls.filter(call => call.method === 'POST');
+const posts = instance => instance.calls.filter(call => call.method === 'POST' && call.route !== '/kernel/api/provider/models');
 
 const inventory = () => ({ models: [
   { id: 'acu-runtime/acu-auto', name: 'acu-auto', group: 'ACU', inUse: true },

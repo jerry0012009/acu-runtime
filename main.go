@@ -714,7 +714,7 @@ func main() {
 		}
 		return
 	}
-	log.Printf("ACU Runtime v0.1.18 developer web mode at http://%s", host.host)
+	log.Printf("ACU Runtime v0.1.21 developer web mode at http://%s", host.host)
 	select {
 	case <-ctx.Done():
 	case err := <-serviceErrors:

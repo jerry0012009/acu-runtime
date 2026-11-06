@@ -305,7 +305,7 @@ function agentModelSelect(agent, role = null) {
   return `<select id="${inputID}" data-agent-model="${agent.id}"${roleAttribute} aria-label="${escapeHTML(agent.name)} ${escapeHTML(role?.label || '默认模型')}" ${disabled ? 'disabled' : ''}>${groups}</select>`;
 }
 
-function modelFlow(agent, compact = false, inventory = null) {
+function modelFlow(agent, compact = false, inventory = null, summary = false) {
   const facts = modelFacts(agent);
   const entries = [];
   const add = (key, kind, name, target, badge, detail = '', muted = false, control = '', trailing = '', subtitle = '') => {
@@ -326,6 +326,7 @@ function modelFlow(agent, compact = false, inventory = null) {
   const catalogIDs = new Set(catalogModels.map(model => model.id));
   const fallbackNative = facts.nativeEntries.filter(model => !catalogIDs.has(model.id));
   const models = compact ? [...facts.top.filter(model => !previewed.has(model.id)), ...fallbackNative.filter(model => !modelIsHidden(agent, model)).slice(0, 1)] : inventory?.tab === 'order' ? catalogModels.filter(model => !modelIsHidden(agent, model)) : [...catalogModels, ...fallbackNative].sort((left, right) => Number(right.id.endsWith('/acu-auto')) - Number(left.id.endsWith('/acu-auto')));
+  if (summary) models.length = 0;
   models.forEach(model => {
     if (inventory?.tab === 'shown' && modelIsHidden(agent, model)) return;
     const group = (ui.status?.routingGroups || []).find(item => item.ref === model.id);
@@ -350,7 +351,15 @@ function modelFlow(agent, compact = false, inventory = null) {
 
 function agentModelSummary(agent) {
   const catalog = agent.catalog;
-  return `<section class="model-summary" aria-label="${escapeHTML(agent.name)} 模型清单">${modelFlow(agent, true)}${!catalog && agent.detected ? `<p class="model-empty">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<button class="text-button model-list-link" data-action="model-inventory" data-agent-id="${agent.id}" ${!ui.status?.ready || !agent.detected ? 'disabled' : ''}><span>查看全部模型${catalog ? `<span class="model-total">${catalog.models.filter(model => !isRoutingGroup(model)).length}</span>` : ''}</span>${icon('arrow')}</button></section>`;
+  const models = (catalog?.models || []).filter(model => !isRoutingGroup(model));
+  const shown = models.filter(model => !modelIsHidden(agent, model));
+  const acu = shown.filter(model => !model.own && model.id.startsWith('acu-runtime/')).length;
+  const native = shown.filter(model => model.own).length;
+  const other = shown.filter(model => !model.own && !model.id.startsWith('acu-runtime/')).length;
+  const examples = shown.filter(model => !model.own && (model.id.endsWith('/acu-auto') || recommendedACUModels.includes(model.id.split('/').slice(1).join('/')))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
+  const stateHint = !agent.connected ? '<span class="model-example muted">可添加</span>' : agent.needsRepair ? '<span class="model-example muted">待核对</span>' : '';
+  const summary = catalog ? `<div class="model-counts"><span><strong>${acu}</strong> 个 ACU</span>${native ? `<span><strong>${native}</strong> 个原生</span>` : ''}${other ? `<span><strong>${other}</strong> 个其他来源</span>` : ''}</div><div class="model-examples">${stateHint}${examples || '<span class="model-example muted">可在全部模型中选择</span>'}</div>` : '';
+  return `<section class="model-summary" aria-label="${escapeHTML(agent.name)} 模型清单">${modelFlow(agent, true, null, true)}${summary}${!catalog && agent.detected ? `<p class="model-empty">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<button class="text-button model-list-link" data-action="model-inventory" data-agent-id="${agent.id}" ${!ui.status?.ready || !agent.detected ? 'disabled' : ''}><span>查看全部模型${catalog ? `<span class="model-total">${models.length}</span>` : ''}</span>${icon('arrow')}</button></section>`;
 }
 
 function filterModelInventory() {
@@ -491,7 +500,7 @@ function agentCard(agent) {
   return `<article class="agent-card compact-card routing-card ${agent.connected ? 'is-configured' : ''}" data-agent="${agent.id}"><div class="agent-card-top"><div class="agent-identity"><span class="agent-monogram ${agent.id}" aria-hidden="true">${({ codex: 'C', claude: '✳', workbuddy: 'W', hermes: 'H' })[agent.id] || 'A'}</span><h3>${escapeHTML(agent.name)}</h3></div><span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span></div>${routeButton}
     ${!ready || !agent.detected || agent.needsRepair ? `<p class="agent-route">${route}</p>` : ''}
     ${agentModelSummary(agent)}<div class="agent-routing-actions">${agent.connected ? `<button class="button secondary" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置 ${icon('arrow')}</button>` : ''}
-    ${ready && agent.restartRequired ? '<span class="agent-restart">需重新打开</span>' : ''}</div></article>`;
+    ${ready && agent.restartRequired ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
 }
 
 async function setAgentModel(id, value, field = 'model') {
@@ -530,6 +539,12 @@ function installRuntimeUpdate() {
     try { await request('/runtime/update/install', { method: 'POST' }); ui.applying = false; await refresh(); }
     catch (error) { ui.applying = false; toast(error.message); await refresh(); }
   });
+}
+
+function reopenAgent(id) {
+  const agent = ui.status?.agents?.find(item => item.id === id);
+  if (!agent) return;
+  showModal(`重新打开 ${escapeHTML(agent.name)}`, `<p>配置已经保存。请先保存 ${escapeHTML(agent.name)} 当前工作，再关闭并重新打开它，新的模型设置才会生效。</p><p>ACU Runtime 会保留当前连接和模型选择。</p>`, '知道了');
 }
 
 function settingsPage() {
@@ -734,7 +749,8 @@ async function confirmSetup() {
         ui.results.push({ id, ok: true, message: setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
-  } finally { ui.applying = false; await refresh(); }
+  } catch (error) { toast(`模型目录刷新失败：${error.message}`); }
+  finally { ui.applying = false; await refresh(); }
 }
 
 async function startAccountLogin(register) {
@@ -800,7 +816,7 @@ app.addEventListener('click', event => {
   const actions = {
     'show-panel': () => request('/runtime/desktop/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'panel' }) }).catch(error => toast(error.message)),
     refresh: () => refresh(true), connect: connectKernel,
-    'check-update': checkForUpdate, 'install-update': installRuntimeUpdate,
+    'check-update': checkForUpdate, 'install-update': installRuntimeUpdate, 'agent-restart': () => reopenAgent(control.dataset.agentId),
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
