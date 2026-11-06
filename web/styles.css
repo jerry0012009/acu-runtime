@@ -449,3 +449,4 @@ select option, select optgroup { color: var(--acu-text); background: var(--acu-s
 .agent-routing-actions .button.secondary { min-height:30px; padding:6px 10px; font-size:10px; border-radius:8px; }
 .agent-restart-button { margin-left:auto; color:var(--acu-warning); font-size:10px; padding:6px 0; }
 .agent-restart-button:hover { color:var(--acu-accent-text); }
+.model-flow-compact-data { display:none; }
