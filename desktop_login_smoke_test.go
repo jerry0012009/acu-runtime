@@ -1,0 +1,138 @@
+//go:build desktop && windows
+
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"io/fs"
+	"net"
+	"net/http"
+	"os"
+	"runtime"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"golang.org/x/sys/windows"
+)
+
+func TestNativeLoginSmoke(t *testing.T) {
+	if os.Getenv("ACU_NATIVE_LOGIN_SMOKE") != "1" {
+		t.Skip("interactive isolated WebView smoke test")
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if err := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED); err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CoUninitialize()
+	cache, err := os.MkdirTemp("", "acu-runtime-native-smoke-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LOCALAPPDATA", cache)
+	var mu sync.Mutex
+	var provider map[string]any
+	providerWrites, renewals := 0, 0
+	expiredWhileLoggedIn := false
+	host, _ := testServer(t, http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch request.URL.Path {
+		case "/api/provider/save":
+			providerWrites++
+			var input struct {
+				Key string `json:"key"`
+			}
+			json.NewDecoder(request.Body).Decode(&input)
+			provider = map[string]any{"id": "acu-runtime", "name": "ACU", "chat": "https://acu.best/v1", "key": map[string]any{"set": true, "masked": "sk-***fixture"}, "models": []map[string]any{{"id": "acu-auto", "on": true}}}
+			io.WriteString(response, `{}`)
+		case "/api/providers":
+			providers := []map[string]any{}
+			if provider != nil {
+				providers = append(providers, provider)
+			}
+			json.NewEncoder(response).Encode(map[string]any{"providers": providers})
+		case "/api/provider/key":
+			io.WriteString(response, `{"key":"fixture-model-key"}`)
+		case "/api/state":
+			io.WriteString(response, `{"agents":[{"id":"codex","fields":[]},{"id":"claude","fields":[]},{"id":"workbuddy","fields":[]},{"id":"hermes","fields":[]}]}`)
+		case "/favicon.ico":
+			response.WriteHeader(404)
+		default:
+			t.Errorf("unexpected smoke-test kernel write: %s", request.URL.Path)
+			response.WriteHeader(400)
+		}
+	}))
+	host.cloudTransport = accountTransport(func(request *http.Request) (*http.Response, error) {
+		switch request.URL.Path {
+		case "/api/user/self":
+			if request.Header.Get("Authorization") == "Bearer fixture-renewed-access" {
+				mu.Lock()
+				renewals++
+				mu.Unlock()
+			}
+			return cloudFixture(`{"success":true,"data":{"id":42,"username":"Native fixture"}}`), nil
+		case "/api/token/":
+			return cloudFixture(`{"success":true,"data":{"total":2,"items":[{"id":7,"name":"First fixture Key","status":1,"unlimited_quota":true},{"id":9,"name":"Second fixture Key","status":1,"unlimited_quota":true}]}}`), nil
+		case "/api/token/7/key", "/api/token/9/key":
+			return cloudFixture(`{"success":true,"data":{"key":"fixture-model-key"}}`), nil
+		case "/v1/models":
+			return cloudFixture(`{"data":[{"id":"acu-auto"}]}`), nil
+		default:
+			t.Errorf("unexpected cloud request: %s", request.URL.Path)
+			return cloudFixture(`{}`), nil
+		}
+	})
+	host.desktop = true
+	host.quitRequests = make(chan struct{}, 1)
+	host.loginRequests = make(chan loginTicket, 1)
+	web, _ := fs.Sub(assets, "web")
+	host.web = http.StripPrefix("/ui/", http.FileServer(http.FS(web)))
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host.host = listener.Addr().String()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+	host.lifecycle = ctx
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if view := host.account.snapshot(); view.LoggedIn && view.Refreshing {
+					mu.Lock()
+					expiredWhileLoggedIn = true
+					mu.Unlock()
+				}
+			}
+		}
+	}()
+	service := &http.Server{Handler: host, ReadHeaderTimeout: 5 * time.Second}
+	defer service.Close()
+	go service.Serve(listener)
+	port, _ := strconv.Atoi(os.Getenv("ACU_NATIVE_INSPECT_PORT"))
+	if err := runDesktop(ctx, host, "http://"+host.host, port, host.quitRequests, cancel); err != nil {
+		t.Fatal(err)
+	}
+	view := host.account.snapshot()
+	if !view.LoggedIn || view.Selected != 9 || view.Error != "" {
+		t.Fatalf("native login and Key switching did not complete: %+v", view)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if provider == nil {
+		t.Fatal("native login never saved the default Key")
+	}
+	if renewals == 0 || !expiredWhileLoggedIn || providerWrites != 2 {
+		t.Fatalf("native background renewal did not survive expiry without rewriting Keys: renewals=%d expiredWhileLoggedIn=%v providerWrites=%d", renewals, expiredWhileLoggedIn, providerWrites)
+	}
+}

@@ -1,0 +1,5 @@
+/bin/
+/preview-*.png
+/dist/
+/.build/
+/cmd/setup/payload.zip
