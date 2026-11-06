@@ -89,7 +89,7 @@ async function refresh(rescan = false, quiet = false) {
         if (caret !== null) search?.setSelectionRange?.(caret, caret);
       }
     }
-    if (quiet && previousState !== JSON.stringify(ui.status) && ['agents', 'overview'].includes(ui.page) && !ui.setup) render();
+    if (quiet && previousState !== JSON.stringify(ui.status) && ['agents', 'overview', 'settings'].includes(ui.page) && !ui.setup) render();
     if (ui.status.ready && pendingNative) {
       const view = pendingNative;
       pendingNative = null;
@@ -513,10 +513,32 @@ async function setAgentModel(id, value, field = 'model') {
   finally { ui.applying = false; await refresh(); }
 }
 
+async function checkForUpdate() {
+  if (!ui.status?.update?.supported || ui.applying) return;
+  ui.applying = true;
+  try { await request('/runtime/update/check', { method: 'POST' }); }
+  catch (error) { toast(error.message); }
+  finally { ui.applying = false; await refresh(); }
+}
+
+function installRuntimeUpdate() {
+  const release = ui.status?.update?.release;
+  if (!release || ui.applying) return;
+  const notes = escapeHTML(release.notes || '修复问题并更新兼容的内置内核。').replace(/\n/g, '<br>');
+  showModal(`更新到 ACU Runtime ${escapeHTML(release.version)}`, `<p>将一并更新 Runtime 和随包提供的兼容内核。已保存的 Key、Agent 与本地配置会保留。</p><p>${notes}</p><p>更新完成后 Runtime 将自动重启，可能短暂中断正在处理的请求。</p>`, '立即更新', async () => {
+    ui.applying = true;
+    try { await request('/runtime/update/install', { method: 'POST' }); ui.applying = false; await refresh(); }
+    catch (error) { ui.applying = false; toast(error.message); await refresh(); }
+  });
+}
+
 function settingsPage() {
+  const update = ui.status?.update || {};
+  const updateLabel = ({ idle: `当前版本 ${update.current || ui.status?.version || ''}`, checking: '正在检查更新…', current: '已是最新版本', available: `发现 ACU Runtime ${update.release?.version || ''}`, downloading: update.total ? `正在下载 ${Math.round(update.downloaded / update.total * 100)}%` : '正在下载更新…', restarting: '正在更新并重新启动…', error: update.message || '检查更新失败' })[update.phase || 'idle'];
   return `${header('', '设置', '按你的习惯使用 ACU。')}
     <section class="panel settings-panel"><h2>外观</h2><div class="setting-row"><div><strong>跟随系统</strong><p>自动适配浅色与深色模式。</p></div><span class="theme-readout"><span class="theme-swatch" aria-hidden="true"></span><span data-system-theme>跟随系统</span></span></div></section>
     <section class="panel settings-panel"><h2>窗口与托盘</h2><div class="setting-row"><div><strong>关闭窗口后继续运行</strong><p>点击托盘图标打开快捷面板，随时查看或调整 Agent。</p></div>${ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">打开快捷面板</button>' : ''}</div></section>
+    ${ui.status?.desktop ? `<section class="panel settings-panel"><h2>应用更新</h2><div class="setting-row"><div><strong>ACU Runtime ${escapeHTML(update.current || ui.status?.version || '')}</strong><p role="status">${escapeHTML(update.supported ? updateLabel : '此平台暂未提供应用内更新安装包')}${update.kernel ? ` · 内置内核 ${escapeHTML(update.kernel)}` : ''}</p>${update.phase === 'available' ? '<p>Runtime 与兼容内核将一起更新；本机 Key 和 Agent 配置会保留。</p>' : ''}</div><div class="update-actions">${update.phase === 'available' ? '<button class="button primary" data-action="install-update">更新并重启</button>' : ''}<button class="button secondary" data-action="check-update" ${(!update.supported || ['checking', 'downloading', 'restarting'].includes(update.phase)) ? 'disabled' : ''}>${update.phase === 'checking' ? '检查中…' : '检查更新'}</button></div></div>${update.phase === 'error' ? '<p class="inventory-warning">更新失败；当前安装未变更。</p>' : ''}</section>` : ''}
     ${ui.status?.desktop ? '<div class="desktop-exit"><span>退出应用可能中断正在经 ACU 处理的请求。</span><button class="button secondary" data-action="quit">退出 ACU Runtime</button></div>' : ''}`;
 }
 
@@ -778,6 +800,7 @@ app.addEventListener('click', event => {
   const actions = {
     'show-panel': () => request('/runtime/desktop/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'panel' }) }).catch(error => toast(error.message)),
     refresh: () => refresh(true), connect: connectKernel,
+    'check-update': checkForUpdate, 'install-update': installRuntimeUpdate,
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },

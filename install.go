@@ -43,11 +43,58 @@ func prepareInstallation(source, target string, release kernelRelease) error {
 	if !verifyKernel(bundled, release.sha256) {
 		return errors.New("安装包内核校验失败，请重新获取安装包")
 	}
-	if err := copyInstalledFile(bundled, filepath.Join(target, "kernel", name), 0755); err != nil {
-		return errors.New("无法安装内核，请检查安装目录权限")
+	files := []struct{ source, target string }{
+		{bundled, filepath.Join(target, "kernel", name)},
+		{filepath.Join(source, "ACU Runtime.exe"), filepath.Join(target, "ACU Runtime.exe")},
 	}
-	if err := copyInstalledFile(filepath.Join(source, "ACU Runtime.exe"), filepath.Join(target, "ACU Runtime.exe"), 0755); err != nil {
-		return errors.New("无法安装应用；如已运行 ACU Runtime，请先从托盘退出再安装")
+	backups := make([]string, len(files))
+	for i, file := range files {
+		if _, err := os.Stat(file.target); err == nil {
+			backup, err := os.CreateTemp(filepath.Dir(file.target), ".acu-update-backup-*")
+			if err != nil {
+				return errors.New("无法保护现有安装")
+			}
+			backups[i] = backup.Name()
+			backup.Close()
+			if err := copyInstalledFile(file.target, backups[i], 0600); err != nil {
+				return errors.New("无法保护现有安装")
+			}
+		} else if !os.IsNotExist(err) {
+			return errors.New("无法检查现有安装")
+		}
+	}
+	rollback := func() error {
+		var failures []error
+		for i, file := range files {
+			if backups[i] != "" {
+				if err := copyInstalledFile(backups[i], file.target, 0755); err != nil {
+					failures = append(failures, err)
+				}
+			} else {
+				if err := os.Remove(file.target); err != nil && !os.IsNotExist(err) {
+					failures = append(failures, err)
+				}
+			}
+		}
+		return errors.Join(failures...)
+	}
+	for _, file := range files {
+		if err := copyInstalledFile(file.source, file.target, 0755); err != nil {
+			if rollback() != nil {
+				return errors.New("更新失败且无法完整恢复；原文件备份保留在安装目录的 .acu-update-backup 文件中，请重新运行安装包修复")
+			}
+			for _, backup := range backups {
+				if backup != "" {
+					_ = os.Remove(backup)
+				}
+			}
+			return errors.New("无法更新应用或内核，已恢复原安装")
+		}
+	}
+	for _, backup := range backups {
+		if backup != "" {
+			_ = os.Remove(backup)
+		}
 	}
 	notice, err := assets.ReadFile("web/THIRD-PARTY-NOTICES.txt")
 	if err != nil {

@@ -93,6 +93,7 @@ type server struct {
 	loginRequests  chan loginTicket
 	cloudTransport http.RoundTripper
 	health         keyHealth
+	update         updateState
 }
 
 func secret() string {
@@ -465,7 +466,7 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 		groups = host.modelInventory(ctx, agents)
 		cancel()
 	}
-	host.json(response, 200, map[string]any{"version": "0.1.14", "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot()})
+	host.json(response, 200, map[string]any{"version": appVersion, "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot(), "update": host.update.snapshot(host.desktop)})
 }
 
 func (host *server) proxy(response http.ResponseWriter, request *http.Request) {
@@ -570,6 +571,8 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
+		case (request.Method == http.MethodGet && request.URL.Path == "/runtime/update") || (request.Method == http.MethodPost && (request.URL.Path == "/runtime/update/check" || request.URL.Path == "/runtime/update/install")):
+			host.updates(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/desktop/action":
 			host.desktopAction(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/status":
@@ -711,7 +714,7 @@ func main() {
 		}
 		return
 	}
-	log.Printf("ACU Runtime v0.1.14 developer web mode at http://%s", host.host)
+	log.Printf("ACU Runtime v0.1.15 developer web mode at http://%s", host.host)
 	select {
 	case <-ctx.Done():
 	case err := <-serviceErrors:

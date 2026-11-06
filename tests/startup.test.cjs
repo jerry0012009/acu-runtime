@@ -581,3 +581,12 @@ test('recommendations hide older and special-purpose models but protect active a
   assert.deepEqual(payload.hidden, ['acu-runtime/gpt-image-1', 'other/hidden']);
   assert.equal(instance.run('recommendedModels({ models: ["gpt-image-1", "gpt-6.1-sol", "glm-5.3-flash"] }).join(",")'), 'gpt-6.1-sol,glm-5.3-flash');
 });
+
+test('desktop settings exposes compatibility update status and the check action', async () => {
+  const instance = await setup({ desktop: true, version: '0.1.15', update: { supported: true, phase: 'available', current: '0.1.15', kernel: 'v0.1.3150', release: { version: '0.1.16' } } });
+  instance.run('ui.page="settings"; render()');
+  const html = instance.elements.app.innerHTML;
+  for (const phrase of ['应用更新', '0.1.15', 'v0.1.3150', '0.1.16', '更新并重启', '检查更新']) assert(html.includes(phrase), phrase);
+  assert(html.includes('本机 Key 和 Agent 配置会保留'));
+  assert(!instance.elements.app.innerHTML.includes('GitHub'));
+});

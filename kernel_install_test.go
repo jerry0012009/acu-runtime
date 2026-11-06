@@ -163,3 +163,33 @@ func TestSetupRejectsCorruptBundleBeforeChangingInstallation(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupRollsBackKernelWhenApplicationReplacementFails(t *testing.T) {
+	source, target := t.TempDir(), t.TempDir()
+	name := filepath.Base(managedKernelPath())
+	for _, directory := range []string{source, target} {
+		if err := os.MkdirAll(filepath.Join(directory, "kernel"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	kernel := []byte("new kernel")
+	digest := fmt.Sprintf("%x", sha256.Sum256(kernel))
+	if err := os.WriteFile(filepath.Join(source, "kernel", name), kernel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "kernel", name), []byte("old kernel"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "ACU Runtime.exe"), []byte("old app"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepareInstallation(source, target, kernelRelease{sha256: digest}); err == nil {
+		t.Fatal("missing application unexpectedly installed")
+	}
+	if got, err := os.ReadFile(filepath.Join(target, "kernel", name)); err != nil || string(got) != "old kernel" {
+		t.Fatal("failed update did not restore the old kernel")
+	}
+	if got, err := os.ReadFile(filepath.Join(target, "ACU Runtime.exe")); err != nil || string(got) != "old app" {
+		t.Fatal("failed update changed the current application")
+	}
+}
