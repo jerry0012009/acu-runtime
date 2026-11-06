@@ -140,3 +140,26 @@ func TestSetupIncludesVerifiedKernelWhenMissing(t *testing.T) {
 		t.Fatal("verified kernel missing from installation")
 	}
 }
+
+func TestSetupRejectsCorruptBundleBeforeChangingInstallation(t *testing.T) {
+	source, target := t.TempDir(), t.TempDir()
+	name := filepath.Base(managedKernelPath())
+	for _, directory := range []string{source, target} {
+		if err := os.MkdirAll(filepath.Join(directory, "kernel"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	os.WriteFile(filepath.Join(source, "kernel", name), []byte("corrupt"), 0600)
+	os.WriteFile(filepath.Join(source, "ACU Runtime.exe"), []byte("new app"), 0600)
+	os.WriteFile(filepath.Join(target, "kernel", name), []byte("old kernel"), 0600)
+	os.WriteFile(filepath.Join(target, "ACU Runtime.exe"), []byte("old app"), 0600)
+	if err := prepareInstallation(source, target, kernelRelease{sha256: strings.Repeat("0", 64)}); err == nil {
+		t.Fatal("corrupt bundle accepted")
+	}
+	for file, want := range map[string]string{"ACU Runtime.exe": "old app", filepath.Join("kernel", name): "old kernel"} {
+		got, err := os.ReadFile(filepath.Join(target, file))
+		if err != nil || string(got) != want {
+			t.Fatalf("failed update changed %s", file)
+		}
+	}
+}

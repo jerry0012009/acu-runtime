@@ -8,6 +8,8 @@ Windows 安装包：双击 `dist/windows-amd64/ACU Runtime Setup.exe`，安装�
 
 安装包自带 Magpie `v0.1.3150` 备用内核。Runtime 优先连接本机已有 Magpie；安装或更新 ACU Runtime 时都会刷新安装目录内的备用内核，既有 Agent 配置保留。找不到独立 Magpie 时使用此备用内核；单独运行未附带内核的应用时，首次启动会从官方 Release 下载并校验 SHA-256。内核包支持 Windows / macOS 的 amd64、arm64；macOS 的实机验证需在对应设备完成。
 
+老用户更新：先从托盘退出 Runtime，再从 [GitHub Releases](https://github.com/jerry0012009/acu-runtime/releases) 下载并运行新版安装包，覆盖安装即可同时更新 Runtime 与它管理的备用内核。独立安装的 Magpie 仍由 Magpie 自己更新；Runtime 不覆盖该安装。当前未实现后台自动更新，不能仅靠重启旧 Runtime 获得新版。每个 Runtime 发行版固定经过检查的内核版本，详细验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
+
 打开后自动连接，无需找路径、选择管理端口或确认启动。失败才显示原因及“重试”。只收起窗口不会停服务；从托盘退出会停止本次启动的管理进程，不停止原有内核。内核启动会执行其正常同步，可能在原网关未运行时接管网关。
 
 ## 已接入

@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { createRequire } = require('node:module');
 const workspace = path.resolve(__dirname, '../..');
 const { chromium } = createRequire(path.join(workspace, '.build/package.json'))('playwright');
-const assets = path.join(workspace, '.build/acu-runtime-upstream');
+const assets = process.env.ACU_TEST_KERNEL_ASSETS || path.join(workspace, '.build/acu-runtime-upstream');
 const executable = process.env.ACU_ROUTING_TEST_EXE || path.join(workspace, '.build/acu-runtime-routing-web.exe');
 const writes = [];
 const previews = [];
@@ -62,7 +62,7 @@ const fixture = http.createServer(async (request, response) => {
   }
   if (url.pathname === '/boot.js') {
     response.setHeader('Content-Type', 'text/javascript');
-    response.end('window.bootPrefs={lang:"zh",theme:"dark",web:true,version:"0.1.2891"};'); return;
+    response.end('window.bootPrefs={lang:"zh",theme:"dark",web:true,version:"0.1.3150"};'); return;
   }
   if (url.pathname === '/api/state') return json(state);
     if (url.pathname === '/api/agents/preview/codex') {
@@ -75,7 +75,7 @@ const fixture = http.createServer(async (request, response) => {
       return json(state);
     }
   if (url.pathname === '/api/providers') return json({ providers: [], presets: [], excluded: [], gateway: { running: true, mine: false, url: 'http://127.0.0.1:3425', groups: [], calls: [] } });
-  if (url.pathname === '/api/settings') return json({ ...state.settings, version: '0.1.2891', dir: '/isolated-test' });
+  if (url.pathname === '/api/settings') return json({ ...state.settings, version: '0.1.3150', dir: '/isolated-test' });
   if (url.pathname === '/api/groups') return json({ groups, models: [] });
   if (url.pathname.startsWith('/api/agent-models/')) return json(catalog);
   if (url.pathname === '/api/plugins') return json({ plugins: [] });
