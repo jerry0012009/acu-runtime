@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.15"
+const appVersion = "0.1.16"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
@@ -77,13 +78,49 @@ func newerVersion(candidate, current string) bool {
 	return false
 }
 func updateClient(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout, CheckRedirect: func(r *http.Request, via []*http.Request) error {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = updateProxy
+	return &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		h := r.URL.Hostname()
 		if len(via) > 5 || r.URL.Scheme != "https" || (h != "github.com" && h != "api.github.com" && h != "release-assets.githubusercontent.com" && h != "objects.githubusercontent.com") {
 			return errors.New("更新下载重定向地址不受信任")
 		}
 		return nil
 	}}
+}
+
+func updateProxy(request *http.Request) (*url.URL, error) {
+	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"} {
+		if os.Getenv(key) != "" {
+			return http.ProxyFromEnvironment(request)
+		}
+	}
+	return systemUpdateProxy(request.URL.Scheme), nil
+}
+
+func parseSystemProxy(value, scheme string) *url.URL {
+	selected := strings.TrimSpace(value)
+	if strings.Contains(value, "=") {
+		selected = ""
+		for _, entry := range strings.Split(value, ";") {
+			parts := strings.SplitN(strings.TrimSpace(entry), "=", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], scheme) {
+				selected = strings.TrimSpace(parts[1])
+				break
+			}
+		}
+	}
+	if selected == "" {
+		return nil
+	}
+	if !strings.Contains(selected, "://") {
+		selected = "http://" + selected
+	}
+	parsed, err := url.Parse(selected)
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != "socks5") {
+		return nil
+	}
+	return parsed
 }
 func checkUpdate(ctx context.Context, client *http.Client, endpoint, current, platform, arch string) (*updateRelease, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)

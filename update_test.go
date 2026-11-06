@@ -87,3 +87,22 @@ func TestUpdateSupportIsLimitedToWindowsAmd64Desktop(t *testing.T) {
 		t.Fatal("web mode must not offer application updates")
 	}
 }
+
+func TestParseWindowsSystemProxy(t *testing.T) {
+	for _, test := range []struct{ value, scheme, want string }{
+		{"127.0.0.1:7897", "https", "http://127.0.0.1:7897"},
+		{"http=localhost:8000;https=localhost:9000", "https", "http://localhost:9000"},
+		{"http=localhost:8000", "https", ""},
+		{"file:///bad", "https", ""},
+		{"", "https", ""},
+	} {
+		got := parseSystemProxy(test.value, test.scheme)
+		text := ""
+		if got != nil {
+			text = got.String()
+		}
+		if text != test.want {
+			t.Fatalf("parseSystemProxy(%q): %q, want %q", test.value, text, test.want)
+		}
+	}
+}
