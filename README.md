@@ -85,3 +85,5 @@ node scripts/test-native-login.cjs
 
 需求与分工见上层 `ACU-Runtime-开发文档-v1.19.md`。开源许可见安装目录中的 `THIRD-PARTY-NOTICES.txt`。
 
+
+应用更新网络：GitHub 不可用时自动尝试公开代理 gh-proxy.com，下载还可备用 ghfast.top；无需用户配置线路，保留 SHA-256 与随包内核校验。

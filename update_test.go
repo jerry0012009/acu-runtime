@@ -2,13 +2,53 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 )
+
+func TestUpdateFallbackChecksAndVerifiesDownloads(t *testing.T) {
+	content := []byte("verified installer payload")
+	digest := fmt.Sprintf("%x", sha256.Sum256(content))
+	var calls []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.URL.Path)
+		switch r.URL.Path {
+		case "/offline":
+			http.Error(w, "unavailable", 503)
+		case "/release":
+			json.NewEncoder(w).Encode(map[string]any{"tag_name": "v0.1.18", "assets": []any{map[string]any{"name": "ACU-Runtime-0.1.18-windows-amd64-Setup.exe", "browser_download_url": updateRepository + "/releases/download/v0.1.18/ACU-Runtime-0.1.18-windows-amd64-Setup.exe", "digest": "sha256:" + digest, "size": len(content)}}})
+		case "/corrupt":
+			w.Write([]byte("not the installer"))
+		case "/package":
+			w.Write(content)
+		}
+	}))
+	defer server.Close()
+	release, err := checkUpdateWithFallback(context.Background(), server.Client(), []string{server.URL + "/offline", server.URL + "/release"}, "0.1.17", "windows", "amd64")
+	if err != nil || release == nil || release.Version != "0.1.18" {
+		t.Fatalf("fallback check: %#v %v", release, err)
+	}
+	target := filepath.Join(t.TempDir(), "installer.exe")
+	err = downloadUpdatePackage(context.Background(), server.Client(), []string{server.URL + "/offline", server.URL + "/corrupt", server.URL + "/package"}, target, digest, nil)
+	if err != nil || !verifyKernel(target, digest) {
+		t.Fatalf("fallback download not verified: %v", err)
+	}
+	if strings.Join(calls, ",") != "/offline,/release,/offline,/corrupt,/package" {
+		t.Fatalf("unexpected fallback order: %v", calls)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := downloadUpdatePackage(ctx, server.Client(), []string{server.URL + "/package"}, target, digest, nil); err == nil {
+		t.Fatal("cancelled update continued")
+	}
+}
 
 func TestNewerVersion(t *testing.T) {
 	for _, test := range []struct {

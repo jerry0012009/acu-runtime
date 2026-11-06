@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.16"
+const appVersion = "0.1.17"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
@@ -80,13 +80,55 @@ func newerVersion(candidate, current string) bool {
 func updateClient(timeout time.Duration) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = updateProxy
+	transport.ResponseHeaderTimeout = 12 * time.Second
 	return &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		h := r.URL.Hostname()
-		if len(via) > 5 || r.URL.Scheme != "https" || (h != "github.com" && h != "api.github.com" && h != "release-assets.githubusercontent.com" && h != "objects.githubusercontent.com") {
+		if len(via) > 5 || r.URL.Scheme != "https" || (h != "github.com" && h != "api.github.com" && h != "release-assets.githubusercontent.com" && h != "objects.githubusercontent.com" && h != "gh-proxy.com" && h != "ghfast.top") {
 			return errors.New("更新下载重定向地址不受信任")
 		}
 		return nil
 	}}
+}
+
+func checkUpdateWithFallback(ctx context.Context, client *http.Client, endpoints []string, current, platform, arch string) (*updateRelease, error) {
+	var err error
+	for _, endpoint := range endpoints {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		attempt, cancel := context.WithTimeout(ctx, 12*time.Second)
+		var release *updateRelease
+		release, err = checkUpdate(attempt, client, endpoint, current, platform, arch)
+		cancel()
+		if err == nil {
+			return release, nil
+		}
+	}
+	return nil, fmt.Errorf("更新线路暂不可用，请稍后重试：%w", err)
+}
+
+func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []string, target, digest string, progress func(int64, int64)) error {
+	var err error
+	for index, source := range sources {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		// Switch away from a blocked or very slow direct connection promptly.
+		timeout := 5 * time.Minute
+		if index == 0 {
+			timeout = 45 * time.Second
+		}
+		attempt, cancel := context.WithTimeout(ctx, timeout)
+		if progress != nil {
+			progress(0, 0)
+		}
+		_, err = installKernel(attempt, client, source, target, digest, progress)
+		cancel()
+		if err == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 func updateProxy(request *http.Request) (*url.URL, error) {
@@ -226,7 +268,7 @@ func (host *server) updates(response http.ResponseWriter, request *http.Request)
 		var err error
 		if action == "check" {
 			var found *updateRelease
-			found, err = checkUpdate(ctx, updateClient(25*time.Second), updateAPI, appVersion, runtime.GOOS, runtime.GOARCH)
+			found, err = checkUpdateWithFallback(ctx, updateClient(15*time.Second), []string{updateAPI, "https://gh-proxy.com/" + updateAPI}, appVersion, runtime.GOOS, runtime.GOARCH)
 			u.mu.Lock()
 			u.view.Release = found
 			if err == nil {
@@ -268,7 +310,7 @@ func (host *server) downloadUpdate(ctx context.Context, release *updateRelease) 
 		}
 	}()
 	installer := filepath.Join(directory, "ACU Runtime Setup.exe")
-	_, err = installKernel(ctx, updateClient(30*time.Minute), release.URL, installer, release.SHA256, func(done, total int64) {
+	err = downloadUpdatePackage(ctx, updateClient(6*time.Minute), []string{release.URL, "https://gh-proxy.com/" + release.URL, "https://ghfast.top/" + release.URL}, installer, release.SHA256, func(done, total int64) {
 		host.update.mu.Lock()
 		host.update.view.Downloaded = done
 		host.update.view.Total = total
