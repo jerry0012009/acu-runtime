@@ -500,3 +500,20 @@ select[data-agent-model] {
   .agent-header-actions { align-items:flex-end; flex-direction:column; gap:5px; }
   .agent-restart-notice { font-size:9px; }
 }
+
+.setup-tools { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; }
+.setup-tools p, .capability-intro, .capability-agent-list p, .capability-search p, .capability-notes { font-size: 13px; color: var(--muted); line-height: 1.65; }
+.setup-tools .switch-row { margin: 0; }
+.capability-modal { width: min(620px, calc(100vw - 32px)); max-height: 90vh; overflow-y: auto; }
+.capability-fields { display: grid; gap: 10px; margin: 20px 0; }
+.capability-fields select, .capability-search input { width: 100%; min-width: 0; }
+.capability-search-status { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; }
+.capability-search-status span, .capability-agent-list small { color: var(--muted); font-size: 12px; }
+.capability-search { margin-bottom: 20px; }
+.capability-search summary { cursor: pointer; font-size: 13px; }
+.capability-search input { margin-top: 8px; }
+.capability-agent-list { padding-top: 16px; border-top: 1px solid var(--line); }
+.capability-agent-list .switch-row { padding: 10px 0; }
+.capability-notes { padding-left: 18px; margin: 18px 0; }
+.capability-modal .modal-actions { flex-wrap: wrap; }
+@media (max-width: 640px) { .workbench-actions { flex-wrap: wrap; } .capability-modal { padding: 24px 18px; } }

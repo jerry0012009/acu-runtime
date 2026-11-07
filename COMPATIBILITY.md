@@ -53,3 +53,12 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 检查版本依次尝试 GitHub、gh-proxy.com，每条线路最多 12 秒。下载安装包依次尝试 GitHub（最多 45 秒）、gh-proxy.com、ghfast.top（代理每条最多 5 分钟）。失败或摘要不符自动换线；所有线路均验证同一 SHA-256，安装器继续验证内核摘要。仅访问公开发布资源，不传递用户 Key 或 GitHub 凭据。未引入签名清单或自建镜像。已有系统代理支持保留。
 
 测试覆盖主线路失败、版本查询备用、下载备用、错误内容被拒绝以及取消后不再换线。
+
+
+### 0.1.33 图片与搜索
+
+- 通过固定内核 v0.1.3150 的共享设置和 Library API 配置；未修改内核或全局 MCPHub。
+- Windows 隔离配置目录中实测四个 Agent 写入（无搜索后端时仅添加免费搜索 MCP，不添加无后端的 ACU 搜索 MCP）：Claude `.claude.json`、Codex `config.toml`、Hermes `config.yaml`、WorkBuddy `mcp.json`。重复配置无重复条目，原有 MCP、共享显式模型、禁用工具与 hub 选项保留；共享模型切换成功。
+- DuckDuckGo MCP 0.7.0 `[browser]` 通过 stdio 初始化、tools/list 和真实搜索，返回 Python 官网文档结果。GitHub 项目 2026-11-08 查询约 1,572 stars，MIT 许可。需要 uvx / 网络，尚未完成每个平台每个 Agent 的交互调用验收。
+- 前端新增默认启用 / 取消、只提交显式选模、失败重试测试。Go 覆盖模型、域名和所有权校验、部分写入失败、Key 隔离与重复配置。浏览器检查深色和 390px 浅色布局、保存及模型选择。
+- ACU SearXNG 服务无已上线地址，不能标为已可用。服务须支持 SearXNG JSON 和 Bearer ACU Key。无付费推理自动测试；工具注册不代表所有模型或完整 PDF 能力验收通过。

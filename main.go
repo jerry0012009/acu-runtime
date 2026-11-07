@@ -94,6 +94,7 @@ type server struct {
 	cloudTransport http.RoundTripper
 	health         keyHealth
 	update         updateState
+	capabilityMu   sync.Mutex
 }
 
 func secret() string {
@@ -571,6 +572,8 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
+		case request.URL.Path == "/runtime/capabilities" && (request.Method == http.MethodGet || request.Method == http.MethodPost):
+			host.capabilities(response, request)
 		case (request.Method == http.MethodGet && request.URL.Path == "/runtime/update") || (request.Method == http.MethodPost && (request.URL.Path == "/runtime/update/check" || request.URL.Path == "/runtime/update/install")):
 			host.updates(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/desktop/action":

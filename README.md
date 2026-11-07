@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.32
+# ACU Runtime 0.1.33
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,9 +8,9 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.32-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.32-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.32-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.33-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.33-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.33-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
@@ -29,7 +29,7 @@ Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`�
 - 接入开关：卡片上方的大开关管理整个 Agent 的本地接入，不代表所有模型都交给 ACU。WorkBuddy 管理附加模型列表；关闭时按内核预览移除其管理的附加项，可能包括其他来源，不宣称只移除 ACU。失败留在弹窗，不退出应用。
 - 模型清单：四个 Agent 用同一张连续清单表达 `角色 → 模型`、`＋新增模型`、`原生保留`，默认模型直接在箭头行切换。不再分多个说明区块。详情支持搜索，来源标识与候选点击具体行才展开；尚未接入显示“可添加”，未知原生信息不填解释性占位。模型显示开关、批量显示、排序和当前模型保护直接复用内核原组件。
 - Codex 边界：固定内核在 ChatGPT 登录模式下使用统一本地入口，再区分原来源与自定义模型；不是每个模型分别绕过网关。API 接入 / 账号用尽回退的行为不同，不承诺原生模型一直可用。这个结论不泛指 ChatGPT 桌面应用。
-- 推荐预览：模型来自内核的 Agent 选项与当前 Key 的交集；WorkBuddy 使用来源模型并说明实际列表遵循已有开关。图片与搜索读取内核现有共享配置并显示具体来源、关闭、缺失或读取失败；不把“已有配置”当成“已验证可用”。本次不自动添加 MCP，不承诺路由后所有多模态能力都可用。
+- 推荐预览：模型来自内核的 Agent 选项与当前 Key 的交集；WorkBuddy 使用来源模型并说明实际列表遵循已有开关。图片与搜索读取内核现有共享配置并显示具体来源、关闭、缺失或读取失败；不把“已有配置”当成“已验证可用”。默认由 Magpie Library 添加识图、生图及可配置的搜索 MCP，可取消。共享模型保持用户显式选择；首次推荐当前 Key 下的 GPT-6.1 Sol 和 Sunburst。工作台「图片与搜索」可随时更换。
 - Agent 日常管理：展开原版 Agent 行，切换模型 / 推理强度、接入或断开；可看到重启提醒。沿用原版选项、写入、还原预览与确认，不另写备份 / 还原逻辑，也不停止其他 Agent 或全局网关。WorkBuddy 等保留应用内选模，原版折叠列表可展开其余 Agent。
 - 用量 / 路由：直接读取内核原生统计、图表和请求轨迹；可能包含本机会话日志和其他来源。费用是估算，不代表 ACU 账单或节省金额；不推断 acu-auto 云端最终模型。
 - ACU 连接：已有 Key 不强制登录；可网页登录 / 注册并选择账号 Key，也可直接粘贴 Key。官网撤销 Key 每 30 秒检查一次，配置前再次检查，不发收费推理请求。
@@ -40,7 +40,7 @@ Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`�
 - 设置：仅保留系统主题、托盘行为和退出入口。第三方许可文件随安装保存在本机，不在用户界面展示。
 - 外观：ACU 黑 / 琥珀黄 / 白；外壳、弹窗与内核模块实时跟随系统明暗，不改内核保存的主题。
 
-Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key 入核；另有隔离原生测试验证 Key 切换。未完成：console.acucompute.com 真实登录、ACU 推荐配置自动导入、自动能力补齐、CC Switch 检测、节省 / 纠偏数据、服务端控制更新、开机启动、签名 / 卸载、Mac 完整业务验收、异步视频。一键接入使用选定 ACU 来源的主模型；WorkBuddy 保留全部可选模型与应用内选择，不主动关闭其他来源。不等于已验证全部多模态能力。
+Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key 入核；另有隔离原生测试验证 Key 切换。未完成：console.acucompute.com 真实登录、ACU 云端推荐配置自动导入、CC Switch 检测、节省 / 纠偏数据、服务端控制更新、开机启动、签名 / 卸载、Mac 完整业务验收、异步视频。一键接入使用选定 ACU 来源的主模型；WorkBuddy 保留全部可选模型与应用内选择，不主动关闭其他来源。不等于已验证全部多模态能力。
 
 账号访问令牌只保存在 Go 内存中，到期前两分钟通过隐藏的官网窗口自动续期；断网、限流和网站验证故障退避重试，不因短期令牌到期要求重新登录，也不重新选择或覆盖模型 Key。只有续期会话被确认失效、撤销或切换时才要求重新登录。续期 Cookie 仍由系统 WebView 管理，不读取或复制到 Go。退出应用后需再次点击登录，可复用 WebView 的官网会话；本轮不实现启动时自动恢复账号。已保存的模型 Key 仍在内核中，无需重复连接。原生消息校验官方来源、窗口与随机状态，不经 URL、日志或跨站本机请求；刷新还校验账号与服务端会话一致。账号列表最多读取前 100 个 Key；无可用 Key 时保留手填兜底。
 
@@ -103,3 +103,15 @@ node scripts/test-native-login.cjs
 
 
 应用更新网络：GitHub 不可用时自动尝试公开代理 gh-proxy.com，下载还可备用 ghfast.top；无需用户配置线路，保留 SHA-256 与随包内核校验。
+
+## 图片与搜索一键配置
+
+「推荐配置」默认勾选「同时配置图片与搜索工具」。Runtime 仅调用 Magpie 的 `/api/settings`、`/api/library/servers/save`，由内核处理 Codex、Claude Code、Hermes、WorkBuddy 的配置格式、备份与分配；不另建 MCP 服务或路由器。主界面和设置中的「图片与搜索」可更换识图 / 生图模型；模型设置由 Magpie 共享。工具目录保留完整的工具开关、模型来源与路由调整能力。
+
+首次识图优先推荐当前 ACU Key 提供的 `gpt-6.1-sol`，生图推荐 `gpt-image-2.5-sunburst-2026-09-08`（或其 Sunburst 别名）。已有选择及 `off` 保留。没有推荐候选时提示用户手选，不随意改用其他生图模型。配置状态不代表收费推理已验证成功；Agent 自己决定工具调用，不保证原生能力与 MCP 的固定优先级。
+
+尚未配置搜索后端时，检测到 `uvx` 就同时分配 [DuckDuckGo MCP Server](https://github.com/nickclyde/duckduckgo-mcp-server)，MIT 许可、无需付费 Key，固定 `duckduckgo-mcp-server[browser]==0.7.0`。搜索与网页提取由该开源项目实现，首次启动由 uvx 下载包和必要的 Python；Runtime 不重新实现搜索或安装器。uvx 不存在时明确显示待安装，可按 [uv 官方说明](https://docs.astral.sh/uv/getting-started/installation/) 安装，重开 Runtime 并保存配置。macOS Finder 启动也检查常见 uvx 安装位置；Windows 写入 uvx 绝对路径，避免应用环境 PATH 不同。
+
+免费搜索受 DuckDuckGo 可达性和限流影响，搜索内容直接发给 DuckDuckGo，不使用或发送 ACU Key。未来 ACU SearXNG 上线后，在「配置 ACU 搜索服务」填写官方 HTTPS 基址；Runtime 只向官方域名配置当前 ACU Key，由内核执行 Bearer 认证。留空保留原配置，停用 / 移除旧来源在工具目录及内核搜索设置中完成；不会自动删除其他 MCP。
+
+新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。

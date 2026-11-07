@@ -230,7 +230,7 @@ test('an unconnected Agent opens a per-Agent recommendation instead of the batch
   const html = instance.elements.overlay.innerHTML;
   for (const phrase of ['Codex 接入 ACU', '原有模型', 'ACU 模型', '默认模型', '看图', '读文档', '联网搜索', '推荐已选好', '同意并接入', '不把所有 GPT 模型统一改走 ACU']) assert(html.includes(phrase), phrase);
   assert(!html.includes('同步辅助模型'));
-  assert(!html.includes('role="switch"'));
+  assert(html.includes('id="setup-tools"'));
   assert.equal(posts(instance).length, 0);
   await instance.run('confirmSetup()');
   assert.deepEqual(JSON.parse(posts(instance)[0].body), { agent: 'codex', provider: 'acu-runtime', model: 'acu-auto', auxiliary: false });
@@ -255,7 +255,7 @@ test('recommendation follows the selected model and only offers supported Agent 
   assert(!instance.elements.overlay.innerHTML.includes('image-only-not-supported'));
   instance.listeners.overlay.change({ target: { id: 'setup-model', value: 'gpt-6.1-sol' } });
   assert(instance.elements.overlay.innerHTML.includes('Codex → gpt-6.1-sol → ACU'));
-  assert(instance.elements.overlay.innerHTML.includes('gpt-6.1-sol 原生识图优先'));
+  assert(instance.elements.overlay.innerHTML.includes('gpt-6.1-sol 的识图取决于模型能力'));
   await instance.run('confirmSetup()');
   assert.equal(JSON.parse(posts(instance)[0].body).model, 'gpt-6.1-sol');
 });
@@ -274,7 +274,7 @@ test('capability preview reads shared settings without modifying tools or claimi
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route === '/api/settings' ? { body: settings } : undefined);
   await instance.run('configureAgent("codex")');
   const html = instance.elements.overlay.innerHTML;
-  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '已有配置 ≠ 已验证可用', '本次不新增 MCP', '暂不提供']) assert(html.includes(phrase), phrase);
+  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '已有配置 ≠ 已验证可用', '同时添加 Magpie 生图 MCP', '暂不提供']) assert(html.includes(phrase), phrase);
   assert(!html.includes('关闭的搜索'));
   assert(!html.includes('missing/image'));
   assert.equal(posts(instance).length, 0);
@@ -379,7 +379,7 @@ test('one click previews options, and only confirmation configures selected agen
   assert(instance.elements.overlay.innerHTML.includes('role="switch"'));
   assert.equal(instance.run('ui.setup.model'), 'acu-auto');
   await instance.run('confirmSetup()');
-  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/kernel/api/agent-models/codex']);
+  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/kernel/api/agent-models/codex', '/runtime/capabilities']);
   assert.deepEqual(JSON.parse(posts(instance)[0].body), { agent: 'codex', provider: 'acu-runtime', model: 'acu-auto', auxiliary: false });
   assert.equal(instance.run('ui.selected.has("codex")'), false);
 });
@@ -598,4 +598,46 @@ test('desktop settings exposes compatibility update status and the check action'
   for (const phrase of ['应用更新', '0.1.15', 'v0.1.3150', '0.1.16', '更新并重启', '检查更新']) assert(html.includes(phrase), phrase);
   assert(html.includes('本机 Key 和 Agent 配置会保留'));
   assert(!instance.elements.app.innerHTML.includes('GitHub'));
+});
+
+const capabilityFixture = () => ({ vision: 'native/vision', imageGen: 'off', visionModels: [{ id: 'acu-runtime/gpt-6.1-sol', name: 'GPT Sol' }], imageModels: [], tools: [], searchReady: false, searchURL: '', messages: ['PDF 继续使用应用文件工具'] });
+
+test('bulk setup prepares kernel MCP only for confirmed agents and can opt out', async () => {
+  for (const enabled of [true, false]) {
+    const instance = await setup({ ready: true, agents: [codex()] }, async route => {
+      if (route === '/runtime/agents/configure') return { body: { agents: [{ id: 'codex', wired: true }] } };
+      if (route === '/runtime/capabilities') return { body: capabilityFixture() };
+    });
+    await instance.run('applyAgents()');
+    assert.equal(instance.run('ui.setup.tools'), true);
+    if (!enabled) instance.listeners.overlay.change({ target: { id: 'setup-tools', checked: false } });
+    await instance.run('confirmSetup()');
+    const tools = posts(instance).filter(call => call.route === '/runtime/capabilities');
+    assert.equal(tools.length, enabled ? 1 : 0);
+    if (enabled) {
+      assert.deepEqual(JSON.parse(tools[0].body), { provider: 'acu-runtime', agents: ['codex'] });
+      assert(instance.elements.app.innerHTML.includes('搜索待配置'));
+      assert(instance.elements.app.innerHTML.includes('图片与搜索'));
+    }
+  }
+});
+
+test('capability manager preserves untouched external models and sends only explicit changes', async () => {
+  const instance = await setup({ ready: true, agents: [codex()] }, async route => route.startsWith('/runtime/capabilities') ? { body: capabilityFixture() } : undefined);
+  await instance.run('openCapabilities()');
+  assert.equal(posts(instance).length, 0);
+  assert(instance.elements.overlay.innerHTML.includes('native/vision（当前来源）'));
+  assert(instance.elements.overlay.innerHTML.includes('待配置搜索服务'));
+  instance.listeners.overlay.change({ target: { dataset: { capability: 'vision' }, value: 'acu-runtime/gpt-6.1-sol' } });
+  instance.listeners.overlay.change({ target: { dataset: { capabilityAgent: 'codex' }, checked: true } });
+  await instance.run('saveCapabilities()');
+  assert.deepEqual(JSON.parse(posts(instance)[0].body), { provider: 'acu-runtime', agents: ['codex'], vision: 'acu-runtime/gpt-6.1-sol' });
+});
+
+test('capability save failure remains visible and retryable', async () => {
+  const instance = await setup({ ready: true, agents: [codex()] }, async (route, options) => route.startsWith('/runtime/capabilities') ? options.method === 'POST' ? { ok: false, body: { error: '部分 Agent 写入失败' } } : { body: capabilityFixture() } : undefined);
+  await instance.run('openCapabilities()');
+  await instance.run('saveCapabilities()');
+  assert(instance.elements.overlay.innerHTML.includes('部分 Agent 写入失败'));
+  assert.equal(instance.run('ui.capabilities.saving'), false);
 });
