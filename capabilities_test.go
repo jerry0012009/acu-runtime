@@ -74,6 +74,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			http.Error(w, "unexpected", 404)
 		}
 	}))
+	host.prepareSearch = func(context.Context, string) error { return nil }
 	return host, f
 }
 func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {

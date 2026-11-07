@@ -10,6 +10,18 @@ app="$out/ACU Runtime.app"
 mkdir -p "$app/Contents/MacOS/kernel" "$app/Contents/Resources"
 export CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=12.0
 go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
+"$app/Contents/MacOS/ACU Runtime" --search-runtime-release-json > "$out/search-release.json"
+python3 - "$out/search-release.json" <<'PY'
+import hashlib, json, pathlib, sys, urllib.request
+manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+url = f"https://github.com/astral-sh/uv/releases/download/{manifest['version']}/{manifest['name']}"
+with urllib.request.urlopen(url, timeout=180) as response:
+    data = response.read(128 * 1024 * 1024 + 1)
+assert len(data) <= 128 * 1024 * 1024
+assert hashlib.sha256(data).hexdigest() == manifest['sha256'], 'Search runtime SHA-256 mismatch'
+pathlib.Path('web/search-runtime.archive').write_bytes(data)
+PY
+go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
 "$app/Contents/MacOS/ACU Runtime" --kernel-release-json > "$out/kernel-release.json"
 python3 - "$out/kernel-release.json" "$app" "$version" <<'PY'
 import hashlib, json, pathlib, plistlib, sys, urllib.request

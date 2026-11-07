@@ -3,3 +3,4 @@
 /dist/
 /.build/
 /cmd/setup/payload.zip
+/web/search-runtime.archive

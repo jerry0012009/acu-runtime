@@ -95,6 +95,7 @@ type server struct {
 	health         keyHealth
 	update         updateState
 	capabilityMu   sync.Mutex
+	prepareSearch  func(context.Context, string) error
 }
 
 func secret() string {
@@ -638,7 +639,16 @@ func main() {
 	inspectPort := flag.Int("inspect-port", 0, "developer WebView inspection port; disabled by default")
 	installTo := flag.String("install-to", "", "installer-only destination directory")
 	releaseJSON := flag.Bool("kernel-release-json", false, "print the pinned kernel package metadata")
+	searchReleaseJSON := flag.Bool("search-runtime-release-json", false, "print the pinned search runtime metadata")
 	flag.Parse()
+	if *searchReleaseJSON {
+		release, err := searchRuntimeRelease(runtime.GOOS, runtime.GOARCH)
+		if err != nil {
+			log.Fatal(err)
+		}
+		json.NewEncoder(os.Stdout).Encode(map[string]string{"version": searchRuntimeVersion, "name": release.name, "sha256": release.sha256})
+		return
+	}
 	if *releaseJSON {
 		release, err := releaseFor(runtime.GOOS, runtime.GOARCH)
 		if err != nil {

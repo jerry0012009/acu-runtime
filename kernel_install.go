@@ -75,6 +75,7 @@ func installKernel(ctx context.Context, client *http.Client, source, target, dig
 		return "", err
 	}
 	request.Header.Set("User-Agent", "ACU-Runtime/"+appVersion)
+	request.Header.Set("Accept", "application/octet-stream")
 	response, err := client.Do(request)
 	if err != nil {
 		return "", errors.New("内核下载失败，请检查网络后重试")

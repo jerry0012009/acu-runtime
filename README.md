@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.33
+# ACU Runtime 0.1.34
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,9 +8,9 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.33-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.33-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.33-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.34-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.34-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.34-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
@@ -110,8 +110,7 @@ node scripts/test-native-login.cjs
 
 首次识图优先推荐当前 ACU Key 提供的 `gpt-6.1-sol`，生图推荐 `gpt-image-2.5-sunburst-2026-09-08`（或其 Sunburst 别名）。已有选择及 `off` 保留。没有推荐候选时提示用户手选，不随意改用其他生图模型。配置状态不代表收费推理已验证成功；Agent 自己决定工具调用，不保证原生能力与 MCP 的固定优先级。
 
-尚未配置搜索后端时，检测到 `uvx` 就同时分配 [DuckDuckGo MCP Server](https://github.com/nickclyde/duckduckgo-mcp-server)，MIT 许可、无需付费 Key，固定 `duckduckgo-mcp-server[browser]==0.7.0`。搜索与网页提取由该开源项目实现，首次启动由 uvx 下载包和必要的 Python；Runtime 不重新实现搜索或安装器。uvx 不存在时明确显示待安装，可按 [uv 官方说明](https://docs.astral.sh/uv/getting-started/installation/) 安装，重开 Runtime 并保存配置。macOS Finder 启动也检查常见 uvx 安装位置；Windows 写入 uvx 绝对路径，避免应用环境 PATH 不同。
-
+尚未配置搜索后端时，自动分配 [DuckDuckGo MCP Server](https://github.com/nickclyde/duckduckgo-mcp-server)，MIT 许可、无需付费 Key，固定 `duckduckgo-mcp-server[browser]==0.7.0`。搜索与网页提取由该开源项目实现。已有运行环境直接复用；没有环境时 Runtime 优先使用安装包附带并校验 SHA-256 的 uv 0.13.7；开发版本缺少包内环境时自动从 Astral 官方 Release 下载固定版本并校验，在 ACURuntime 私有工具目录解压，调用其包管理器自动准备 Python 3.12 / MCP 依赖后再分配工具。无需用户选择、管理员权限、修改系统 PATH 或手动安装。正式安装包不需要临时去 GitHub 获取运行环境；首次仍需联网下载 MCP / Python 依赖，可能数分钟；失败明确显示可重试原因。
 免费搜索受 DuckDuckGo 可达性和限流影响，搜索内容直接发给 DuckDuckGo，不使用或发送 ACU Key。未来 ACU SearXNG 上线后，在「配置 ACU 搜索服务」填写官方 HTTPS 基址；Runtime 只向官方域名配置当前 ACU Key，由内核执行 Bearer 认证。留空保留原配置，停用 / 移除旧来源在工具目录及内核搜索设置中完成；不会自动删除其他 MCP。
 
 新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。

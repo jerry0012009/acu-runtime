@@ -641,3 +641,13 @@ test('capability save failure remains visible and retryable', async () => {
   assert(instance.elements.overlay.innerHTML.includes('部分 Agent 写入失败'));
   assert.equal(instance.run('ui.capabilities.saving'), false);
 });
+
+test('free search hides dependency choices and remains automatic on a fresh machine', async () => {
+  const view = { ...capabilityFixture(), freeSearchAvailable: false };
+  const instance = await setup({ ready: true, agents: [codex()] }, async route => route.startsWith('/runtime/capabilities') ? { body: view } : undefined);
+  await instance.run('openCapabilities()');
+  const html = instance.elements.overlay.innerHTML;
+  assert(html.includes('自动准备，无需注册或安装'));
+  for (const phrase of ['uvx', '安装 uv', '需先安装']) assert(!html.includes(phrase), phrase);
+  assert(!html.includes('data-capability="freeSearch" checked disabled'));
+});

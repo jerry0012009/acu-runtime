@@ -55,10 +55,12 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 测试覆盖主线路失败、版本查询备用、下载备用、错误内容被拒绝以及取消后不再换线。
 
 
-### 0.1.33 图片与搜索
+### 0.1.34 图片与搜索
 
 - 通过固定内核 v0.1.3150 的共享设置和 Library API 配置；未修改内核或全局 MCPHub。
 - Windows 隔离配置目录中实测四个 Agent 写入（无搜索后端时仅添加免费搜索 MCP，不添加无后端的 ACU 搜索 MCP）：Claude `.claude.json`、Codex `config.toml`、Hermes `config.yaml`、WorkBuddy `mcp.json`。重复配置无重复条目，原有 MCP、共享显式模型、禁用工具与 hub 选项保留；共享模型切换成功。
-- DuckDuckGo MCP 0.7.0 `[browser]` 通过 stdio 初始化、tools/list 和真实搜索，返回 Python 官网文档结果。GitHub 项目 2026-11-08 查询约 1,572 stars，MIT 许可。需要 uvx / 网络，尚未完成每个平台每个 Agent 的交互调用验收。
-- 前端新增默认启用 / 取消、只提交显式选模、失败重试测试。Go 覆盖模型、域名和所有权校验、部分写入失败、Key 隔离与重复配置。浏览器检查深色和 390px 浅色布局、保存及模型选择。
+- DuckDuckGo MCP 0.7.0 `[browser]` 通过 stdio 初始化、tools/list 和真实搜索，返回 Python 官网文档结果。GitHub 项目 2026-11-08 查询约 1,572 stars，MIT 许可。安装包附带经过 SHA-256 校验的官方固定 uv 0.13.7，缺少环境时自动准备，无需用户手动安装；需要网络，尚未完成每个平台每个 Agent 的交互调用验收。
+- 新增官方运行环境压缩包 SHA-256 校验、ZIP / tar.gz 限定可执行文件解压、缺包拒绝测试；前端新增默认启用 / 取消、只提交显式选模、失败重试测试。Go 覆盖模型、域名和所有权校验、部分写入失败、Key 隔离与重复配置。浏览器检查深色和 390px 浅色布局、保存及模型选择。
 - ACU SearXNG 服务无已上线地址，不能标为已可用。服务须支持 SearXNG JSON 和 Bearer ACU Key。无付费推理自动测试；工具注册不代表所有模型或完整 PDF 能力验收通过。
+
+- 无 uvx 的 Windows 新配置目录验收：包内校验解压私有运行环境、自动下载 MCP 依赖、四 Agent 分配、重复执行和模型切换全链路通过。Python 运行版本固定为 3.12，由 uv 自动准备，避免系统 Python 版本差异。

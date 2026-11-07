@@ -71,6 +71,15 @@ type capabilityInput struct {
 // Reuse an existing uvx installation. Dependency installation belongs to the
 // tool's package manager, not a second package manager embedded in Runtime.
 func freeSearchCommand() string {
+	dir := managedSearchDirectory()
+	if release, err := searchRuntimeRelease(runtime.GOOS, runtime.GOARCH); err == nil && dir != "" {
+		marker, _ := os.ReadFile(filepath.Join(dir, ".verified"))
+		if string(marker) == release.sha256 {
+			if info, err := os.Stat(filepath.Join(dir, searchRuntimeName())); err == nil && !info.IsDir() {
+				return filepath.Join(dir, searchRuntimeName())
+			}
+		}
+	}
 	if path, err := exec.LookPath("uvx"); err == nil {
 		return path
 	}
@@ -162,7 +171,7 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	if !view.SearchReady {
 		view.Messages = append(view.Messages, "ACU 搜索待配置；可使用免费的 DuckDuckGo MCP，搜索内容发送至 DuckDuckGo，无需 ACU Key。")
 		if !view.FreeSearchAvailable {
-			view.Messages = append(view.Messages, "免费搜索需要 uv / uvx：安装后重新打开 Runtime，再点击保存。")
+			view.Messages = append(view.Messages, "首次配置会自动准备免费搜索工具，可能需要几分钟。")
 		}
 	}
 	if view.Vision == "" && preferredCapability(view.VisionModels, "gpt-6.1-sol") == "" {
@@ -242,7 +251,8 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	}
 	freeCommand := freeSearchCommand()
 	wantFree := input.FreeSearch == nil || *input.FreeSearch
-	if wantFree && freeCommand != "" && !view.SearchReady && (input.SearchURL == nil || *input.SearchURL == "") && len(input.Agents) > 0 {
+	needsFree := wantFree && !view.SearchReady && (input.SearchURL == nil || *input.SearchURL == "") && len(input.Agents) > 0
+	if needsFree {
 		defs = append(defs, struct{ name, path string }{"acu-free-search", "free-search"})
 	}
 	for _, def := range defs {
@@ -250,6 +260,19 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			if t.Name == def.name && t.Note != capabilityOwner {
 				return view, fmt.Errorf("已有同名工具 %s，请先在工具目录中重命名", def.name)
 			}
+		}
+	}
+	if needsFree {
+		freeCommand, err = ensureSearchCommand(ctx)
+		if err != nil {
+			return view, err
+		}
+		prepare := host.prepareSearch
+		if prepare == nil {
+			prepare = prepareFreeSearch
+		}
+		if err = prepare(ctx, freeCommand); err != nil {
+			return view, err
 		}
 	}
 	// Keep all unrelated preferences and explicit existing picks. Defaults are
@@ -313,7 +336,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		}
 		tool := map[string]any{"name": def.name, "transport": "http", "url": strings.TrimRight(gateway, "/") + "/mcp/magpie/" + def.path, "agents": ids, "note": capabilityOwner, "local": true, "startupTimeout": 60}
 		if def.path == "free-search" {
-			tool = map[string]any{"name": def.name, "transport": "stdio", "command": freeCommand, "args": []string{"--native-tls", "--from", "duckduckgo-mcp-server[browser]==0.7.0", "duckduckgo-mcp-server"}, "agents": ids, "note": capabilityOwner, "local": true, "startupTimeout": 120}
+			tool = map[string]any{"name": def.name, "transport": "stdio", "command": freeCommand, "args": []string{"--native-tls", "--python", "3.12", "--from", "duckduckgo-mcp-server[browser]==0.7.0", "duckduckgo-mcp-server"}, "agents": ids, "note": capabilityOwner, "local": true, "startupTimeout": 120}
 		}
 		if stored != nil {
 			// The kernel owns transport and tool options; preserve later edits made
@@ -338,7 +361,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 func (host *server) capabilities(w http.ResponseWriter, r *http.Request) {
 	host.capabilityMu.Lock()
 	defer host.capabilityMu.Unlock()
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Minute)
 	defer cancel()
 	var view capabilityView
 	var err error
