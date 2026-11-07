@@ -450,3 +450,11 @@ select option, select optgroup { color: var(--acu-text); background: var(--acu-s
 .agent-restart-button { margin-left:auto; color:var(--acu-warning); font-size:10px; padding:6px 0; }
 .agent-restart-button:hover { color:var(--acu-accent-text); }
 .model-flow-compact-data { display:none; }
+.model-counts { align-items:center; gap:6px; margin:8px 0 4px 40px; white-space:nowrap; }
+.model-counts > span { padding:3px 7px; }
+.model-counts .model-examples { display:inline-flex; align-items:center; flex-wrap:wrap; gap:5px; margin:0 0 0 3px; min-width:0; overflow:hidden; }
+.model-counts .model-example { padding:3px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+.agent-routing-actions { min-height:30px; justify-content:flex-end; border-top:0; padding-top:2px; }
+.agent-routing-actions .button.secondary { border:0; background:transparent; color:var(--acu-muted); min-height:24px; padding:3px 2px; font-size:10px; }
+.agent-routing-actions .button.secondary:hover:not(:disabled) { color:var(--acu-accent-text); background:transparent; }
+.agent-restart-button { font-size:10px; }

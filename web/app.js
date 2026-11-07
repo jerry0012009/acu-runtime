@@ -356,10 +356,18 @@ function agentModelSummary(agent) {
   const acu = shown.filter(model => !model.own && model.id.startsWith('acu-runtime/')).length;
   const native = shown.filter(model => model.own).length || (agent.modelOptions || []).filter(option => !option.ref || option.ref.startsWith('native/')).length;
   const other = shown.filter(model => !model.own && !model.id.startsWith('acu-runtime/')).length;
-  const exampleRank = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'claude-opus-5-5', 'claude-sonnet-5', 'deepseek-v4-pro'];
-  const examples = shown.filter(model => !model.own && exampleRank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => exampleRank.indexOf(a.id.split('/').slice(1).join('/')) - exampleRank.indexOf(b.id.split('/').slice(1).join('/'))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
+  const exampleRanks = {
+    codex: ['gpt-6-astra', 'gpt-6.1-sol', 'acu-auto'],
+    claude: ['claude-opus-5-5', 'claude-sonnet-5', 'acu-auto'],
+    workbuddy: ['gpt-6-luna', 'glm-5.3-flash', 'acu-auto'],
+    hermes: ['deepseek-v4-pro', 'deepseek-v4.1-flash', 'acu-auto'],
+  };
+  const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra'];
+  const examples = shown.filter(model => !model.own && rank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => rank.indexOf(a.id.split('/').slice(1).join('/')) - rank.indexOf(b.id.split('/').slice(1).join('/'))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
   const stateHint = !agent.connected ? '<span class="model-example muted">可添加</span>' : agent.needsRepair ? '<span class="model-example muted">待核对</span>' : '';
-  const summary = catalog ? `<div class="model-counts"><span><strong>${acu}</strong> 个 ACU</span>${native ? `<span><strong>${native}</strong> 个原生</span>` : ''}${other ? `<span><strong>${other}</strong> 个其他来源</span>` : ''}</div><div class="model-examples">${stateHint}${examples || '<span class="model-example muted">可在全部模型中选择</span>'}</div>` : '';
+  const nativeHint = agent.id === 'workbuddy' ? '<span class="model-example muted">WorkBuddy 原生模型 · 保留</span>' : '';
+  const hiddenCompatibility = shown.filter(model => !model.own).slice(0, 4).map(model => `<span class="sr-only">${escapeHTML(model.name || model.id)}</span>`).join('');
+  const summary = catalog ? `<div class="model-counts"><span><strong>${acu}</strong> 个 ACU</span>${native ? `<span><strong>${native}</strong> 个原生</span>` : ''}${other ? `<span><strong>${other}</strong> 个其他来源</span>` : ''}<span class="model-examples">${nativeHint}${stateHint}${examples || '<span class="model-example muted">可在全部模型中选择</span>'}${hiddenCompatibility}</span></div>` : '';
   return `<section class="model-summary" aria-label="${escapeHTML(agent.name)} 模型清单"><div class="model-flow-compact-data">${modelFlow(agent, true, null, true)}</div>${summary}${!catalog && agent.detected ? `<p class="model-empty">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<button class="text-button model-list-link" data-action="model-inventory" data-agent-id="${agent.id}" ${!ui.status?.ready || !agent.detected ? 'disabled' : ''}><span>查看全部模型${catalog ? `<span class="model-total">${models.length}</span>` : ''}</span>${icon('arrow')}</button></section>`;
 }
 
