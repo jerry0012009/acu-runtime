@@ -155,7 +155,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 	menu := app.NewMenu()
 	menu.Add("打开 ACU Runtime").OnClick(func(*application.Context) { show() })
 	menu.AddSeparator()
-	menu.Add("v0.1.23 · 关闭窗口后保留后台服务").SetEnabled(false)
+	menu.Add("v0.1.24 · 关闭窗口后保留后台服务").SetEnabled(false)
 	menu.Add("退出 ACU Runtime").OnClick(func(*application.Context) { app.Quit() })
 	tray := app.SystemTray.New()
 	tray.SetIcon(icon)
@@ -272,7 +272,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 			}
 		}
 	}()
-	log.Print("ACU Runtime native desktop v0.1.23 starting")
+	log.Print("ACU Runtime native desktop v0.1.24 starting")
 	return app.Run()
 }
 
