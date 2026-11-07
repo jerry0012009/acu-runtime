@@ -1,12 +1,20 @@
-# ACU Runtime · 桌面基础版 0.1.15
+# ACU Runtime 0.1.32
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
 ## 安装与使用
 
-Windows 安装包：双击 `dist/windows-amd64/ACU Runtime Setup.exe`，安装到当前用户目录并自动打开，开始菜单有应用入口，无需管理员权限。当前尚未签名，也未提供注册卸载器，不作为正式分发验收。
+从 [GitHub Releases](https://github.com/jerry0012009/acu-runtime/releases/latest) 下载对应平台安装包。完整安装说明见 [RELEASE-NOTES.md](RELEASE-NOTES.md)。
 
-安装包自带 Magpie `v0.1.3150` 备用内核。Runtime 优先连接本机已有 Magpie；安装或更新 ACU Runtime 时都会刷新安装目录内的备用内核，既有 Agent 配置保留。找不到独立 Magpie 时使用此备用内核；单独运行未附带内核的应用时，首次启动会从官方 Release 下载并校验 SHA-256。内核包支持 Windows / macOS 的 amd64、arm64；macOS 的实机验证需在对应设备完成。
+| 平台 | 安装包 | 安装 |
+| --- | --- | --- |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.32-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.32-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.32-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+
+Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
+
+安装包自带 Magpie `v0.1.3150` 备用内核。Runtime 优先连接本机已有 Magpie；安装或更新 ACU Runtime 时都会刷新安装目录内的备用内核，既有 Agent 配置保留。找不到独立 Magpie 时使用此备用内核；单独运行未附带内核的应用时，首次启动会从官方 Release 下载并校验 SHA-256。内核包支持 Windows / macOS 的 amd64、arm64；macOS 原生桌面在对应架构 runner 构建并进行启动检查；真实账号与 Agent 业务验证需在对应设备完成。
 
 老用户可以在“设置 → 应用更新”一键检查并更新。Runtime 从 ACU Runtime 正式版读取发布信息；下载与安装包的 SHA-256 相符才继续。确认后安装器等待当前进程退出，一起更新 Runtime 与它管理的备用内核，再自动重启。失败时保留或恢复旧程序和内核；Key、Agent 与本地配置不会触碰。尚未有此平台安装包时会说明，不会替换内核。独立安装的 Magpie 仍由 Magpie 自己更新；Runtime 不覆盖该安装。每个 Runtime 发行版固定经过检查的内核版本，详细验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 
@@ -32,7 +40,7 @@ Windows 安装包：双击 `dist/windows-amd64/ACU Runtime Setup.exe`，安装�
 - 设置：仅保留系统主题、托盘行为和退出入口。第三方许可文件随安装保存在本机，不在用户界面展示。
 - 外观：ACU 黑 / 琥珀黄 / 白；外壳、弹窗与内核模块实时跟随系统明暗，不改内核保存的主题。
 
-Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key 入核；另有隔离原生测试验证 Key 切换。未完成：console.acucompute.com 真实登录、ACU 推荐配置自动导入、自动能力补齐、CC Switch 检测、节省 / 纠偏数据、服务端控制更新、开机启动、签名 / 卸载、Mac 实机验收、异步视频。一键接入使用选定 ACU 来源的主模型；WorkBuddy 保留全部可选模型与应用内选择，不主动关闭其他来源。不等于已验证全部多模态能力。
+Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key 入核；另有隔离原生测试验证 Key 切换。未完成：console.acucompute.com 真实登录、ACU 推荐配置自动导入、自动能力补齐、CC Switch 检测、节省 / 纠偏数据、服务端控制更新、开机启动、签名 / 卸载、Mac 完整业务验收、异步视频。一键接入使用选定 ACU 来源的主模型；WorkBuddy 保留全部可选模型与应用内选择，不主动关闭其他来源。不等于已验证全部多模态能力。
 
 账号访问令牌只保存在 Go 内存中，到期前两分钟通过隐藏的官网窗口自动续期；断网、限流和网站验证故障退避重试，不因短期令牌到期要求重新登录，也不重新选择或覆盖模型 Key。只有续期会话被确认失效、撤销或切换时才要求重新登录。续期 Cookie 仍由系统 WebView 管理，不读取或复制到 Go。退出应用后需再次点击登录，可复用 WebView 的官网会话；本轮不实现启动时自动恢复账号。已保存的模型 Key 仍在内核中，无需重复连接。原生消息校验官方来源、窗口与随机状态，不经 URL、日志或跨站本机请求；刷新还校验账号与服务端会话一致。账号列表最多读取前 100 个 Key；无可用 Key 时保留手填兜底。
 
@@ -44,7 +52,15 @@ Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key �
 .\scripts\build-windows.ps1
 ```
 
-只构建原生应用：
+macOS 原生应用、DMG 与 ZIP（在对应架构 Mac 上运行，需要 Xcode 命令行工具）：
+
+```sh
+bash scripts/build-macos.sh
+```
+
+GitHub Actions 在推送 `v版本号` 标签后构建 Windows x64、macOS arm64 / amd64，全部检查通过再发布含 SHA-256 清单的 Release。
+
+只构建 Windows 原生应用：
 
 ```powershell
 go build -tags desktop,production -ldflags '-H windowsgui' -o 'bin/ACU Runtime.exe' .

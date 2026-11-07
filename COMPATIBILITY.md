@@ -1,4 +1,12 @@
-# Runtime 0.1.17 / Magpie 0.1.3150
+# Runtime 0.1.32 / Magpie 0.1.3150
+
+发布平台：Windows 10/11 x64、macOS 12+ Apple Silicon / Intel。macOS 通过对应架构 GitHub runner 原生构建（desktop,production + CGO），不再将服务端交叉编译作为桌面包。
+
+发布流水线对每个平台执行 Go 测试、原生 desktop/production 测试、vet 与前端测试；macOS 另检查应用 Info.plist、ad-hoc 签名、原生桌面进程启动及本地界面。安装包附带固定摘要校验的 Magpie v0.1.3150，路径为 Windows 的应用目录 `kernel/acu-kernel.exe` 或 macOS `.app/Contents/MacOS/kernel/acu-kernel`。
+
+Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applications 内应用；不支持应用内安装。Windows ARM64 尚未发布安装包。当前没有 Windows 代码签名、Apple Developer ID 签名与公证。CI 启动检查不等于真实账号登录、全部 Agent 与多模态业务验收。
+
+下面保留历史验证记录，其范围和版本以各节文字为准。
 
 验证日期：2026-11-06。源码、备用内核与安装包一起升级；不自动采用未经验证的上游 latest。
 
@@ -26,7 +34,7 @@
 
 安装包每次都更新自己的备用内核，不再因检测到外部 Magpie 而跳过。现有外部 Magpie、Key 与 Agent 配置不由安装器改写。Runtime 的外部内核选择仍遵循原有发现规则；显式 ACU_KERNEL_PATH 也保留。
 
-当前应用内安装包只支持 Windows x64。Windows ARM64 与 macOS 还没有对应 Runtime 安装包；会报告平台不可用而不进行下载。后续发布这些平台的签名安装器后，才能开放一键安装。独立 Magpie 不受 Runtime 更新器管理。
+当前应用内安装包只支持 Windows x64。macOS 使用 0.1.32 新增的独立 DMG / ZIP 安装包，应用内不会执行下载安装；Windows ARM64 尚无对应安装包。独立 Magpie 不受 Runtime 更新器管理。
 
 更新网络：优先使用显式 HTTP(S)_PROXY/NO_PROXY 环境设置，否则读取 Windows 手动系统代理。PAC 自动代理与国内镜像尚未接入。无法访问 GitHub 时保留现有安装，可稍后重试。
 

@@ -318,7 +318,7 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
   if ((!inventory || inventory.tab !== 'order') && facts.configured && agent.id !== 'workbuddy') {
     const roles = compact ? facts.roleRows.slice(0, 2) : facts.roleRows;
     const hasModelChoices = agent.modelOptions?.length || agent.catalog?.models?.length;
-    roles.forEach(role => add('role:' + role.label, 'route', role.label, role.model, role.ref ? facts.routeName(role.ref) : '原来源', role.ref || '沿用当前来源', false, compact && ['默认模型', '子任务模型'].includes(role.label) && hasModelChoices ? agentModelSelect(agent, role) : ''));
+    roles.forEach(role => add('role:' + role.label, 'route', role.label, role.model, role.ref ? facts.routeName(role.ref) : '原来源', '', false, compact && ['默认模型', '子任务模型'].includes(role.label) && hasModelChoices ? agentModelSelect(agent, role) : ''));
     if (compact && !roles.some(role => role.label === '默认模型') && hasModelChoices) add('role:default', 'route', '默认模型', '', '', '', false, agentModelSelect(agent));
   }
   const previewed = new Set(facts.configured && agent.id !== 'workbuddy' ? facts.roleRows.slice(0, 2).map(role => role.ref) : []);
@@ -333,9 +333,9 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
     const source = group ? '自动路由' : facts.routeName(model.id);
     const hidden = modelIsHidden(agent, model);
     const mode = hidden ? '已隐藏' : model.own ? '原生' : agent.needsRepair ? '待核对' : !agent.connected ? '可添加' : source;
-    const detail = [group?.members?.length ? `候选来源：${group.members.map(member => member.split('/')[0]).filter((value, index, all) => all.indexOf(value) === index).join('、')}` : '', group?.patterns?.length ? `适用模型：${group.patterns.join('、')}` : '', model.inUse ? '当前配置已选用' : ''].filter(Boolean).join(' · ');
+    const detail = [group?.members?.length ? `候选来源：${group.members.map(member => member.split('/')[0]).filter((value, index, all) => all.indexOf(value) === index).join('、')}` : '', group?.patterns?.length ? `适用模型：${group.patterns.join('、')}` : ''].filter(Boolean).join(' · ');
     const provider = !model.own && !group && model.id.includes('/') ? model.id.split('/')[0] : '';
-    const visibility = inventory && inventory.tab !== 'order' ? `<button type="button" class="model-visibility ${hidden ? '' : 'is-on'}" data-model-visibility data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" role="switch" aria-checked="${!hidden}" ${model.inUse || model.own || ui.inventorySaving ? 'disabled' : ''} title="${escapeHTML(model.inUse ? '当前模型会始终保留' : model.own ? '原生模型由上方开关控制' : hidden ? '显示此模型' : '隐藏此模型')}"><span aria-hidden="true"></span><span class="sr-only">${hidden ? '隐藏' : '显示'}</span></button>` : '';
+    const visibility = inventory && inventory.tab !== 'order' && model.inUse ? '<span class="model-in-use" title="请先切换默认模型或子任务模型，再隐藏此模型">使用中 · 保留显示</span>' : inventory && inventory.tab !== 'order' ? `<button type="button" class="model-visibility ${hidden ? '' : 'is-on'}" data-model-visibility data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" role="switch" aria-checked="${!hidden}" ${model.inUse || model.own || ui.inventorySaving ? 'disabled' : ''} title="${escapeHTML(model.inUse ? '当前模型会始终保留' : model.own ? '原生模型由上方开关控制' : hidden ? '显示此模型' : '隐藏此模型')}"><span aria-hidden="true"></span><span class="sr-only">${hidden ? '隐藏' : '显示'}</span></button>` : '';
     const order = inventory?.tab === 'order' ? `<span class="model-order-actions"><button type="button" data-model-move="up" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === 0 || ui.inventorySaving ? 'disabled' : ''} aria-label="上移">↑</button><button type="button" data-model-move="down" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === models.length - 1 || ui.inventorySaving ? 'disabled' : ''} aria-label="下移">↓</button></span>` : '';
     add('model:' + model.id, model.own ? 'native' : 'add', model.name || model.id, '', mode, detail, hidden, '', visibility || order, provider);
   });
@@ -349,10 +349,13 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
   return `<ul class="model-flow ${compact ? 'compact-flow' : ''}">${entries.join('')}</ul>`;
 }
 
-function agentModelSummary(agent) {
+function agentModelSummary(agent, advanced = '') {
   const catalog = agent.catalog;
   const models = (catalog?.models || []).filter(model => !isRoutingGroup(model));
-  const shown = models.filter(model => !modelIsHidden(agent, model));
+  const facts = modelFacts(agent);
+  const allModels = [...models, ...facts.nativeEntries.filter(model => !models.some(current => current.id === model.id))];
+  const shown = allModels.filter(model => !modelIsHidden(agent, model));
+  const visibilityCount = catalog ? `${shown.length}/${allModels.length}` : '';
   const acu = shown.filter(model => !model.own && model.id.startsWith('acu-runtime/')).length;
   const native = shown.filter(model => model.own).length || (agent.modelOptions || []).filter(option => !option.ref || option.ref.startsWith('native/')).length;
   const other = shown.filter(model => !model.own && !model.id.startsWith('acu-runtime/')).length;
@@ -367,8 +370,9 @@ function agentModelSummary(agent) {
   const stateHint = !agent.connected ? '<span class="model-example muted">可添加</span>' : agent.needsRepair ? '<span class="model-example muted">待核对</span>' : '';
   const nativeHint = agent.id === 'workbuddy' ? '<span class="model-example muted">WorkBuddy 原生模型 · 保留</span>' : '';
   const hiddenCompatibility = shown.filter(model => !model.own).slice(0, 4).map(model => `<span class="sr-only">${escapeHTML(model.name || model.id)}</span>`).join('');
-  const summary = catalog ? `<div class="model-counts"><span><strong>${acu}</strong> 个 ACU</span>${native ? `<span><strong>${native}</strong> 个原生</span>` : ''}${other ? `<span><strong>${other}</strong> 个其他来源</span>` : ''}<span class="model-examples">${nativeHint}${stateHint}${examples || '<span class="model-example muted">可在全部模型中选择</span>'}${hiddenCompatibility}</span></div>` : '';
-  return `<section class="model-summary" aria-label="${escapeHTML(agent.name)} 模型清单"><div class="model-flow-compact-data">${modelFlow(agent, true, null, true)}</div>${summary}${!catalog && agent.detected ? `<p class="model-empty">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<button class="text-button model-list-link" data-action="model-inventory" data-agent-id="${agent.id}" ${!ui.status?.ready || !agent.detected ? 'disabled' : ''}><span>查看全部模型${catalog ? `<span class="model-total">${models.length}</span>` : ''}</span>${icon('arrow')}</button></section>`;
+  const summary = catalog ? `<div class="model-counts"><span class="model-visibility-count"><strong>${visibilityCount}</strong> 个模型已显示</span>${acu ? `<span><strong>${acu}</strong> 个 ACU</span>` : ''}${native ? `<span><strong>${native}</strong> 个原生</span>` : ''}${other ? `<span><strong>${other}</strong> 个其他来源</span>` : ''}<span class="model-examples">${nativeHint}${stateHint}${examples || '<span class="model-example muted">可在全部模型中选择</span>'}${hiddenCompatibility}</span></div>` : '';
+  const modelTotal = visibilityCount;
+  return `<section class="model-summary" aria-label="${escapeHTML(agent.name)} 模型清单"><div class="model-flow-compact-data">${modelFlow(agent, true, null, true)}</div>${summary}${!catalog && agent.detected ? `<p class="model-empty">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<div class="model-summary-actions">${advanced}<button class="text-button model-list-link" data-action="model-inventory" data-agent-id="${agent.id}" ${!ui.status?.ready || !agent.detected ? 'disabled' : ''}><span>查看全部模型${modelTotal ? ` <span class="model-total">${modelTotal}</span>` : ''}</span>${icon('arrow')}</button></div></section>`;
 }
 
 function filterModelInventory() {
@@ -502,14 +506,15 @@ function agentCard(agent) {
   const inApp = agent.id === 'workbuddy';
   const routed = agent.connected && (selectedModel?.ref || agent.model === 'magpie');
   const acuRoute = routed && (ui.status?.connection?.choices || []).some(choice => selectedModel?.ref?.startsWith(choice.id + '/'));
-  const state = !ready ? '检测中' : !agent.detected ? '未检测到' : agent.needsRepair ? '配置有变化' : !agent.connected ? '原生配置' : inApp ? '模型列表已配置' : acuRoute ? '默认走 ACU' : routed ? '本机路由已配置' : selectedModel ? '原来源已选' : '已接入';
+  const state = !ready ? '检测中' : !agent.detected ? '未检测到' : agent.needsRepair ? '配置有变化' : !agent.connected ? '原生配置' : inApp ? '模型列表已配置' : acuRoute ? '已接入 ACU' : routed ? '本机路由已配置' : selectedModel ? '原来源已选' : '已接入';
   const disabled = !ready || !agent.detected || ui.applying || ui.accountBusy;
   const route = !ready ? '正在检测应用' : !agent.detected ? '安装并打开一次应用后，重新检测。' : agent.needsRepair ? '应用配置已变化，请检查后重新接入。' : !agent.connected ? '未接入 ACU · 保留应用当前设置' : inApp ? '已准备模型 · 在应用内选择通道' : acuRoute ? '所选默认模型 → ACU' : routed ? '所选默认模型 → 本机网关' : selectedModel ? '当前模型使用原生通道' : '已保存接入配置 · 在应用内选择';
   const routeButton = !agent.detected ? `<button class="route-toggle route-toggle-disabled" disabled title="等待检测此 Agent">${icon('link')}<span><strong>等待检测</strong><small>打开 Agent 后重新检测</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>` : agent.connected ? `<button class="route-toggle route-toggle-on" data-action="agent-toggle" data-agent-id="${agent.id}" aria-pressed="true" title="点击关闭${inApp ? '附加模型列表' : '本地接入'}" ${disabled ? 'disabled' : ''}><span class="route-toggle-icon">${icon('check')}</span><span><strong>${inApp ? '附加模型已开启' : 'ACU 接入已开启'}</strong><small>点击关闭${inApp ? '并预览移除项' : '并还原原配置'}</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>` : `<button class="route-toggle route-toggle-off" data-action="agent-toggle" data-agent-id="${agent.id}" aria-pressed="false" title="点击开启 ACU 接入" ${disabled || !activeChoice() ? 'disabled' : ''}><span class="route-toggle-icon">${icon('link')}</span><span><strong>ACU 接入未开启</strong><small>${!activeChoice() ? '先连接 ACU' : '点击查看推荐配置并开启'}</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>`;
-  return `<article class="agent-card compact-card routing-card ${agent.connected ? 'is-configured' : ''}" data-agent="${agent.id}"><div class="agent-card-top"><div class="agent-identity"><span class="agent-monogram ${agent.id}" aria-hidden="true">${({ codex: 'C', claude: '✳', workbuddy: 'W', hermes: 'H' })[agent.id] || 'A'}</span><h3>${escapeHTML(agent.name)}</h3></div><span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span></div>${routeButton}
+  const restartNotice = ready && agent.id === 'workbuddy' && agent.restartRequired ? `<div class="agent-restart-notice"><span>重启后生效</span><button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重启</button></div>` : '';
+  const headerState = agent.id === 'workbuddy' && agent.connected ? `<div class="agent-header-actions"><span class="agent-state ${ready && !agent.needsRepair ? 'route-on' : ''}">已连接</span>${restartNotice}</div>` : `<span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span>`;
+  return `<article class="agent-card compact-card routing-card ${agent.connected ? 'is-configured' : ''}" data-agent="${agent.id}"><div class="agent-card-top"><div class="agent-identity"><span class="agent-monogram ${agent.id}" aria-hidden="true">${({ codex: 'C', claude: '✳', workbuddy: 'W', hermes: 'H' })[agent.id] || 'A'}</span><h3>${escapeHTML(agent.name)}</h3></div>${headerState}</div>${routeButton}
     ${!ready || !agent.detected || agent.needsRepair ? `<p class="agent-route">${route}</p>` : ''}
-    ${agentModelSummary(agent)}<div class="agent-routing-actions">${agent.connected ? `<button class="button secondary" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置 ${icon('arrow')}</button>` : ''}
-    ${ready && agent.restartRequired ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
+    ${agentModelSummary(agent, agent.connected ? `<button class="button secondary advanced-link" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置</button>` : '')}<div class="agent-routing-actions">${ready && agent.restartRequired && agent.id !== 'workbuddy' ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
 }
 
 async function setAgentModel(id, value, field = 'model') {
@@ -550,10 +555,33 @@ function installRuntimeUpdate() {
   });
 }
 
-function reopenAgent(id) {
+async function reopenAgent(id) {
   const agent = ui.status?.agents?.find(item => item.id === id);
-  if (!agent) return;
-  showModal(`重新打开 ${escapeHTML(agent.name)}`, `<p>配置已经保存。请先保存 ${escapeHTML(agent.name)} 当前工作，再关闭并重新打开它，新的模型设置才会生效。</p><p>ACU Runtime 会保留当前连接和模型选择。</p>`, '知道了');
+  if (!agent || ui.applying || ui.accountBusy) return;
+  ui.applying = true;
+  render();
+  try {
+    await requestKernel(`/kernel/api/agents/restart/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    // Magpie restarts the app-server asynchronously. Read the Runtime status
+    // directly while waiting; refresh() intentionally ignores requests while
+    // an apply operation is active.
+    let latest = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, attempt ? 750 : 350));
+      latest = await request('/runtime/status');
+      ui.status = latest;
+      const current = latest.agents?.find(item => item.id === id);
+      if (!current?.restartRequired) break;
+    }
+    const current = latest?.agents?.find(item => item.id === id);
+    if (current?.restartRequired) throw new Error(`${agent.name} 尚未完成重启，请保存工作后手动重新打开`);
+    toast(`${agent.name} 已重启`);
+  } catch (error) {
+    toast(error.message || `无法重启 ${agent.name}，请关闭后重新打开`);
+  } finally {
+    ui.applying = false;
+    render();
+  }
 }
 
 function settingsPage() {

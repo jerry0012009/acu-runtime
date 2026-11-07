@@ -372,6 +372,7 @@ summary.flow-line:hover { background: var(--acu-surface-alt); }
 .model-visibility.is-on { background: var(--acu-accent); }
 .model-visibility.is-on > span:first-child { transform: translateX(14px); background: var(--acu-on-accent); }
 .model-visibility:disabled { opacity: .55; cursor: not-allowed; }
+.model-in-use { margin-left:auto; color:var(--acu-muted); font-size:10px; white-space:nowrap; }
 .flow-line > .model-visibility { margin-left: auto; }
 .model-order-actions { display: inline-flex; gap: 3px; margin-left: auto; }
 .model-order-actions button { width: 24px; height: 24px; padding: 0; border: 1px solid var(--acu-line); border-radius: 5px; color: var(--acu-text-secondary); background: var(--acu-surface-alt); cursor: pointer; }
@@ -438,6 +439,16 @@ select option, select optgroup { color: var(--acu-text); background: var(--acu-s
   select[data-agent-model] option:checked { background: var(--acu-accent-soft); color: var(--acu-accent-text); }
   select[data-agent-model] option::checkmark { color: var(--acu-accent-text); }
 }
+/* Keep the compact picker visible in embedded Chromium/WebView builds. Some
+   engines report base-select support while rendering the control as a hidden
+   anchor; the regular select remains the most reliable cross-platform UI. */
+select[data-agent-model] {
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c908f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+}
 @media(max-width:600px) { .flow-path:has(select) { grid-template-columns: minmax(0,1fr); gap: 5px; } .flow-path:has(select) .flow-name { font-size: 11px; color: var(--acu-muted); } }
 .model-counts { display:flex; flex-wrap:wrap; gap:7px; margin:7px 0 5px 40px; color:var(--acu-muted); font-size:10px; }
 .model-counts span { padding:4px 8px; border:1px solid var(--acu-line); border-radius:999px; background:var(--acu-surface-alt); }
@@ -458,8 +469,15 @@ select option, select optgroup { color: var(--acu-text); background: var(--acu-s
 .agent-routing-actions .button.secondary { border:0; background:transparent; color:var(--acu-muted); min-height:24px; padding:3px 2px; font-size:10px; }
 .agent-routing-actions .button.secondary:hover:not(:disabled) { color:var(--acu-accent-text); background:transparent; }
 .agent-restart-button { font-size:10px; }
+.agent-header-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.agent-restart-notice { display:inline-flex; align-items:center; gap:7px; padding:4px 6px 4px 9px; border:1px solid color-mix(in srgb,var(--acu-warning) 38%,var(--acu-line)); border-radius:999px; background:var(--acu-warning-soft); color:var(--acu-warning); font-size:10px; white-space:nowrap; }
+.agent-restart-notice .agent-restart-button { margin:0; padding:3px 7px; border:0; border-radius:999px; background:var(--acu-warning); color:var(--acu-surface); font-size:10px; font-weight:600; }
+.agent-restart-notice .agent-restart-button:hover { color:var(--acu-surface); background:var(--acu-accent); }
 /* Final workbench polish: one compact model row and a quiet secondary action. */
 .model-summary { padding-top: 10px; }
+.model-summary-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; padding-top:6px; border-top:1px solid color-mix(in srgb,var(--acu-line) 65%,transparent); }
+.model-summary-actions .model-list-link { flex:0 0 auto; min-width:0; margin-left:auto; }
+.model-summary-actions .advanced-link { flex:0 0 auto; order:-1; }
 .model-counts { display:flex; align-items:center; flex-wrap:nowrap; gap:6px; margin:0; min-height:34px; overflow:hidden; }
 .model-counts > span:not(.model-examples) { border:0; background:transparent; padding:0; color:var(--acu-muted); }
 .model-counts > span:not(.model-examples)::after { content:' ·'; color:var(--acu-line); margin-left:5px; }
@@ -468,7 +486,17 @@ select option, select optgroup { color: var(--acu-text); background: var(--acu-s
 .model-counts .model-examples { display:flex; align-items:center; gap:6px; margin:0; padding:0; border:0; background:none; overflow:hidden; }
 .model-counts .model-example { background:none; border:0; border-left:1px solid var(--acu-line); border-radius:0; padding:0 0 0 8px; color:var(--acu-text-secondary); max-width:135px; }
 .model-counts .model-example.muted { color:var(--acu-muted); }
-.model-list-link { margin-top:5px; min-height:38px; border:1px solid var(--acu-line); background:transparent; }
-.model-list-link:hover { background:var(--acu-surface-alt); }
+.model-list-link { margin-top:0; min-height:30px; width:auto; border:0; background:transparent; padding:5px 0; }
+.model-list-link:hover { background:transparent; color:var(--acu-accent-text); }
+.model-list-link > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.model-summary-actions .advanced-link { border:0; background:transparent; color:var(--acu-muted); min-height:30px; padding:5px 0; font-size:10px; }
+.model-summary-actions .advanced-link:hover:not(:disabled) { color:var(--acu-accent-text); background:transparent; }
 .agent-routing-actions { min-height:26px; justify-content:flex-end; }
 .agent-routing-actions .button.secondary { opacity:.62; font-size:10px; }
+
+@media (max-width:600px) {
+  .model-summary-actions { gap:8px; }
+  .model-summary-actions .advanced-link { font-size:9px; }
+  .agent-header-actions { align-items:flex-end; flex-direction:column; gap:5px; }
+  .agent-restart-notice { font-size:9px; }
+}
