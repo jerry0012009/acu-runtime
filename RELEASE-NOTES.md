@@ -1,4 +1,6 @@
-# ACU Runtime 0.1.44
+# ACU Runtime 0.1.45
+
+移除 Agent 卡片来源统计左侧重复的“已显示/全部”模型数量，仅在“查看全部模型”入口保留比例；各来源数量和模型示例保留。
 
 统一 Runtime 推荐配置、模型来源显示、嵌入内核提示与错误中的名称为“ACU 内核”。保留底层 Magpie API 路径、配置标识与开源声明；外部 Agent 的 MCP 集成卡片名称由客户端和内核决定，当前内核固定使用 magpie 入口，未通过改写应用配置强行重命名。名称不代表实际模型或计费来源。
 
@@ -32,9 +34,9 @@ Windows 启动时通过注册表判断是否有 WSL 发行版，没有才调用 
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.44-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.44-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.44-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.45-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.45-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.45-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 
