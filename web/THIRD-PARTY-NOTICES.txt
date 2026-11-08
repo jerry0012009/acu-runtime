@@ -2,7 +2,7 @@ ACU Runtime — third-party notices
 
 Magpie
 Source: https://github.com/yetone/magpie
-Pinned kernel release and isolated UI integration: v0.1.3150
+Pinned kernel release and isolated UI integration: v0.1.3337
 The runtime reuses an existing executable when available. Development
 installers bundle a verified CLI executable from the release above.
 Upstream source assets used for isolated integration tests are not bundled here.

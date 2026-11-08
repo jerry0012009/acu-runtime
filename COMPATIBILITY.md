@@ -1,8 +1,12 @@
-# Runtime 0.1.32 / Magpie 0.1.3150
+# Runtime 0.1.47 / Magpie 0.1.3337
+
+本次配套内核为 v0.1.3337（2026-11-09 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。
+
+发布新增 `scripts/test-kernel-compatibility.py`：使用打包内核和 Runtime，在临时 HOME、Agent 配置与随机回环端口中验证自动更新设置命令、四 Agent 接入与模型写入、共享识图/生图设置、三 MCP HTTP 工具清单、重复配置无重复项、原有 MCP 保留及仅保存共享模型不重写 Agent 文件。使用假 Key，不验证真实推理、登录或外部搜索服务效果。各平台通过情况以对应发行流水线结果为准。
 
 发布平台：Windows 10/11 x64、macOS 12+ Apple Silicon / Intel。macOS 通过对应架构 GitHub runner 原生构建（desktop,production + CGO），不再将服务端交叉编译作为桌面包。
 
-发布流水线对每个平台执行 Go 测试、原生 desktop/production 测试、vet 与前端测试；macOS 另检查应用 Info.plist、ad-hoc 签名、原生桌面进程启动及本地界面。安装包附带固定摘要校验的 Magpie v0.1.3150，路径为 Windows 的应用目录 `kernel/acu-kernel.exe` 或 macOS `.app/Contents/MacOS/kernel/acu-kernel`。
+发布流水线对每个平台执行 Go 测试、原生 desktop/production 测试、vet 与前端测试；macOS 另检查应用 Info.plist、ad-hoc 签名、原生桌面进程启动及本地界面。安装包附带固定摘要校验的 Magpie v0.1.3337，路径为 Windows 的应用目录 `kernel/acu-kernel.exe` 或 macOS `.app/Contents/MacOS/kernel/acu-kernel`。
 
 Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applications 内应用；不支持应用内安装。Windows ARM64 尚未发布安装包。当前没有 Windows 代码签名、Apple Developer ID 签名与公证。CI 启动检查不等于真实账号登录、全部 Agent 与多模态业务验收。
 

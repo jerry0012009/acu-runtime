@@ -167,7 +167,7 @@ test('home only shows the connection toolbar and compact agent controls', async 
   const html = instance.elements.app.innerHTML;
   for (const phrase of ['启用的 API Key', '登录 ACU', '一键配置', 'ACU 接入未开启', '点击查看推荐配置并开启', '原生配置']) assert(html.includes(phrase));
   assert.equal((html.match(/class="flow-number/g) || []).length, 3);
-  for (const phrase of ['步骤 1', '步骤 2', '步骤 3', '回到 Agent 使用']) assert(html.includes(phrase));
+  for (const phrase of ['步骤 1', '步骤 2', '步骤 3', '打开 Agent 试用']) assert(html.includes(phrase));
   for (const phrase of ['已识别现有连接', '不需要再次添加 Key', '首次接入可能调整', 'CODING AGENT', '当前通道', '第 1 步', '已选 1 个', 'data-step=']) assert(!html.includes(phrase));
 });
 

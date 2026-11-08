@@ -233,6 +233,9 @@ h1{font-size:25px;font-weight:650;letter-spacing:-.5px}
 .workbench-heading p { font-size: 12px; margin-top: 6px; }
 .count-label { font-size: 11px; color: var(--acu-muted); background: var(--acu-surface-alt); padding: 3px 7px; border: 1px solid var(--acu-line); border-radius: 6px; margin-left: 6px; vertical-align: middle; }
 .workbench-actions { display: flex; align-items: center; gap: 14px; }
+.workbench-actions .workbench-utility { color: var(--acu-muted); font-weight: 400; }
+.workbench-actions .workbench-utility:hover:not(:disabled) { color: var(--acu-text); }
+.workbench-actions .icon-button.workbench-utility { width: 30px; height: 30px; }
 .agent-grid { gap: 18px; }
 .routing-card { padding: 23px 22px 18px; display: flex; flex-direction: column; }
 .routing-card .agent-card-top { align-items: center; gap: 12px; }

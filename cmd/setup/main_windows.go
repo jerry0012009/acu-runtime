@@ -23,7 +23,7 @@ import (
 //go:embed payload.zip
 var payload []byte
 
-const setupKernelVersion = "v0.1.3150"
+const setupKernelVersion = "v0.1.3337"
 
 func verifyBundledKernel(path, digest string) bool {
 	if len(digest) != 64 {
