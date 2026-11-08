@@ -548,3 +548,14 @@ select[data-agent-model] {
 .setup-adjustments .field-label { margin-top: 16px; }
 .setup-tools input { appearance: auto; width: 18px; height: 18px; }
 .setup-tools input::after { display: none; }
+
+.capability-page { max-width: 1040px; }
+.capability-page > .panel { padding: 24px; margin-bottom: 20px; }
+.capability-page h2 { margin-bottom: 10px; }
+.capability-model-panel form { max-width: 640px; }
+.capability-model-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.capability-model-actions > span { color: var(--muted); font-size: 12px; }
+.capability-page .capability-search-status { border-bottom: 1px solid var(--line); margin-top: 10px; }
+.capability-page .capability-advanced-actions { margin-top: 18px; }
+.capability-page .capability-fields select { border: 1px solid var(--line); border-radius: 7px; background: var(--acu-surface-alt); color: var(--ink); padding: 10px 12px; }
+@media(max-width:600px) { .capability-page > .panel { padding: 20px 16px; } .capability-model-actions { flex-wrap: wrap; } }

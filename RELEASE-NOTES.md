@@ -1,4 +1,6 @@
-ACU Runtime 0.1.36：Windows 与 macOS 原生桌面发布。
+ACU Runtime 0.1.37：Windows 与 macOS 原生桌面发布。
+
+「图片与搜索」改为独立管理页：常用模型局部保存、应用工具独立操作、高级设置独立跳转。模型与搜索合并为同一个内核入口，另保留工具分配入口。离开页面仅在模型有未保存修改时提示保存或放弃；保存失败保留修改，内核返回后重新读取设置。
 
 简化一键配置与图片搜索管理：应用直接显示「已配置 / 待补齐」并提供明确配置按钮；保存模型只修改共享模型，不重写工具。搜索服务、模型来源与工具权限进入内核高级设置。重复一键配置默认保留已接入应用的主模型、模型可见性与工具自定义选项，部分失败可单独重试。
 
@@ -10,9 +12,9 @@ ACU Runtime 0.1.36：Windows 与 macOS 原生桌面发布。
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.36-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.36-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.36-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.37-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.37-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.37-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 

@@ -598,6 +598,7 @@ function settingsPage() {
 
 function render() {
   if (ui.frame) return;
+  if (ui.page === 'capabilities') { if (!document.getElementById('capability-page')) renderCapabilities(); return; }
   if (['agents', 'connection', 'tools'].includes(ui.page)) {
     ui.connectionOpen ||= ui.page === 'connection';
     ui.page = 'overview';
@@ -624,8 +625,9 @@ function render() {
 }
 
 function closeOverlay() {
-  if (ui.capabilities?.saving) return;
-  ui.capabilities = null;
+  if (ui.capabilities?.leavingBusy) return;
+  if (ui.page !== 'capabilities') ui.capabilities = null;
+  ui.capabilityNext = null;
   ui.inventory = null;
   ui.inventoryQuery = '';
   ui.setup = null;
@@ -643,6 +645,7 @@ async function openCapabilities() {
   if (!ui.status?.ready || !choice || ui.applying) return;
   const current = { provider: choice.id, loading: true, draft: {}, error: '' };
   ui.capabilities = current;
+  ui.page = 'capabilities'; ui.frame = null;
   renderCapabilities();
   try {
     current.view = await request(`/runtime/capabilities?provider=${encodeURIComponent(choice.id)}`);
@@ -670,12 +673,46 @@ function renderCapabilities() {
   };
   const agents = (ui.status?.agents || []).filter(agent => agent.detected);
   const missing = view ? agents.filter(agent => capabilityAgentState(view, agent.id).count < 3) : [];
-  const body = view ? `<p class="capability-intro">选择识图和生图模型，各应用共用。保存模型设置不会重新配置工具。</p><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '使用已设置的搜索服务' : view.freeSearchConfigured ? '使用免费搜索' : '待配置'}</span></div><div class="capability-agent-list"><div class="capability-list-heading"><strong>应用工具</strong>${missing.length ? `<button class="text-button" data-configure-capabilities="missing" ${current.saving ? 'disabled' : ''}>${current.retry ? '重试未完成项' : '配置未完成项'}</button>` : ''}</div>${agents.map(agent => {
+  const body = view ? `<section class="panel capability-model-panel"><h2>常用模型</h2><p class="capability-intro">选择识图和生图模型，各应用共用。</p><form data-capability-model-form><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-model-actions"><span role="status">${Object.keys(current.draft).length ? '有未保存的修改' : ''}</span><button type="submit" class="button primary" data-save-capabilities ${current.saving || !Object.keys(current.draft).length ? 'disabled' : ''}>${current.saving === 'models' ? '保存中…' : '保存模型设置'}</button></div></form></section><section class="panel capability-tools-panel"><div class="capability-list-heading"><h2>应用工具</h2>${missing.length ? `<button class="text-button" data-configure-capabilities="missing" ${current.saving ? 'disabled' : ''}>${current.retry ? '重试未完成项' : '配置未完成项'}</button>` : ''}</div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '使用已设置的搜索服务' : view.freeSearchConfigured ? '使用免费搜索' : '待配置'}</span></div>${agents.map(agent => {
     const state = capabilityAgentState(view, agent.id);
-    return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${state.count === 3 ? 'complete' : ''}">${state.count === 3 ? '已配置 ✓' : state.count ? '待补齐' : '待配置'}${state.custom ? ' · 自定义设置' : ''}</span></div><button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>${state.count === 3 ? '重新配置' : '配置'}</button></div>`;
-  }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}</div><p class="capability-intro capability-help">包含识图、生图和搜索工具。新增工具后请重新打开应用；首次使用按应用提示确认。已配置表示配置已写入。</p><details class="capability-advanced"><summary>高级设置</summary><p>模型来源、搜索服务和工具权限由内核统一管理。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="images" ${current.saving ? 'disabled' : ''}>模型与图片设置</button><button class="button secondary" data-capability-native="search" ${current.saving ? 'disabled' : ''}>搜索服务</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></details>` : `<p>${current.loading ? '正在读取配置…' : '配置暂未读取，请关闭后重试。'}</p>`;
-  overlay.innerHTML = `<div class="scrim"><section class="modal capability-modal recommendation-modal" role="dialog" aria-modal="true" aria-labelledby="capability-title"><div class="recommendation-header"><button class="icon-button modal-close" data-close aria-label="关闭" ${current.saving ? 'disabled' : ''}>${icon('close')}</button><h2 id="capability-title">图片与搜索</h2></div><div class="recommendation-body">${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress ? `<p class="capability-progress" role="status">${escapeHTML(current.progress)}</p>` : ''}${body}</div><div class="recommendation-footer"><div class="modal-actions"><button class="button secondary" data-close ${current.saving ? 'disabled' : ''}>完成</button><button class="button primary" data-save-capabilities ${!view || current.saving || !Object.keys(current.draft).length ? 'disabled' : ''}>${current.saving === 'models' ? '保存中…' : '保存模型设置'}</button></div></div></section></div>`;
+    return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${state.count === 3 ? 'complete' : ''}" title="已配置表示配置已写入；实际使用取决于模型和应用权限。">${state.count === 3 ? '已配置 ✓' : state.count ? '待补齐' : '待配置'}${state.custom ? ' · 自定义设置' : ''}</span></div><button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>${state.count === 3 ? '重新配置' : '配置'}</button></div>`;
+  }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}<p class="capability-intro capability-help">首次配置或新增工具后，请重新打开对应应用。</p></section><section class="panel capability-advanced-panel"><h2>高级设置</h2><p>更多模型来源、搜索服务和工具权限设置。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="settings" ${current.saving ? 'disabled' : ''}>模型与搜索设置</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></section>` : `<section class="panel capability-model-panel"><p>${current.loading ? '正在读取配置…' : '配置暂未读取，请返回后重试。'}</p></section>`;
+  app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress ? `<p class="capability-progress" role="status">${escapeHTML(current.progress)}</p>` : ''}${body}</main></div>`;
+}
+
+function changeCapabilityModel(target) {
+  const current = ui.capabilities;
+  if (!current?.view || current.saving || !['vision', 'imageGen'].includes(target.dataset?.capability)) return;
+  const key = target.dataset.capability;
+  if (target.value === current.view[key]) delete current.draft[key];
+  else current.draft[key] = target.value;
+  const save = app.querySelector('[data-save-capabilities]');
+  if (save) save.disabled = !Object.keys(current.draft).length;
+  const status = app.querySelector('.capability-model-actions [role="status"]');
+  if (status) status.textContent = Object.keys(current.draft).length ? '有未保存的修改' : '';
+}
+
+function leaveCapabilities(next) {
+  const current = ui.capabilities;
+  if (current?.saving || current?.leavingBusy) return;
+  const leave = () => { ui.capabilities = null; ui.capabilityNext = null; closeOverlay(); next(); };
+  if (!current || !Object.keys(current.draft).length) { leave(); return; }
+  if (ui.capabilityNext) return;
+  ui.capabilityNext = leave;
+  overlay.innerHTML = `<div class="scrim"><section class="modal confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title"><h2 id="leave-title">保存模型修改？</h2><div class="modal-body"><p>识图或生图模型的修改尚未保存。</p></div><div class="modal-actions"><button class="button secondary" data-capability-stay>继续编辑</button><button class="button secondary" data-capability-discard>放弃更改</button><button class="button primary" data-capability-save-leave>保存并继续</button></div></section></div>`;
   document.body.classList.add('overlay-open');
+}
+
+function returnFromCapabilities() {
+  leaveCapabilities(() => { ui.page = 'overview'; ui.frame = null; app.innerHTML = ''; render(); refresh(false, true); });
+}
+
+function openCapabilityAdvanced(view) {
+  leaveCapabilities(() => {
+    ui.capabilityReturn = true;
+    if (view === 'library') openNative('library');
+    else openNative('settings', '', false, 'models');
+  });
 }
 
 async function saveCapabilities() {
@@ -691,6 +728,7 @@ async function saveCapabilities() {
     toast('模型设置已保存');
   } catch (error) { current.error = error.message; }
   finally { current.saving = false; if (ui.capabilities === current) renderCapabilities(); }
+  return !Object.keys(current.draft).length;
 }
 
 async function configureCapabilities(target) {
@@ -934,7 +972,7 @@ function openNative(view, agent = '', developer = false, tab = '', focus = '', a
     if (focus) query.set('acu-focus', focus);
     if (action === 'disconnect' || action === 'models') query.set('acu-action', action);
     const capabilityLinks = view === 'agents' && agent ? `<nav class="native-context-tabs" aria-label="${escapeHTML(names[agent])} 功能配置"><span class="context-caption">${escapeHTML(names[agent])}</span><button class="button secondary" data-native-view="settings" data-native-tab="models" data-native-focus="imagesList">图片服务（共享）</button><button class="button secondary" data-native-view="settings" data-native-tab="models" data-native-focus="searchList">搜索服务（共享）</button><button class="button secondary" data-native-view="library">添加工具 / MCP</button></nav>` : '';
-    app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-action="back">← 返回工作台</button><span class="build-tag">配置保存在本机</span></header><div class="native-heading"><div><h1>${agent ? escapeHTML(names[agent]) + ' 配置' : ({ usage: '用量详情', routing: '路由详情', plugins: '插件与工具', masking: '内容保护', agents: 'Agent 模型配置', providers: '高级连接设置', settings: '共享能力服务', library: '工具目录' })[view] || '配置'}</h1><p>${['usage', 'routing'].includes(view) ? '本机请求记录；费用为估算，不代表 ACU 账单。' : action === 'disconnect' ? '确认前会显示要还原的配置；仅停止此 Agent 接入，不退出 ACU，也不删除已保存的 Key。' : view === 'providers' ? '管理其他模型来源或高级连接选项；ACU 登录与快速连接请使用首页。' : ['settings', 'library'].includes(view) ? '此处是共享服务与工具目录；按页面中的 Agent 选项配置，不会自动为所有应用启用。' : '调整此 Agent 的高级模型与工具配置；保存后按提示重新打开应用。'}</p></div><button class="button secondary" data-action="back">${view === 'providers' ? '返回首页，继续配置' : '返回并检查状态'} ${icon('arrow')}</button></div>${capabilityLinks}<iframe class="native-frame" title="${view === 'providers' ? '高级连接配置' : '高级配置'}" src="/kernel/?${query}" sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"></iframe></div>`;
+    app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-action="back">← ${ui.capabilityReturn ? '返回图片与搜索' : '返回工作台'}</button><span class="build-tag">配置保存在本机</span></header><div class="native-heading"><div><h1>${agent ? escapeHTML(names[agent]) + ' 配置' : ({ usage: '用量详情', routing: '路由详情', plugins: '插件与工具', masking: '内容保护', agents: 'Agent 模型配置', providers: '高级连接设置', settings: '共享能力服务', library: '工具目录' })[view] || '配置'}</h1><p>${['usage', 'routing'].includes(view) ? '本机请求记录；费用为估算，不代表 ACU 账单。' : action === 'disconnect' ? '确认前会显示要还原的配置；仅停止此 Agent 接入，不退出 ACU，也不删除已保存的 Key。' : view === 'providers' ? '管理其他模型来源或高级连接选项；ACU 登录与快速连接请使用首页。' : ['settings', 'library'].includes(view) ? '此处是共享服务与工具目录；按页面中的 Agent 选项配置，不会自动为所有应用启用。' : '调整此 Agent 的高级模型与工具配置；保存后按提示重新打开应用。'}</p></div><button class="button secondary" data-action="back">${view === 'providers' ? '返回首页，继续配置' : '返回并检查状态'} ${icon('arrow')}</button></div>${capabilityLinks}<iframe class="native-frame" title="${view === 'providers' ? '高级连接配置' : '高级配置'}" src="/kernel/?${query}" sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"></iframe></div>`;
 }
 
 
@@ -942,7 +980,13 @@ function openNative(view, agent = '', developer = false, tab = '', focus = '', a
 app.addEventListener('click', event => {
   if (ui.applying || ui.accountBusy) return;
   const page = event.target.closest('[data-page]');
-  if (page) { ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); return; }
+  if (page) { const navigate = () => { ui.capabilityReturn = false; ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); }; if (ui.page === 'capabilities') leaveCapabilities(navigate); else navigate(); return; }
+  if (event.target.closest('[data-capability-back]')) { returnFromCapabilities(); return; }
+  if (event.target.closest('[data-save-capabilities]')) { event.preventDefault?.(); saveCapabilities(); return; }
+  const configureTools = event.target.closest('[data-configure-capabilities]');
+  if (configureTools) { configureCapabilities(configureTools.dataset.configureCapabilities); return; }
+  const advanced = event.target.closest('[data-capability-native]');
+  if (advanced) { openCapabilityAdvanced(advanced.dataset.capabilityNative); return; }
   const native = event.target.closest('[data-native-view]');
   if (native) { openNative(native.dataset.nativeView, '', false, native.dataset.nativeTab, native.dataset.nativeFocus); return; }
   const control = event.target.closest('[data-action]');
@@ -964,12 +1008,13 @@ app.addEventListener('click', event => {
     'agent-disconnect': () => openDisconnectDialog(control.dataset.agentId),
     'agent-toggle': () => { const id = control.dataset.agentId; const agent = ui.status?.agents?.find(item => item.id === id); if (agent?.connected) openDisconnectDialog(id); else configureAgent(id); },
     'native-models': () => openNative('agents'), 'native-providers': () => openNative('providers'),
-    back: () => { ui.page = 'overview'; ui.frame = null; app.innerHTML = ''; refresh(); },
+    back: () => { if (ui.capabilityReturn) { ui.capabilityReturn = false; openCapabilities(); } else { ui.page = 'overview'; ui.frame = null; app.innerHTML = ''; refresh(); } },
     quit: () => showModal('退出 ACU Runtime', '<p>可能中断正在经 ACU 处理的请求。只想收起窗口，请点击窗口关闭按钮。</p>', '退出应用', () => request('/runtime/desktop/quit', { method: 'POST' })),
   };
   actions[control.dataset.action]?.();
 });
 app.addEventListener('change', event => {
+  if (event.target.dataset?.capability) { changeCapabilityModel(event.target); return; }
   if (event.target.dataset?.agentModel) { setAgentModel(event.target.dataset.agentModel, event.target.value, event.target.dataset.agentRole || 'model'); return; }
   if (event.target.id === 'quick-key') {
     const [kind, ...parts] = event.target.value.split(':');
@@ -989,6 +1034,7 @@ app.addEventListener('change', event => {
   document.querySelector(`[data-select-agent="${id}"]`)?.focus();
 });
 app.addEventListener('submit', event => {
+  if (event.target.matches('[data-capability-model-form]')) { event.preventDefault(); saveCapabilities(); return; }
   if (!event.target.matches('[data-connection-form]')) return;
   event.preventDefault();
   const values = new FormData(event.target);
@@ -1005,11 +1051,16 @@ overlay.addEventListener('click', event => {
   if (inventoryTab) { ui.inventoryTab = inventoryTab.dataset.inventoryTab; ui.inventoryBulk = null; redrawInventory(); return; }
   const inventoryBulk = event.target.closest('[data-inventory-bulk]');
   if (inventoryBulk) { bulkInventory(inventoryBulk.dataset.agentId, inventoryBulk.dataset.inventoryBulk); return; }
-  if (event.target.closest('[data-save-capabilities]')) { saveCapabilities(); return; }
-  const configureTools = event.target.closest('[data-configure-capabilities]');
-  if (configureTools) { configureCapabilities(configureTools.dataset.configureCapabilities); return; }
-  const advanced = event.target.closest('[data-capability-native]');
-  if (advanced) { if (ui.capabilities?.saving) return; const view = advanced.dataset.capabilityNative; closeOverlay(); if (view === 'library') openNative('library'); else openNative('settings', '', false, 'models', view === 'search' ? 'searchList' : 'imagesList'); return; }
+  if (event.target.closest('[data-capability-stay]')) { ui.capabilityNext = null; closeOverlay(); return; }
+  if (event.target.closest('[data-capability-discard]')) { ui.capabilityNext?.(); return; }
+  if (event.target.closest('[data-capability-save-leave]')) {
+    const next = ui.capabilityNext; const current = ui.capabilities;
+    if (!next || !current || current.leavingBusy) return;
+    current.leavingBusy = true;
+    for (const button of overlay.querySelectorAll?.('button') || []) button.disabled = true;
+    saveCapabilities().then(saved => { current.leavingBusy = false; if (saved) next(); else { ui.capabilityNext = null; closeOverlay(); } });
+    return;
+  }
   if (event.target.closest('[data-confirm-setup]')) { confirmSetup(); return; }
   if (event.target.closest('[data-confirm-disconnect]')) { confirmDisconnect(); return; }
   if (event.target.closest('[data-retry-disconnect]')) { openDisconnectDialog(ui.disconnect?.agentId); return; }
@@ -1022,13 +1073,6 @@ overlay.addEventListener('input', event => {
 });
 
 overlay.addEventListener('change', event => {
-  if (ui.capabilities) {
-    const key = event.target.dataset?.capability;
-    if (key) ui.capabilities.draft[key] = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
-    const save = overlay.querySelector('[data-save-capabilities]');
-    if (save) save.disabled = !Object.keys(ui.capabilities.draft).length || !!ui.capabilities.saving;
-    return;
-  }
   if (!ui.setup) return;
   if (event.target.id === 'setup-tools') { ui.setup.tools = event.target.checked; renderSetup(); }
   if (event.target.id === 'setup-model') {
