@@ -228,7 +228,7 @@ test('an unconnected Agent opens a per-Agent recommendation instead of the batch
   const instance = await setup({ ready: true, connection: connected(), agents: [{ ...codex(), connected: false }] });
   await instance.run('configureAgent("codex")');
   const html = instance.elements.overlay.innerHTML;
-  for (const phrase of ['Codex 接入 ACU', '原有模型', 'ACU 模型', '默认模型', '看图', '读文档', '联网搜索', '推荐已选好', '同意并接入', '不把所有 GPT 模型统一改走 ACU']) assert(html.includes(phrase), phrase);
+  for (const phrase of ['Codex 接入 ACU', '原有模型', 'ACU 模型', '默认模型', '看图', '读文档', '联网搜索', '推荐已选好', '同意并接入', '已有聊天保留原来的模型']) assert(html.includes(phrase), phrase);
   assert(!html.includes('同步辅助模型'));
   assert(html.includes('id="setup-tools"'));
   assert.equal(posts(instance).length, 0);

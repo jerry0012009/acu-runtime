@@ -1,4 +1,6 @@
-ACU Runtime 0.1.40：Windows 与 macOS 原生桌面发布。
+ACU Runtime 0.1.41：Windows 与 macOS 原生桌面发布。
+
+后台内核和工具进程在 Windows 使用无控制台隐藏启动；安装包内核为 nogui CLI，不创建 Magpie 桌面窗口、任务栏或托盘图标。已有独立 Magpie 保持用户自己的启动状态。路由页与 Codex 推荐配置明确说明：不同聊天可以使用不同来源，已有聊天保留原选模，选择 ACU 来源的模型后才走 ACU。
 
 优先复用已开启的 Magpie 本机管理服务，未开启时才启动必要的控制进程并由内核复用已有推理网关。退出只结束 Runtime 自己启动的进程。修复 Magpie 返回已有服务地址后正常退出被误判启动失败的问题。连接前通过内核命令关闭自动更新，不增加用户选项；用户手动升级不会被强制降级。
 
@@ -16,9 +18,9 @@ ACU Runtime 0.1.40：Windows 与 macOS 原生桌面发布。
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.40-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.40-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.40-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.41-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.41-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.41-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 

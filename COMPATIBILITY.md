@@ -93,3 +93,9 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 自动更新开关通过 Magpie 原生命令修改，保留其余设置。独立安装保持原路径和版本，不自动降级。该策略不保证用户手动升级后的新版本兼容。已在更新前下载暂存的升级不由 Runtime 清除。
 
 0.1.39 本机隔离实测：已有管理服务时 ready=true、Runtime 常驻 Magpie 子进程为 0；无管理服务时 ready=true、控制子进程为 1。两条路径均确认 noAutoUpdate=true、noAutoDownload=true、autoRestart=false。测试没有发送收费推理请求。
+
+## 0.1.41 后台可见性与路由说明
+
+Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程属性。随包内核官方 CLI 的 Go 构建标签为 nogui；不启动 gui/tray、不创建 Magpie 快捷方式或桌面自启。隔离配置使用随包 CLI 实测：管理服务复用时无常驻子进程，备用控制路径一个子进程且 MainWindowHandle=0、ready=true。本机已有独立桌面 Magpie 保留。
+
+路由跟踪确认原生 OpenAI 与 ACU 请求属于不同 session；一键配置不重写已存在的聊天选模。推荐预览与路由页说明保留聊天选模及按模型来源路由的行为。
