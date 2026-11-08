@@ -648,7 +648,7 @@ test('free search hides dependency choices and remains automatic on a fresh mach
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route.startsWith('/runtime/capabilities') ? { body: view } : undefined);
   await instance.run('openCapabilities()');
   const html = instance.elements.app.innerHTML;
-  assert(html.includes('应用工具'));
+  assert(html.includes('通用工具'));
   assert(!html.includes('data-capability="freeSearch"'));
   assert(!html.includes('data-capability-agent'));
   assert(!html.includes('searchURL'));
@@ -662,22 +662,31 @@ test('configured apps show status and explicit actions without switches or ACU p
  const instance = await setup({ready:true,agents:[codex()]}, async route => route.startsWith('/runtime/capabilities') ? {body:view} : undefined);
  await instance.run('openCapabilities()');
  const html=instance.elements.app.innerHTML;
- for(const phrase of ['已配置 ✓','重新配置','使用免费搜索','保存模型设置','高级设置']) assert(html.includes(phrase),phrase);
+ for(const phrase of ['已接入 ✓','一键检查并补齐','使用免费搜索','保存模型设置','高级设置']) assert(html.includes(phrase),phrase);
  for(const phrase of ['3/3','type="checkbox"','ACU 搜索待配置','扫描件','HTTP','MCP','searchURL']) assert(!html.includes(phrase),phrase);
  assert(html.includes('data-save-capabilities disabled'));
  await instance.run('saveCapabilities()');assert.equal(posts(instance).length,0);
- await instance.run('configureCapabilities("codex")');
+ await instance.run('configureCapabilities("check")');
  assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['codex']});
 });
 
-test('failed tool setup refreshes partial results and retries only missing apps', async () => {
+test('unified tool check preserves success and retries only the failed agent', async () => {
  const view = {...capabilityFixture(),tools:['acu-vision','acu-image','acu-free-search'].map(name=>({name,agents:['codex']}))};
- const instance=await setup({ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async (route,options)=>route.startsWith('/runtime/capabilities') ? options.method==='POST'?{ok:false,body:{error:'工具准备失败'}}:{body:view}:undefined);
- await instance.run('openCapabilities()');await instance.run('configureCapabilities("missing")');
- assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['claude']});
- assert(instance.elements.app.innerHTML.includes('重试未完成项'));
- assert(instance.elements.app.innerHTML.includes('已配置 ✓'));
- assert(instance.elements.app.innerHTML.includes('工具准备失败'));
+ let fail=true;
+ const instance=await setup({ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async (route,options)=>route.startsWith('/runtime/capabilities') ? options.method==='POST'&&JSON.parse(options.body).agents[0]==='claude'&&fail?{ok:false,body:{error:'工具写入失败'}}:{body:view}:undefined);
+ await instance.run('openCapabilities()');
+ assert.equal((instance.elements.app.innerHTML.match(/data-configure-capabilities=/g)||[]).length,1);
+ await instance.run('configureCapabilities("check")');
+ assert.deepEqual(posts(instance).map(call=>JSON.parse(call.body).agents),[['codex'],['claude']]);
+ assert(instance.elements.app.innerHTML.includes('已接入 ✓'));
+ assert(instance.elements.app.innerHTML.includes('需要处理'));
+ assert(instance.elements.app.innerHTML.includes('工具写入失败'));
+ assert(instance.elements.app.innerHTML.includes('data-configure-capabilities="claude"'));
+ assert(!instance.elements.app.innerHTML.includes('data-configure-capabilities="codex"'));
+ fail=false;await instance.run('configureCapabilities("claude")');
+ assert.deepEqual(JSON.parse(posts(instance).at(-1).body).agents,['claude']);
+ assert(!instance.elements.app.innerHTML.includes('data-configure-capabilities="claude"'));
+ assert(!instance.elements.app.innerHTML.includes('重新配置'));
 });
 
 test('repeated one-click setup preserves connected app model and visibility by default',async()=>{
@@ -705,7 +714,7 @@ test('custom tool settings are named and tool reconfiguration does not submit mo
  await instance.run('openCapabilities()');
  assert(instance.elements.app.innerHTML.includes('自定义设置'));
  instance.listeners.app.change({target:{dataset:{capability:'vision'},value:'off'}});
- await instance.run('configureCapabilities("codex")');
+ await instance.run('configureCapabilities("check")');
  assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['codex']});
  assert.equal(instance.run('ui.capabilities.draft.vision'),'off');
 });
@@ -718,7 +727,7 @@ test('capabilities is a management page with a local model form and two external
  for(const phrase of ['id="capability-page"','常用模型','data-capability-model-form','返回工作台','模型与搜索设置','工具与应用分配']) assert(html.includes(phrase),phrase);
  assert.equal(instance.elements.overlay.innerHTML,'');
  assert(!html.includes('data-close'));
- assert(html.indexOf('</form>')<html.indexOf('<h2>应用工具</h2>'));
+ assert(html.indexOf('</form>')<html.indexOf('<h2>通用工具</h2>'));
  assert(html.indexOf('</form>')<html.indexOf('<h2>高级设置</h2>'));
  assert.equal((html.match(/data-capability-native=/g)||[]).length,2);
 });
@@ -765,4 +774,10 @@ test('save-and-leave failure keeps the page and unsaved draft',async()=>{
  assert.equal(instance.run('ui.page'),'capabilities');assert.equal(instance.run('ui.capabilities.draft.vision'),'off');
  assert(instance.elements.app.innerHTML.includes('保存失败'));assert(!instance.elements.app.innerHTML.includes('iframe'));
  assert.equal(instance.elements.overlay.innerHTML,'');
+});
+
+
+test('single-agent tool retry is unavailable before a failure',async()=>{
+ const instance=await setup({ready:true,agents:[codex()]},async route=>route.startsWith('/runtime/capabilities')?{body:capabilityFixture()}:undefined);
+ await instance.run('openCapabilities()');await instance.run('configureCapabilities("codex")');assert.equal(posts(instance).length,0);
 });

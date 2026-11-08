@@ -672,12 +672,13 @@ function renderCapabilities() {
     return `<label class="field-label" for="capability-${field}">${label}</label><select id="capability-${field}" data-capability="${field}" ${current.saving ? 'disabled' : ''}><option value="" disabled ${!value ? 'selected' : ''}>由一键配置选择推荐模型</option>${options.map(model => `<option value="${escapeHTML(model.id)}" ${value === model.id ? 'selected' : ''}>${escapeHTML(model.name || model.id)}</option>`).join('')}<option value="off" ${value === 'off' ? 'selected' : ''}>关闭此补充能力</option></select>`;
   };
   const agents = (ui.status?.agents || []).filter(agent => agent.detected);
-  const missing = view ? agents.filter(agent => capabilityAgentState(view, agent.id).count < 3) : [];
-  const body = view ? `<section class="panel capability-model-panel"><h2>常用模型</h2><p class="capability-intro">选择识图和生图模型，各应用共用。</p><form data-capability-model-form><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-model-actions"><span role="status">${Object.keys(current.draft).length ? '有未保存的修改' : ''}</span><button type="submit" class="button primary" data-save-capabilities ${current.saving || !Object.keys(current.draft).length ? 'disabled' : ''}>${current.saving === 'models' ? '保存中…' : '保存模型设置'}</button></div></form></section><section class="panel capability-tools-panel"><div class="capability-list-heading"><h2>应用工具</h2>${missing.length ? `<button class="text-button" data-configure-capabilities="missing" ${current.saving ? 'disabled' : ''}>${current.retry ? '重试未完成项' : '配置未完成项'}</button>` : ''}</div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '使用已设置的搜索服务' : view.freeSearchConfigured ? '使用免费搜索' : '待配置'}</span></div>${agents.map(agent => {
+
+  const body = view ? `<section class="panel capability-model-panel"><h2>常用模型</h2><p class="capability-intro">选择识图和生图模型，各应用共用。</p><form data-capability-model-form><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-model-actions"><span role="status">${Object.keys(current.draft).length ? '有未保存的修改' : ''}</span><button type="submit" class="button primary" data-save-capabilities ${current.saving || !Object.keys(current.draft).length ? 'disabled' : ''}>${current.saving === 'models' ? '保存中…' : '保存模型设置'}</button></div></form></section><section class="panel capability-tools-panel"><div class="capability-list-heading"><h2>通用工具</h2></div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '使用已设置的搜索服务' : view.freeSearchConfigured ? '使用免费搜索' : '待配置'}</span></div>${agents.map(agent => {
     const state = capabilityAgentState(view, agent.id);
-    return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${state.count === 3 ? 'complete' : ''}" title="已配置表示配置已写入；实际使用取决于模型和应用权限。">${state.count === 3 ? '已配置 ✓' : state.count ? '待补齐' : '待配置'}${state.custom ? ' · 自定义设置' : ''}</span></div><button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>${state.count === 3 ? '重新配置' : '配置'}</button></div>`;
-  }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}<p class="capability-intro capability-help">首次配置或新增工具后，请重新打开对应应用。</p></section><section class="panel capability-advanced-panel"><h2>高级设置</h2><p>更多模型来源、搜索服务和工具权限设置。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="settings" ${current.saving ? 'disabled' : ''}>模型与搜索设置</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></section>` : `<section class="panel capability-model-panel"><p>${current.loading ? '正在读取配置…' : '配置暂未读取，请返回后重试。'}</p></section>`;
-  app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress ? `<p class="capability-progress" role="status">${escapeHTML(current.progress)}</p>` : ''}${body}</main></div>`;
+    const failure = current.toolFailures?.[agent.id];
+    return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${!failure && state.count === 3 ? 'complete' : ''}" title="已接入表示工具配置已写入；实际使用取决于模型和应用权限。">${failure ? '需要处理' : state.count === 3 ? '已接入 ✓' : state.count ? '待补齐' : '待接入'}${state.custom ? ' · 自定义设置' : ''}</span>${failure ? `<span class="capability-tool-error">${escapeHTML(failure)}</span>` : ''}</div>${failure ? `<button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>重试</button>` : ''}</div>`;
+  }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}<p class="capability-intro capability-help">首次配置或新增工具后，请重新打开对应应用。</p><div class="capability-check-actions"><span class="capability-intro">检查并补齐各应用的识图、生图和搜索工具，保留已有选择。</span><button class="button primary" data-configure-capabilities="check" ${current.saving || !agents.length ? 'disabled' : ''}>${current.saving === 'tools' ? '正在检查…' : '一键检查并补齐'}</button></div></section><section class="panel capability-advanced-panel"><h2>高级设置</h2><p>更多模型来源、搜索服务和工具权限设置。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="settings" ${current.saving ? 'disabled' : ''}>模型与搜索设置</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></section>` : `<section class="panel capability-model-panel"><p>${current.loading ? '正在读取配置…' : '配置暂未读取，请返回后重试。'}</p></section>`;
+  app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress || current.toolSummary ? `<p class="capability-progress" role="status">${escapeHTML(current.progress || current.toolSummary)}</p>` : ''}${body}</main></div>`;
 }
 
 function changeCapabilityModel(target) {
@@ -735,18 +736,24 @@ async function configureCapabilities(target) {
   const current = ui.capabilities;
   if (!current?.view || current.saving) return;
   const detected = (ui.status?.agents || []).filter(agent => agent.detected);
-  const agents = target === 'missing' ? detected.filter(agent => capabilityAgentState(current.view, agent.id).count < 3).map(agent => agent.id) : detected.filter(agent => agent.id === target).map(agent => agent.id);
+  const agents = target === 'check' ? detected : detected.filter(agent => agent.id === target && current.toolFailures?.[agent.id]);
   if (!agents.length) return;
-  current.saving = 'tools'; current.error = ''; current.retry = false;
-  current.progress = '正在准备图片与搜索工具，首次配置可能需要几分钟…';
-  renderCapabilities();
-  try {
-    current.view = await request('/runtime/capabilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: current.provider, agents }) });
-    toast('工具已配置，请重新打开应用');
-  } catch (error) {
-    current.error = error.message; current.retry = true;
-    try { current.view = await request(`/runtime/capabilities?provider=${encodeURIComponent(current.provider)}`); } catch { /* keep the last known state and allow retry */ }
-  } finally { current.saving = false; current.progress = ''; if (ui.capabilities === current) renderCapabilities(); }
+  current.saving = 'tools'; current.error = ''; current.toolFailures ||= {};
+  let completed = 0;
+  for (const [index, agent] of agents.entries()) {
+    current.progress = `检查并补齐 ${agent.name}（${index + 1}/${agents.length}），首次准备可能需要几分钟…`;
+    renderCapabilities();
+    try {
+      current.view = await request('/runtime/capabilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: current.provider, agents: [agent.id] }) });
+      delete current.toolFailures[agent.id]; completed++;
+    } catch (error) {
+      current.toolFailures[agent.id] = error.message;
+      try { current.view = await request(`/runtime/capabilities?provider=${encodeURIComponent(current.provider)}`); } catch { /* preserve last known state */ }
+    }
+  }
+  current.saving = false; current.progress = '';
+  current.toolSummary = completed === agents.length ? '检查完成，工具配置已补齐；新增工具后请重新打开应用。' : `已完成 ${completed}/${agents.length} 个应用，请重试下方需要处理的应用。`;
+  if (ui.capabilities === current) renderCapabilities();
 }
 
 function disconnectLabel(id) {
