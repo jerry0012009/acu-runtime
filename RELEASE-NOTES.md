@@ -1,4 +1,8 @@
-# ACU Runtime 0.1.42
+# ACU Runtime 0.1.43
+
+修复 WorkBuddy 官方 PDF 组件路径发现：一键配置及已接入用户升级启动时，若本机已有官方 external-packages/pdf-cli/workbuddy-pdf.exe 且没有自定义 WORKBUDDY_PDF，则在应用支持的 env 设置中补齐路径。保留其他环境变量、沙箱和审批设置，不修改内置技能、不安装新解析器。官方启动器连续定位、文本提取和扫描件页面渲染已实测通过；桌面新任务最终验收仍由用户执行。
+
+Windows 启动时通过注册表判断是否有 WSL 发行版，没有才调用 Magpie 官方设置关闭无用途的 WSL Agent 探测，避免重复启动 wsl.exe；已有发行版或检测不确定时保留内核设置。不运行 WSL 安装命令、不新增用户选项。本机已捕获 Magpie 重复探测，关闭后采样未再出现；“正在发布”窗口自身尚未捕获，未将其断言为已修复。
 
 一键配置补齐 `acu-auto` 缺失的 922,000 上下文信息，通过 Magpie 官方设置同步到客户端；其他模型沿用各自目录上限并保留用户覆盖。修复本机 Hermes 因错误回退 32K 无法启动的问题。
 
@@ -26,9 +30,9 @@
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.42-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.42-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.42-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.43-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.43-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.43-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 

@@ -420,6 +420,9 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	if err := host.assignImageGuidance(ctx, input.Agents); err != nil {
 		return view, err
 	}
+	if err := host.prepareAgentComponents(input.Agents); err != nil {
+		return view, fmt.Errorf("工具已配置，PDF 组件路径同步失败：%w", err)
+	}
 	view, _, _, err = host.capabilityRead(ctx, input.Provider)
 	return view, err
 }

@@ -283,6 +283,9 @@ func (kernel *kernelState) start(ctx context.Context) error {
 	}
 	policy, cancelPolicy := context.WithTimeout(ctx, 20*time.Second)
 	err := pauseKernelUpdates(policy, executable)
+	if err == nil {
+		err = prepareKernelDetection(policy, executable)
+	}
 	cancelPolicy()
 	if err != nil {
 		return err
@@ -749,6 +752,9 @@ func main() {
 	serviceErrors := make(chan error, 1)
 	go func() { serviceErrors <- service.Serve(listener) }()
 	if !*webMode {
+		if err := repairConnectedWorkBuddyPDF(); err != nil {
+			log.Printf("WorkBuddy PDF 组件路径同步未完成：%v", err)
+		}
 		if err := runDesktop(ctx, host, "http://"+host.host, *inspectPort, host.quitRequests, shutdown); err != nil {
 			log.Print(err)
 		}

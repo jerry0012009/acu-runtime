@@ -206,6 +206,10 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		host.json(response, 400, map[string]string{"error": "未检测到此 Agent"})
 		return
 	}
+	if err := host.prepareAgentComponents([]string{input.Agent}); err != nil {
+		host.json(response, 400, map[string]string{"error": "PDF 组件路径同步失败：" + err.Error()})
+		return
+	}
 	if input.Preserve && target.Wired {
 		if err := host.ensureACUContext(ctx, input.Provider); err != nil {
 			host.json(response, 400, map[string]string{"error": err.Error()})

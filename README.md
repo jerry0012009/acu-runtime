@@ -143,3 +143,10 @@ WorkBuddy 桌面端 GPT-6.1 Sol 已实际调用官方 `workbuddy-pdf` 提取正�
 
 
 推荐工具同时通过 Magpie 技能库分发 `acu-image-tools`：普通生图请求优先发现并调用已配置的图片 MCP，未指定模型时沿用共享生图设置，不静默替换成消耗应用积分的原生 ImageGen。仅为调用指引，不能强制客户端工具选择；用户明确指定原生服务时尊重选择。工具可用性、首次信任与客户端技能加载仍需实际验收。已有同名用户技能和用户修改不覆盖。
+
+
+### 0.1.43 组件发现与后台探测
+
+Windows 没有注册 WSL 发行版时，通过 Magpie 官方 `settings set noWSLAgents on` 停止无用途的 WSL 探测；不调用 wsl.exe 判断安装状态。已有发行版及无法确认的环境保留设置。后续安装 WSL 的用户可在内核高级设置重新开启探测。
+
+WorkBuddy 已安装官方 `external-packages/pdf-cli/workbuddy-pdf.exe` 时，一键配置及已接入用户的 Runtime 启动会补齐其官方启动器支持的 `env.WORKBUDDY_PDF`。不覆盖用户已有值（含显式空值），不修改内置技能或沙箱/审批，不安装其他 PDF 工具；组件尚未安装时保留原行为。现有 WorkBuddy 应用需重新打开或新建任务以加载配置。文本提取与扫描件页面渲染通过官方启动器验证，扫描件 OCR/识图仍使用应用现有能力。
