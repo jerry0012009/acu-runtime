@@ -14,9 +14,8 @@ try {
     $search = (& $application --search-runtime-release-json | Out-String | ConvertFrom-Json)
     $searchArchive = Join-Path $root 'web/search-runtime.archive'
     if (!(Test-Path -LiteralPath $searchArchive) -or (Get-FileHash -LiteralPath $searchArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $search.sha256) {
-        Invoke-WebRequest -Uri "https://github.com/astral-sh/uv/releases/download/$($search.version)/$($search.name)" -OutFile "$searchArchive.download"
-        if ((Get-FileHash -LiteralPath "$searchArchive.download" -Algorithm SHA256).Hash.ToLowerInvariant() -ne $search.sha256) { throw 'Search runtime checksum mismatch' }
-        Move-Item -LiteralPath "$searchArchive.download" -Destination $searchArchive -Force
+        python scripts/download-release.py astral-sh/uv $search.version $search.name $search.sha256 $searchArchive
+        if ($LASTEXITCODE -ne 0) { throw 'Search runtime download or checksum failed' }
     }
     & $GoExecutable build -tags desktop,production -ldflags '-H windowsgui' -o $application .
     if ($LASTEXITCODE -ne 0) { throw 'Bundled desktop build failed' }
@@ -24,10 +23,8 @@ try {
     if (!$release.sha256 -or $release.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Invalid kernel manifest' }
     $kernel = Join-Path $kernelDirectory 'acu-kernel.exe'
     if (!(Test-Path -LiteralPath $kernel) -or (Get-FileHash -LiteralPath $kernel -Algorithm SHA256).Hash.ToLowerInvariant() -ne $release.sha256) {
-        $download = "$kernel.download"
-        Invoke-WebRequest -Uri "https://github.com/yetone/magpie/releases/download/$($release.version)/$($release.name)" -OutFile $download
-        if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $release.sha256) { throw 'Kernel checksum mismatch; not packaged' }
-        Move-Item -LiteralPath $download -Destination $kernel -Force
+        python scripts/download-release.py yetone/magpie $release.version $release.name $release.sha256 $kernel
+        if ($LASTEXITCODE -ne 0) { throw 'Kernel download or checksum failed' }
     }
     $payload = Join-Path $root 'cmd/setup/payload.zip'
     Compress-Archive -LiteralPath $application, $kernelDirectory, (Join-Path $root 'web/THIRD-PARTY-NOTICES.txt') -DestinationPath $payload -Force

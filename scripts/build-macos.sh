@@ -12,28 +12,24 @@ export CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=12.0
 go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
 "$app/Contents/MacOS/ACU Runtime" --search-runtime-release-json > "$out/search-release.json"
 python3 - "$out/search-release.json" <<'PY'
-import hashlib, json, pathlib, sys, urllib.request
+import json, pathlib, sys
+sys.path.insert(0, 'scripts')
+from importlib import import_module
+download = import_module('download-release').download
 manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
-url = f"https://github.com/astral-sh/uv/releases/download/{manifest['version']}/{manifest['name']}"
-with urllib.request.urlopen(url, timeout=180) as response:
-    data = response.read(128 * 1024 * 1024 + 1)
-assert len(data) <= 128 * 1024 * 1024
-assert hashlib.sha256(data).hexdigest() == manifest['sha256'], 'Search runtime SHA-256 mismatch'
-pathlib.Path('web/search-runtime.archive').write_bytes(data)
+download('astral-sh/uv', manifest['version'], manifest['name'], manifest['sha256'], 'web/search-runtime.archive')
 PY
 go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
 "$app/Contents/MacOS/ACU Runtime" --kernel-release-json > "$out/kernel-release.json"
 python3 - "$out/kernel-release.json" "$app" "$version" <<'PY'
-import hashlib, json, pathlib, plistlib, sys, urllib.request
+import json, pathlib, plistlib, sys
+sys.path.insert(0, 'scripts')
+from importlib import import_module
+download = import_module('download-release').download
 manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
 app = pathlib.Path(sys.argv[2])
 kernel = app / 'Contents/MacOS/kernel/acu-kernel'
-url = f"https://github.com/yetone/magpie/releases/download/{manifest['version']}/{manifest['name']}"
-with urllib.request.urlopen(url, timeout=180) as response:
-    data = response.read(128 * 1024 * 1024 + 1)
-assert len(data) <= 128 * 1024 * 1024
-assert hashlib.sha256(data).hexdigest() == manifest['sha256'], 'Kernel SHA-256 mismatch'
-kernel.write_bytes(data)
+download('yetone/magpie', manifest['version'], manifest['name'], manifest['sha256'], kernel)
 kernel.chmod(0o755)
 plist = dict(CFBundleName='ACU Runtime', CFBundleDisplayName='ACU Runtime',
              CFBundleIdentifier='com.acucompute.runtime', CFBundleExecutable='ACU Runtime',
