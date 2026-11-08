@@ -81,21 +81,22 @@ type kernelState struct {
 }
 
 type server struct {
-	kernel         *kernelState
-	token          string
-	host           string
-	web            http.Handler
-	desktop        bool
-	quitRequests   chan struct{}
-	desktopActions chan desktopAction
-	lifecycle      context.Context
-	account        accountState
-	loginRequests  chan loginTicket
-	cloudTransport http.RoundTripper
-	health         keyHealth
-	update         updateState
-	capabilityMu   sync.Mutex
-	prepareSearch  func(context.Context, string) error
+	kernel           *kernelState
+	token            string
+	host             string
+	web              http.Handler
+	desktop          bool
+	quitRequests     chan struct{}
+	desktopActions   chan desktopAction
+	lifecycle        context.Context
+	account          accountState
+	loginRequests    chan loginTicket
+	cloudTransport   http.RoundTripper
+	health           keyHealth
+	update           updateState
+	capabilityMu     sync.Mutex
+	prepareSearch    func(context.Context, string) error
+	imageSkillSource func() (string, error)
 }
 
 func secret() string {

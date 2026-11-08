@@ -38,6 +38,10 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			json.NewEncoder(w).Encode(f.prefs)
 		case "/api/library":
 			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers})
+		case "/api/library/skills/probe":
+			io.WriteString(w, `{"candidates":[{"name":"acu-image-tools","path":"."}]}`)
+		case "/api/library/skills/install":
+			io.WriteString(w, `{}`)
 		case "/api/provider/key":
 			io.WriteString(w, `{"key":"private-acu-test-key"}`)
 		case "/api/settings/search-api":
@@ -45,7 +49,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			json.NewDecoder(r.Body).Decode(&in)
 			if key, ok := in["key"].(string); ok {
 				f.searchKey = key
-				f.prefs["searchAPIs"] = []map[string]any{{"vendor": "searxng", "url": in["url"], "ready": true}}
+				f.prefs["searchAPIs"] = []map[string]any{{"vendor": in["vendor"], "url": in["url"], "ready": true}}
 			}
 			io.WriteString(w, `{}`)
 		case "/api/library/servers/save":
@@ -75,6 +79,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		}
 	}))
 	host.prepareSearch = func(context.Context, string) error { return nil }
+	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
 	return host, f
 }
 func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
@@ -175,7 +180,8 @@ func TestCapabilityFreeSearchUsesNoSecrets(t *testing.T) {
 		t.Skip("uvx not installed")
 	}
 	host, f := capabilityTestHost(t)
-	f.prefs["searchAPIs"] = []any{}
+	// An explicit disabled source is retained; the extra free MCP remains available.
+	f.prefs["searchAPIs"] = []map[string]any{{"vendor": "you", "off": true}}
 	view, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", Agents: []string{"codex"}})
 	if err != nil {
 		t.Fatal(err)
@@ -216,5 +222,26 @@ func TestCapabilityModelSaveRejectsMixedOperations(t *testing.T) {
 	}
 	if len(f.writes) > 0 {
 		t.Fatal("mutated on invalid request")
+	}
+}
+
+func TestCapabilityPrefersNativeKeylessSearch(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	f.prefs["searchAPIs"] = []any{}
+	host.prepareSearch = func(context.Context, string) error {
+		t.Fatal("prepared extra package despite native search")
+		return nil
+	}
+	view, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", Agents: []string{"codex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !view.SearchReady || f.searchKey != "" {
+		t.Fatal("keyless native search not ready")
+	}
+	for _, s := range f.servers {
+		if s["name"] == "acu-free-search" {
+			t.Fatal("installed redundant search MCP")
+		}
 	}
 }

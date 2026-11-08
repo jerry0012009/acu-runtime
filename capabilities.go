@@ -290,10 +290,38 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	if needsFree {
 		defs = append(defs, struct{ name, path string }{"acu-free-search", "free-search"})
 	}
+	// Validate the native search name too before making any configuration write.
+	for _, t := range lib.Servers {
+		if needsFree && t.Name == "acu-search" && t.Note != capabilityOwner {
+			return view, errors.New("已有同名工具 acu-search，请先在工具目录中重命名")
+		}
+	}
 	for _, def := range defs {
 		for _, t := range lib.Servers {
 			if t.Name == def.name && t.Note != capabilityOwner {
 				return view, fmt.Errorf("已有同名工具 %s，请先在工具目录中重命名", def.name)
+			}
+		}
+	}
+	if len(input.Agents) > 0 {
+		if err := host.ensureACUContext(ctx, input.Provider); err != nil {
+			return view, err
+		}
+		if needsFree {
+			added, err := host.ensureNativeSearch(ctx, prefs)
+			if err != nil {
+				return view, err
+			}
+			if added {
+				view, prefs, lib, err = host.capabilityRead(ctx, input.Provider)
+				if err != nil {
+					return view, err
+				}
+				if view.SearchReady {
+					needsFree = false
+					defs = defs[:len(defs)-1]
+					defs = append(defs, struct{ name, path string }{"acu-search", "web-search"})
+				}
 			}
 		}
 	}
@@ -388,6 +416,9 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		if len(result.Problems) > 0 || len(result.Result.Problems) > 0 {
 			return view, errors.New("工具已保存，但部分 Agent 写入失败，请在工具目录检查并重试")
 		}
+	}
+	if err := host.assignImageGuidance(ctx, input.Agents); err != nil {
+		return view, err
 	}
 	view, _, _, err = host.capabilityRead(ctx, input.Provider)
 	return view, err

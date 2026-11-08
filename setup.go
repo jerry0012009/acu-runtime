@@ -207,12 +207,20 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		return
 	}
 	if input.Preserve && target.Wired {
+		if err := host.ensureACUContext(ctx, input.Provider); err != nil {
+			host.json(response, 400, map[string]string{"error": err.Error()})
+			return
+		}
 		host.json(response, 200, state)
 		return
 	}
 	main := pickACU(target.Fields, "model", input.Provider, input.Model)
 	if input.Agent != "workbuddy" && main == "" {
 		host.json(response, 400, map[string]string{"error": "此 Agent 暂不支持所选 ACU 模型，请更换模型"})
+		return
+	}
+	if err := host.ensureACUContext(ctx, input.Provider); err != nil {
+		host.json(response, 400, map[string]string{"error": err.Error()})
 		return
 	}
 	var result map[string]json.RawMessage

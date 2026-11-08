@@ -1,4 +1,12 @@
-ACU Runtime 0.1.41：Windows 与 macOS 原生桌面发布。
+# ACU Runtime 0.1.42
+
+一键配置补齐 `acu-auto` 缺失的 922,000 上下文信息，通过 Magpie 官方设置同步到客户端；其他模型沿用各自目录上限并保留用户覆盖。修复本机 Hermes 因错误回退 32K 无法启动的问题。
+
+搜索优先复用 Magpie 内置免 Key You.com 来源，无需新增依赖；保留已有来源和停用选择。现有 DuckDuckGo MCP 保留。免费服务受网络和服务方额度影响。
+
+通过 Magpie 技能库分发简短的生图指引：默认优先使用已配置图片 MCP，不随意覆盖共享生图模型，不静默切换到收取应用积分的原生 ImageGen。MCP 入口显示 Magpie 属正常行为，实际模型以工具返回与路由记录为准。指引不等同于强制客户端选工具，桌面默认行为仍需验收。
+
+本机已实测 WorkBuddy 桌面端使用 ACU GPT-6.1 Sol 提取 PDF、渲染页面并识图核对；PDF 官方组件偶发找不到程序仍需排查。Runtime 不另装 PDF 解析器、不更改应用权限。Hermes 已完成真实 ACU 请求；四个客户端搜索 MCP 入口均返回有效结果，这不代表所有桌面操作均已验收。
 
 后台内核和工具进程在 Windows 使用无控制台隐藏启动；安装包内核为 nogui CLI，不创建 Magpie 桌面窗口、任务栏或托盘图标。已有独立 Magpie 保持用户自己的启动状态。路由页与 Codex 推荐配置明确说明：不同聊天可以使用不同来源，已有聊天保留原选模，选择 ACU 来源的模型后才走 ACU。
 
@@ -18,9 +26,9 @@ ACU Runtime 0.1.41：Windows 与 macOS 原生桌面发布。
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.41-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.41-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.41-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.42-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.42-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.42-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 
