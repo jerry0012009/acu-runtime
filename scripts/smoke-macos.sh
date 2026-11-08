@@ -5,7 +5,11 @@ version="$2"
 port=43871
 "$app/Contents/MacOS/ACU Runtime" --listen "127.0.0.1:$port" > /tmp/acu-smoke.log 2>&1 &
 runtime_pid=$!
-trap 'kill "$runtime_pid" 2>/dev/null || true' EXIT
+cleanup() {
+    kill "$runtime_pid" 2>/dev/null || true
+    wait "$runtime_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
 python3 - "$port" "$version" <<'PY'
 import json, sys, time, urllib.request
 origin = 'http://127.0.0.1:' + sys.argv[1]

@@ -61,4 +61,14 @@ stage="$out/dmg"
 mkdir -p "$stage"
 ditto "$app" "$stage/ACU Runtime.app"
 ln -sfn /Applications "$stage/Applications"
-hdiutil create -volname 'ACU Runtime' -srcfolder "$stage" -ov -format UDZO "dist/release/ACU-Runtime-$version-macos-$arch.dmg"
+image="dist/release/ACU-Runtime-$version-macos-$arch.dmg"
+# DiskImages can briefly report EBUSY on shared CI hosts. Retry the same
+# output without weakening signing, startup checks or packaging failures.
+for attempt in 1 2 3; do
+    if hdiutil create -volname 'ACU Runtime' -srcfolder "$stage" -ov -format UDZO "$image"; then
+        break
+    fi
+    [[ "$attempt" -lt 3 ]] || exit 1
+    sleep 3
+done
+hdiutil verify "$image"
