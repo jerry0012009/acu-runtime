@@ -1,0 +1,38 @@
+package main
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+)
+
+// Opt-in only on disposable release runners. Never install or replace apps
+// as a side effect of the normal developer test suite.
+func TestOfficialWorkBuddyInstallSmoke(t *testing.T) {
+	if os.Getenv("ACU_AGENT_INSTALL_SMOKE") != "1" {
+		t.Skip("requires disposable installation runner")
+	}
+	if workBuddyInstalled() {
+		t.Fatal("smoke runner already has WorkBuddy; refusing to alter it")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer cancel()
+	pkg, err := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), pkg.Name)
+	if err := downloadAgentPackage(ctx, agentDownloadClient(), pkg.URL, path, pkg.SHA256, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := installWorkBuddy(ctx, path); err != nil {
+		t.Fatal(err)
+	}
+	if !workBuddyInstalled() {
+		t.Fatal("installer returned but desktop executable/bundle was not found")
+	}
+	t.Log("official package installed without modifying sign-in or client credentials")
+}

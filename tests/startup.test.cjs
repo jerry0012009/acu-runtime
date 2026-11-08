@@ -781,3 +781,25 @@ test('single-agent tool retry is unavailable before a failure',async()=>{
  const instance=await setup({ready:true,agents:[codex()]},async route=>route.startsWith('/runtime/capabilities')?{body:capabilityFixture()}:undefined);
  await instance.run('openCapabilities()');await instance.run('configureCapabilities("codex")');assert.equal(posts(instance).length,0);
 });
+
+test('empty desktop offers domestic install and never installs without a click', async()=>{
+ const instance=await setup({ready:true,desktop:true,agents:[]});
+ assert(instance.elements.app.innerHTML.includes('安装并配置 WorkBuddy'));
+ assert(instance.elements.app.innerHTML.includes('国内官方下载线路'));
+ assert(instance.elements.app.innerHTML.includes('安装并配置 ChatGPT'));
+ assert.equal(posts(instance).length,0);
+});
+
+test('installed agents keep their existing flow without an install prompt',async()=>{
+ const instance=await setup({ready:true,desktop:true,agents:[codex()]});
+ assert(!instance.elements.app.innerHTML.includes('安装并配置 WorkBuddy'));
+ assert.equal(posts(instance).length,0);
+});
+
+test('install action supplies selected ACU model and keeps credentials out of request',async()=>{
+ const instance=await setup({ready:true,desktop:true,agents:[]},async(route,options)=>route==='/runtime/agents/install'&&options.method==='POST'?{body:{agent:'workbuddy',phase:'downloading',message:'正在下载'}}:undefined);
+ await instance.run('installAgent("workbuddy")');
+ const call=posts(instance).find(c=>c.route==='/runtime/agents/install');
+ assert.deepEqual(JSON.parse(call.body),{agent:'workbuddy',provider:'acu-runtime',model:'acu-auto'});
+ assert(!call.body.includes('sk-'));
+});

@@ -150,3 +150,12 @@ WorkBuddy 桌面端 GPT-6.1 Sol 已实际调用官方 `workbuddy-pdf` 提取正�
 Windows 没有注册 WSL 发行版时，通过 Magpie 官方 `settings set noWSLAgents on` 停止无用途的 WSL 探测；不调用 wsl.exe 判断安装状态。已有发行版及无法确认的环境保留设置。后续安装 WSL 的用户可在内核高级设置重新开启探测。
 
 WorkBuddy 已安装官方 `external-packages/pdf-cli/workbuddy-pdf.exe` 时，一键配置及已接入用户的 Runtime 启动会补齐其官方启动器支持的 `env.WORKBUDDY_PDF`。不覆盖用户已有值（含显式空值），不修改内置技能或沙箱/审批，不安装其他 PDF 工具；组件尚未安装时保留原行为。现有 WorkBuddy 应用需重新打开或新建任务以加载配置。文本提取与扫描件页面渲染通过官方启动器验证，扫描件 OCR/识图仍使用应用现有能力。
+
+
+### 没有 Agent 时安装并接入
+
+工作台在未检测到任何 Agent 时显示“安装并配置 WorkBuddy”。用户先连接 ACU，再显式点击安装；运行时使用国内腾讯官方 download.codebuddy.cn 固定 5.9.3.42398134 的 Windows/macOS 架构包及官方 API 提供的 SHA-256，不需要境外镜像或额外包管理器。Windows 使用厂商 NSIS 静默安装并核验腾讯签名；Mac 使用官方 ZIP 校验签名，安装到 ~/Applications，不覆盖已有应用。第一次启动由官方客户端初始化目录，内核重新检测后复用现有配置接口；已有模型、共享工具选择和登录状态保留，新增工具可能需要保存工作后重开应用。WorkBuddy 是否要求账号由客户端决定，不绕过登录、协议或安全确认。
+
+ChatGPT 作为折叠的其他入口，打开官方安装页面；不下载第三方重新打包文件。安装完成后通过内核自动接入，网络不通可停止等待后选择 WorkBuddy。没有 ChatGPT 账号的网关模式依赖客户端支持，Runtime 不伪造 auth.json、不清除已有登录。纯国内网络优先保证 WorkBuddy 官方下载路径；不能将官方客户端的账号登录或原生云服务访问承诺为 ACU 可替代。
+
+安装流程后台状态支持页面重载恢复、避免重复并发安装。正常测试不安装第三方应用；发行 CI 在一次性 Windows/Mac runner 上显式执行 ACU_AGENT_INSTALL_SMOKE=1 的官方包安装检查。

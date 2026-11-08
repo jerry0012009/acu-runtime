@@ -24,6 +24,7 @@ const icon = (name, className = '') => `<svg class="icon ${className}" viewBox="
 const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const ui = { page: 'overview', status: null, busy: false, frame: null, error: '', autoStarted: false, selected: null, applying: false, results: [], progress: '', accountBusy: false, keySelection: null, providerSelection: null, setup: null, disconnect: null, inventory: null, inventoryTab: 'all', inventoryBulk: null, inventorySaving: false, polling: false, connectionOpen: false };
 const launchQuery = new URLSearchParams(globalThis.location?.search || '');
+ui.agentInstall = null;
 if (launchQuery.get('page') === 'overview' || launchQuery.has('native')) ui.page = 'overview';
 let pendingNative = launchQuery.get('native');
 const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usage', 'routing', 'plugins', 'masking']);
@@ -66,6 +67,7 @@ async function refresh(rescan = false, quiet = false) {
     const previousAccount = ui.status?.account;
     const previousState = JSON.stringify(ui.status);
     ui.status = await request('/runtime/status');
+    if (ui.status.agentInstall?.phase) ui.agentInstall = ui.status.agentInstall;
     if (ui.providerSelection !== null && !(ui.status.connection?.choices || []).some(choice => choice.id === ui.providerSelection)) ui.providerSelection = '';
     if (previousAccount?.username !== ui.status.account?.username || previousAccount?.site !== ui.status.account?.site) ui.keySelection = null;
     if (ui.status.ready && ui.selected === null) ui.selected = new Set((ui.status.agents || []).filter(agent => agent.detected && !agent.connected).map(agent => agent.id));
@@ -200,10 +202,29 @@ function agentsPage() {
   const detected = agents.filter(agent => agent.detected);
   const restarting = agents.filter(agent => agent.connected && agent.restartRequired);
   return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${activeChoice() ? '一键接入，随时调整模型与工具。' : '先连接 ACU，再选择要接入的应用。'}</p></div><div class="workbench-actions"><button class="button secondary" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片与搜索</button><button class="icon-button" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button secondary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
-    <div class="agent-grid">${agents.map(agentCard).join('')}</div>
+    ${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.map(agentCard).join('')}</div>` : ''}
     ${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片与搜索' : result.id))}</strong><span>${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
     ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && result.id === 'tools') ? '<button class="button secondary" data-action="capabilities">处理未完成工具</button>' : ''}
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
+}
+
+function agentInstallPanel(count) {
+  const install = ui.agentInstall;
+  if (count && !install) return '';
+  const running = install && !['complete', 'error'].includes(install.phase);
+  const percent = install?.total > 0 ? ` · ${Math.min(100, Math.round(install.downloaded / install.total * 100))}%` : '';
+  const disabled = !ui.status?.desktop || !ui.status?.ready || !activeChoice() || running || ui.applying;
+  return `<section class="panel agent-install-panel" aria-label="安装 Agent"><h2>${install?.phase === 'complete' ? '应用已准备' : '还没有可用的 Agent？'}</h2><p>推荐 WorkBuddy：使用国内官方下载线路，自动校验并安装，随后通过 ACU 内核配置模型、识图、生图与搜索工具。已有账号和登录状态保留；首次使用如要求登录，请按应用提示完成。</p>${install ? `<p role="status" class="agent-install-status">${escapeHTML(install.message || '正在检查')}${percent}</p>` : ''}${install?.phase === 'waiting' ? '<button class="text-button" data-action="cancel-agent-install">停止等待，返回选择应用</button>' : ''}${!activeChoice() ? '<p>请先登录 ACU 或填写已有 Key。</p>' : ''}<div class="agent-install-actions"><button class="button primary" data-action="install-agent" data-agent-id="workbuddy" ${disabled ? 'disabled' : ''}>${running ? '正在准备应用…' : install?.phase === 'error' ? '重试安装并配置 WorkBuddy' : '安装并配置 WorkBuddy'}</button><details><summary>使用 ChatGPT 桌面端</summary><p>打开官方安装入口，安装完成后自动接入 ACU。下载受限时推荐使用 WorkBuddy；不要求退出已有账号，未登录模式的功能以客户端支持为准。</p><button class="button secondary" data-action="install-agent" data-agent-id="codex" ${disabled ? 'disabled' : ''}>安装并配置 ChatGPT</button></details></div></section>`;
+}
+
+async function installAgent(id) {
+  const choice = activeChoice();
+  if (!choice || !ui.status?.ready || ui.applying) return;
+  try {
+    ui.agentInstall = await request('/runtime/agents/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: choice.id, model: recommendedModels(choice)[0] || choice.models?.[0] }) });
+    render();
+    refresh();
+  } catch (error) { toast(error.message); }
 }
 
 function connectionContent() {
@@ -1005,6 +1026,8 @@ app.addEventListener('click', event => {
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
     capabilities: openCapabilities,
     'configure-agent': () => configureAgent(control.dataset.agentId),
+    'install-agent': () => installAgent(control.dataset.agentId),
+    'cancel-agent-install': async () => { try { await request('/runtime/agents/install/cancel', { method: 'POST' }); await refresh(); } catch (error) { toast(error.message); } },
     'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
     'account-login': () => startAccountLogin(false), 'account-register': () => startAccountLogin(true),

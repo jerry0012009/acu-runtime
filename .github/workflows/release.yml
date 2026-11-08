@@ -39,6 +39,11 @@ jobs:
           go test ./...
           go test -tags desktop,production ./...
           go vet -tags desktop,production ./...
+      - name: Verify official WorkBuddy installation on clean runner
+        env:
+          ACU_AGENT_INSTALL_SMOKE: '1'
+        shell: bash
+        run: go test -run '^TestOfficialWorkBuddyInstallSmoke$' -v -timeout 25m .
       - name: Package Windows installer
         if: runner.os == 'Windows'
         env:

@@ -1,4 +1,8 @@
-# ACU Runtime 0.1.45
+# ACU Runtime 0.1.46
+
+没有 Agent 时提供“安装并配置 WorkBuddy”，使用国内官方 CDN 的固定版本安装包并校验 SHA-256，Windows 另验腾讯 Authenticode，Mac 校验应用签名并安装到当前用户 Applications。已有应用不覆盖，账号凭据不修改；检测、模型接入、MCP 和推荐技能配置复用内核。首次使用可能仍需完成 WorkBuddy 官方登录和工具信任。
+
+ChatGPT 桌面端提供官方安装入口并等待内核检测后自动配置；境外下载不可达时可停止等待并选择国内 WorkBuddy 路径。未提供第三方 ChatGPT 镜像，不承诺所有客户端云功能免账号可用。没有应用时不再展示四张不可操作卡片。安装进度随 Runtime 状态恢复，失败可重试。
 
 移除 Agent 卡片来源统计左侧重复的“已显示/全部”模型数量，仅在“查看全部模型”入口保留比例；各来源数量和模型示例保留。
 
@@ -34,9 +38,9 @@ Windows 启动时通过注册表判断是否有 WSL 发行版，没有才调用 
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.45-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.45-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.45-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.46-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.46-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.46-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 
