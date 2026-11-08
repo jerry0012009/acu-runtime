@@ -1,4 +1,6 @@
-# ACU Runtime 0.1.43
+# ACU Runtime 0.1.44
+
+统一 Runtime 推荐配置、模型来源显示、嵌入内核提示与错误中的名称为“ACU 内核”。保留底层 Magpie API 路径、配置标识与开源声明；外部 Agent 的 MCP 集成卡片名称由客户端和内核决定，当前内核固定使用 magpie 入口，未通过改写应用配置强行重命名。名称不代表实际模型或计费来源。
 
 修复 WorkBuddy 官方 PDF 组件路径发现：一键配置及已接入用户升级启动时，若本机已有官方 external-packages/pdf-cli/workbuddy-pdf.exe 且没有自定义 WORKBUDDY_PDF，则在应用支持的 env 设置中补齐路径。保留其他环境变量、沙箱和审批设置，不修改内置技能、不安装新解析器。官方启动器连续定位、文本提取和扫描件页面渲染已实测通过；桌面新任务最终验收仍由用户执行。
 
@@ -30,9 +32,9 @@ Windows 启动时通过注册表判断是否有 WSL 发行版，没有才调用 
 
 | 设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.43-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
-| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.43-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
-| Mac Intel | `ACU-Runtime-0.1.43-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.44-windows-amd64-Setup.exe` | 退出旧版后双击安装，开始菜单打开 ACU Runtime |
+| Mac Apple Silicon（M1/M2/M3/M4 等） | `ACU-Runtime-0.1.44-macos-arm64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
+| Mac Intel | `ACU-Runtime-0.1.44-macos-amd64.dmg` | 打开 DMG，将 ACU Runtime 拖入 Applications |
 
 macOS 需要 12 或更新版本；另附 `.app.zip` 作为备用分发格式。安装后打开应用，登录 ACU 或填写已有 Key，选择需要接入的 Agent。首次应用配置前可以预览变更。Windows 需要 Microsoft Edge WebView2 Runtime，Windows 11 通常已内置；缺失时安装 Microsoft 官方 Evergreen WebView2 Runtime。
 

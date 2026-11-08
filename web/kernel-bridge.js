@@ -60,7 +60,7 @@
     for (const element of [root, ...root.querySelectorAll('[title],[aria-label]')]) {
       for (const attribute of ['title', 'aria-label']) {
         const value = element.getAttribute(attribute);
-        if (value && /\bmagpie\b/i.test(value)) element.setAttribute(attribute, value.replace(/\bmagpie\b/gi, 'ACU'));
+        if (value && /\bmagpie\b/i.test(value)) element.setAttribute(attribute, value.replace(/\bmagpie\b/gi, 'ACU 内核'));
       }
     }
   };

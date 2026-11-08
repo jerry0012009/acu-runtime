@@ -28,7 +28,7 @@ func pauseKernelUpdates(ctx context.Context, executable string) error {
 func pauseKernelUpdatesWith(run func([]string) error) error {
 	for _, args := range [][]string{{"update", "auto", "off", "notify"}, {"settings", "set", "autoRestart", "off"}} {
 		if err := run(args); err != nil {
-			return errors.New("无法关闭 Magpie 自动更新；请检查内核设置后重试，已有安装未被替换")
+			return errors.New("无法关闭 ACU 内核自动更新；请检查内核设置后重试，已有安装未被替换")
 		}
 	}
 	return nil

@@ -253,7 +253,7 @@ function isRoutingGroup(model) {
 function modelOptionLabel(option, agent) {
   const source = (ui.status?.connection?.choices || []).find(choice => (option.ref || option.value || '').startsWith(choice.id + '/'));
   const suffix = isRoutingGroup(option) ? '当前高级配置' : source ? source.name || 'ACU' : !option.ref ? `${agent.name} 原生` : option.group;
-  return `${option.label || option.value || '默认'}${suffix ? ` · ${suffix}` : ''}`.replace(/\bmagpie\b/gi, '本机网关');
+  return `${option.label || option.value || '默认'}${suffix ? ` · ${suffix}` : ''}`.replace(/\bmagpie\b/gi, 'ACU 内核');
 }
 
 function modelOptionGroup(option, agent) {
@@ -870,9 +870,9 @@ function renderSetup() {
     const addedModels = recommendation.availableModels.length ? recommendation.availableModels.map(escapeHTML).join('、') : '此 Agent 暂无可选的 ACU 模型';
     const rows = recommendation.capabilities.map(row => [...row]);
     if (setup.tools) {
-      rows[0][1] = `${setup.model} 的识图取决于模型能力；同时添加 Magpie 识图 MCP，保留已选模型。`;
-      rows[2][1] += ' 添加 Magpie 搜索 MCP；未连接搜索来源时仍需配置。';
-      rows[3][1] = rows[3][1].replace('本次不新增 MCP。', '同时添加 Magpie 生图 MCP，首次使用推荐 ACU 生图模型。');
+      rows[0][1] = `${setup.model} 的识图取决于模型能力；同时添加 ACU 内核识图 MCP，保留已选模型。`;
+      rows[2][1] += ' 添加 ACU 内核搜索 MCP；未连接搜索来源时仍需配置。';
+      rows[3][1] = rows[3][1].replace('本次不新增 MCP。', '同时添加 ACU 内核生图 MCP，首次使用推荐 ACU 生图模型。');
     }
     const capabilityRows = rows.map(([label, route, change]) => `<tr><th>${escapeHTML(label)}</th><td>${escapeHTML(route)}</td><td>${escapeHTML(change)}</td></tr>`).join('');
     const inApp = setup.agentId === 'workbuddy';
