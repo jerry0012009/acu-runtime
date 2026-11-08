@@ -376,7 +376,8 @@ test('one click previews options, and only confirmation configures selected agen
   await instance.run('applyAgents()');
   assert.equal(posts(instance).length, 0);
   assert(instance.elements.overlay.innerHTML.includes('确认配置'));
-  assert(instance.elements.overlay.innerHTML.includes('role="switch"'));
+  assert(instance.elements.overlay.innerHTML.includes('data-setup-agent="codex"'));
+  assert(!instance.elements.overlay.innerHTML.includes('role="switch"'));
   assert.equal(instance.run('ui.setup.model'), 'acu-auto');
   await instance.run('confirmSetup()');
   assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/kernel/api/agent-models/codex', '/runtime/capabilities']);
@@ -408,7 +409,7 @@ test('dialog Agent switches can include an already connected WorkBuddy', async (
   await instance.run('applyAgents()');
   instance.listeners.overlay.change({ target: { dataset: { setupAgent: 'workbuddy' }, checked: true } });
   assert.equal(instance.run('ui.setup.agents.has("workbuddy")'), true);
-  assert(instance.elements.overlay.innerHTML.includes('WorkBuddy 完整列表仍可单独管理'));
+  assert(instance.elements.overlay.innerHTML.includes('保留现有模型'));
 });
 
 test('deleting a local Key removes its check and blocks setup on the next poll', async () => {
@@ -627,16 +628,16 @@ test('capability manager preserves untouched external models and sends only expl
   await instance.run('openCapabilities()');
   assert.equal(posts(instance).length, 0);
   assert(instance.elements.overlay.innerHTML.includes('native/vision（当前来源）'));
-  assert(instance.elements.overlay.innerHTML.includes('待配置搜索服务'));
+  assert(instance.elements.overlay.innerHTML.includes('待配置'));
   instance.listeners.overlay.change({ target: { dataset: { capability: 'vision' }, value: 'acu-runtime/gpt-6.1-sol' } });
-  instance.listeners.overlay.change({ target: { dataset: { capabilityAgent: 'codex' }, checked: true } });
   await instance.run('saveCapabilities()');
-  assert.deepEqual(JSON.parse(posts(instance)[0].body), { provider: 'acu-runtime', agents: ['codex'], vision: 'acu-runtime/gpt-6.1-sol' });
+  assert.deepEqual(JSON.parse(posts(instance)[0].body), { provider: 'acu-runtime', modelsOnly: true, vision: 'acu-runtime/gpt-6.1-sol' });
 });
 
 test('capability save failure remains visible and retryable', async () => {
   const instance = await setup({ ready: true, agents: [codex()] }, async (route, options) => route.startsWith('/runtime/capabilities') ? options.method === 'POST' ? { ok: false, body: { error: '部分 Agent 写入失败' } } : { body: capabilityFixture() } : undefined);
   await instance.run('openCapabilities()');
+  instance.listeners.overlay.change({ target: { dataset: { capability: 'vision' }, value: 'off' } });
   await instance.run('saveCapabilities()');
   assert(instance.elements.overlay.innerHTML.includes('部分 Agent 写入失败'));
   assert.equal(instance.run('ui.capabilities.saving'), false);
@@ -647,7 +648,64 @@ test('free search hides dependency choices and remains automatic on a fresh mach
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route.startsWith('/runtime/capabilities') ? { body: view } : undefined);
   await instance.run('openCapabilities()');
   const html = instance.elements.overlay.innerHTML;
-  assert(html.includes('自动准备，无需注册或安装'));
+  assert(html.includes('应用工具'));
+  assert(!html.includes('data-capability="freeSearch"'));
+  assert(!html.includes('data-capability-agent'));
+  assert(!html.includes('searchURL'));
   for (const phrase of ['uvx', '安装 uv', '需先安装']) assert(!html.includes(phrase), phrase);
   assert(!html.includes('data-capability="freeSearch" checked disabled'));
+});
+
+
+test('configured apps show status and explicit actions without switches or ACU pending warnings', async () => {
+ const view = {...capabilityFixture(), freeSearchConfigured: true, tools: ['acu-vision','acu-image','acu-free-search'].map(name => ({name, agents:['codex']}))};
+ const instance = await setup({ready:true,agents:[codex()]}, async route => route.startsWith('/runtime/capabilities') ? {body:view} : undefined);
+ await instance.run('openCapabilities()');
+ const html=instance.elements.overlay.innerHTML;
+ for(const phrase of ['已配置 ✓','重新配置','使用免费搜索','保存模型设置','高级设置']) assert(html.includes(phrase),phrase);
+ for(const phrase of ['3/3','type="checkbox"','ACU 搜索待配置','扫描件','HTTP','MCP','searchURL']) assert(!html.includes(phrase),phrase);
+ assert(html.includes('data-save-capabilities disabled'));
+ await instance.run('saveCapabilities()');assert.equal(posts(instance).length,0);
+ await instance.run('configureCapabilities("codex")');
+ assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['codex']});
+});
+
+test('failed tool setup refreshes partial results and retries only missing apps', async () => {
+ const view = {...capabilityFixture(),tools:['acu-vision','acu-image','acu-free-search'].map(name=>({name,agents:['codex']}))};
+ const instance=await setup({ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async (route,options)=>route.startsWith('/runtime/capabilities') ? options.method==='POST'?{ok:false,body:{error:'工具准备失败'}}:{body:view}:undefined);
+ await instance.run('openCapabilities()');await instance.run('configureCapabilities("missing")');
+ assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['claude']});
+ assert(instance.elements.overlay.innerHTML.includes('重试未完成项'));
+ assert(instance.elements.overlay.innerHTML.includes('已配置 ✓'));
+ assert(instance.elements.overlay.innerHTML.includes('工具准备失败'));
+});
+
+test('repeated one-click setup preserves connected app model and visibility by default',async()=>{
+ const instance=await setup({ready:true,agents:[{...codex(),connected:true}]},async route=>route==='/runtime/agents/configure'?{body:{agents:[{id:'codex',wired:true}]}}:route==='/runtime/capabilities'?{body:capabilityFixture()}:undefined);
+ instance.run('ui.selected = new Set(["codex"])');
+ await instance.run('applyAgents()');await instance.run('confirmSetup()');
+ assert.equal(JSON.parse(posts(instance)[0].body).preserve,true);
+ assert(!posts(instance).some(call=>call.route==='/kernel/api/agent-models/codex'));
+});
+
+
+test('capability advanced search opens the kernel search section',async()=>{
+ const instance=await setup({ready:true,agents:[codex()]},async route=>route.startsWith('/runtime/capabilities')?{body:capabilityFixture()}:undefined);
+ await instance.run('openCapabilities()');
+ instance.listeners.overlay.click({target:{closest:selector=>selector==='[data-capability-native]'?{dataset:{capabilityNative:'search'}}:null}});
+ assert(instance.elements.app.innerHTML.includes('iframe'));
+ assert(instance.elements.app.innerHTML.includes('searchList'));
+ assert(instance.elements.app.innerHTML.includes('tab=models'));
+ assert.equal(posts(instance).length,0);
+});
+
+test('custom tool settings are named and tool reconfiguration does not submit model drafts',async()=>{
+ const view={...capabilityFixture(),tools:[{name:'acu-vision',agents:['codex'],custom:true}]};
+ const instance=await setup({ready:true,agents:[codex()]},async route=>route.startsWith('/runtime/capabilities')?{body:view}:undefined);
+ await instance.run('openCapabilities()');
+ assert(instance.elements.overlay.innerHTML.includes('自定义设置'));
+ instance.listeners.overlay.change({target:{dataset:{capability:'vision'},value:'off'}});
+ await instance.run('configureCapabilities("codex")');
+ assert.deepEqual(JSON.parse(posts(instance)[0].body),{provider:'acu-runtime',agents:['codex']});
+ assert.equal(instance.run('ui.capabilities.draft.vision'),'off');
 });

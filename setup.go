@@ -148,6 +148,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		Provider  string `json:"provider"`
 		Model     string `json:"model"`
 		Auxiliary bool   `json:"auxiliary"`
+		Preserve  bool   `json:"preserve"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(response, request.Body, 4096)).Decode(&input) != nil {
 		host.json(response, 400, map[string]string{"error": "无法读取配置"})
@@ -203,6 +204,10 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 	}
 	if target == nil || target.CLIMissing {
 		host.json(response, 400, map[string]string{"error": "未检测到此 Agent"})
+		return
+	}
+	if input.Preserve && target.Wired {
+		host.json(response, 200, state)
 		return
 	}
 	main := pickACU(target.Fields, "model", input.Provider, input.Model)

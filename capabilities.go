@@ -28,6 +28,7 @@ type capabilityTool struct {
 	URL       string   `json:"url"`
 	Note      string   `json:"note"`
 	Agents    []string `json:"agents"`
+	Custom    bool     `json:"custom,omitempty"`
 	stored    map[string]any
 }
 
@@ -66,6 +67,7 @@ type capabilityInput struct {
 	ImageGen   *string  `json:"imageGen"`
 	SearchURL  *string  `json:"searchURL"`
 	FreeSearch *bool    `json:"freeSearch"`
+	ModelsOnly bool     `json:"modelsOnly"`
 }
 
 // Reuse an existing uvx installation. Dependency installation belongs to the
@@ -148,6 +150,10 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	for _, tool := range lib.Servers {
 		if tool.Note == capabilityOwner {
+			tool.Custom = tool.stored["hub"] != nil && tool.stored["hub"] != ""
+			if disabled, ok := tool.stored["disabledTools"].([]any); ok {
+				tool.Custom = tool.Custom || (tool.Name != "acu-image" && len(disabled) > 0) || (tool.Name == "acu-image" && (len(disabled) != 1 || disabled[0] != "generate_video"))
+			}
 			view.Tools = append(view.Tools, tool)
 			if tool.Name == "acu-free-search" && len(tool.Agents) > 0 {
 				view.FreeSearchConfigured = true
@@ -213,6 +219,35 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	}
 	if choice == nil {
 		return view, errors.New("请选择可用的 ACU Key")
+	}
+	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil) {
+		return view, errors.New("模型设置不能同时修改工具或搜索服务")
+	}
+	// Saving shared model picks must never prepare dependencies or rewrite MCP
+	// assignments. Validate and change only the fields the user selected.
+	if input.ModelsOnly {
+		changed := false
+		for _, entry := range []struct {
+			pick   *string
+			models []capabilityModel
+			field  string
+		}{{input.Vision, view.VisionModels, "vision"}, {input.ImageGen, view.ImageModels, "imageGen"}} {
+			if entry.pick == nil {
+				continue
+			}
+			if *entry.pick != "off" && !slices.ContainsFunc(entry.models, func(m capabilityModel) bool { return m.ID == *entry.pick }) {
+				return view, errors.New("模型不可用，请刷新后重新选择")
+			}
+			prefs[entry.field], _ = json.Marshal(*entry.pick)
+			changed = true
+		}
+		if changed {
+			if err := host.kernel.exchange(ctx, "POST", "/api/settings", prefs, nil); err != nil {
+				return view, err
+			}
+		}
+		view, _, _, err = host.capabilityRead(ctx, input.Provider)
+		return view, err
 	}
 	state, err := host.kernel.readState(ctx)
 	if err != nil {

@@ -199,9 +199,10 @@ function agentsPage() {
   const agents = ui.status?.agents || Object.entries(names).map(([id, name]) => ({ id, name }));
   const detected = agents.filter(agent => agent.detected);
   const restarting = agents.filter(agent => agent.connected && agent.restartRequired);
-  return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${activeChoice() ? '按应用查看推荐配置，确认后分别接入。' : '先连接 ACU，再选择要接入的应用。'}</p></div><div class="workbench-actions"><button class="button secondary" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片与搜索</button><button class="icon-button" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button secondary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '推荐配置'}${icon('arrow')}</button></div></div>
+  return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${activeChoice() ? '一键接入，随时调整模型与工具。' : '先连接 ACU，再选择要接入的应用。'}</p></div><div class="workbench-actions"><button class="button secondary" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片与搜索</button><button class="icon-button" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button secondary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
     <div class="agent-grid">${agents.map(agentCard).join('')}</div>
     ${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片与搜索' : result.id))}</strong><span>${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
+    ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && result.id === 'tools') ? '<button class="button secondary" data-action="capabilities">处理未完成工具</button>' : ''}
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
 }
 
@@ -634,13 +635,13 @@ function closeOverlay() {
 }
 
 function setupToolsControl(setup) {
-  return `<div class="setup-tools"><label class="switch-row"><span>同时配置图片与搜索工具</span><input id="setup-tools" type="checkbox" role="switch" ${setup.tools ? 'checked' : ''}></label><p>由 Magpie 内核将推荐 MCP 写入所选 Agent。保留已选模型；首次推荐 ACU 识图与生图模型。未连接 ACU 搜索时，自动准备免费搜索工具；首次配置可能需要几分钟。</p></div>`;
+  return `<div class="setup-tools"><label class="switch-row"><span>同时配置图片与搜索工具</span><input id="setup-tools" type="checkbox" ${setup.tools ? 'checked' : ''}></label><p>自动为所选应用准备识图、生图和搜索。保留已有模型和工具设置，首次配置可能需要几分钟。</p></div>`;
 }
 
 async function openCapabilities() {
   const choice = activeChoice();
   if (!ui.status?.ready || !choice || ui.applying) return;
-  const current = { provider: choice.id, loading: true, draft: {}, agents: new Set(), error: '' };
+  const current = { provider: choice.id, loading: true, draft: {}, error: '' };
   ui.capabilities = current;
   renderCapabilities();
   try {
@@ -651,6 +652,12 @@ async function openCapabilities() {
   renderCapabilities();
 }
 
+function capabilityAgentState(view, id) {
+  const tools = view.tools.filter(tool => tool.agents?.includes(id));
+  const count = ['acu-vision', 'acu-image', 'search'].filter(name => tools.some(tool => name === 'search' ? ['acu-search', 'acu-free-search'].includes(tool.name) : tool.name === name)).length;
+  return { count, custom: tools.some(tool => tool.custom) };
+}
+
 function renderCapabilities() {
   const current = ui.capabilities;
   if (!current) return;
@@ -659,31 +666,49 @@ function renderCapabilities() {
     const value = current.draft[field] ?? view[field];
     const options = [...models];
     if (value && value !== 'off' && !options.some(model => model.id === value)) options.unshift({ id: value, name: `${value}（当前来源）` });
-    return `<label class="field-label" for="capability-${field}">${label}</label><select id="capability-${field}" data-capability="${field}" ${current.saving ? 'disabled' : ''}><option value="" disabled ${!value ? 'selected' : ''}>首次保存时使用推荐模型</option>${options.map(model => `<option value="${escapeHTML(model.id)}" ${value === model.id ? 'selected' : ''}>${escapeHTML(model.name || model.id)}</option>`).join('')}<option value="off" ${value === 'off' ? 'selected' : ''}>关闭此补充能力</option></select>`;
+    return `<label class="field-label" for="capability-${field}">${label}</label><select id="capability-${field}" data-capability="${field}" ${current.saving ? 'disabled' : ''}><option value="" disabled ${!value ? 'selected' : ''}>由一键配置选择推荐模型</option>${options.map(model => `<option value="${escapeHTML(model.id)}" ${value === model.id ? 'selected' : ''}>${escapeHTML(model.name || model.id)}</option>`).join('')}<option value="off" ${value === 'off' ? 'selected' : ''}>关闭此补充能力</option></select>`;
   };
   const agents = (ui.status?.agents || []).filter(agent => agent.detected);
-  const body = view ? `<p class="capability-intro">这些模型由 Magpie 共享给各个 Agent 的 MCP 工具；修改后由内核直接生效。</p><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '搜索来源已配置' : view.freeSearchConfigured ? '免费 DuckDuckGo MCP 已配置' : '待配置搜索服务'}</span></div><label class="switch-row"><span>免费联网搜索</span><input type="checkbox" data-capability="freeSearch" ${(current.draft.freeSearch ?? true) ? 'checked' : ''} ${current.saving ? 'disabled' : ''}></label><p class="capability-intro">自动准备，无需注册或安装。搜索由 DuckDuckGo 提供，受网络和限流影响。取消此项只跳过新增；移除已有工具请进入工具目录。</p><details class="capability-search"><summary>配置 ACU 搜索服务</summary><p>填写已上线的 ACU SearXNG 服务地址，内核使用当前 ACU Key。留空保留原配置。</p><label class="field-label" for="capability-searchURL">官方 HTTPS 地址</label><input id="capability-searchURL" data-capability="searchURL" type="url" value="${escapeHTML(current.draft.searchURL ?? view.searchURL ?? '')}" placeholder="由 ACU 提供的服务地址" ${current.saving ? 'disabled' : ''}></details><div class="capability-agent-list"><strong>为以下应用添加 / 修复推荐工具</strong><p>已有分配会保留；取消分配可进入工具目录。</p>${agents.map(agent => {
-    const assigned = ['acu-vision', 'acu-image', 'search'].filter(name => view.tools.some(tool => tool.agents?.includes(agent.id) && (name === 'search' ? ['acu-search', 'acu-free-search'].includes(tool.name) : tool.name === name))).length;
-    return `<label class="switch-row"><span>${escapeHTML(agent.name)} <small>${assigned}/3 已配置</small></span><input type="checkbox" data-capability-agent="${escapeHTML(agent.id)}" ${current.agents.has(agent.id) ? 'checked' : ''} ${current.saving ? 'disabled' : ''}></label>`;
-  }).join('')}</div><ul class="capability-notes">${view.messages.map(message => `<li>${escapeHTML(message)}</li>`).join('')}</ul>` : `<p>${current.loading ? '正在读取 Magpie 配置…' : '配置暂未读取，请关闭后重试。'}</p>`;
-  overlay.innerHTML = `<div class="scrim"><section class="modal capability-modal" role="dialog" aria-modal="true" aria-labelledby="capability-title"><button class="icon-button modal-close" data-close aria-label="关闭" ${current.saving ? 'disabled' : ''}>${icon('close')}</button><div class="recommendation-kicker">共享工具</div><h2 id="capability-title">图片与搜索</h2>${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${body}<div class="modal-actions"><button class="button secondary" data-capability-library ${current.saving ? 'disabled' : ''}>工具目录 / 更多设置</button><button class="button primary" data-save-capabilities ${!view || current.saving ? 'disabled' : ''}>${current.saving ? '正在准备并保存…' : '保存配置'}</button></div></section></div>`;
+  const missing = view ? agents.filter(agent => capabilityAgentState(view, agent.id).count < 3) : [];
+  const body = view ? `<p class="capability-intro">选择识图和生图模型，各应用共用。保存模型设置不会重新配置工具。</p><div class="capability-fields">${select('vision', '识图模型', view.visionModels)}${select('imageGen', '生图模型', view.imageModels)}</div><div class="capability-search-status"><strong>联网搜索</strong><span>${view.searchReady ? '使用已设置的搜索服务' : view.freeSearchConfigured ? '使用免费搜索' : '待配置'}</span></div><div class="capability-agent-list"><div class="capability-list-heading"><strong>应用工具</strong>${missing.length ? `<button class="text-button" data-configure-capabilities="missing" ${current.saving ? 'disabled' : ''}>${current.retry ? '重试未完成项' : '配置未完成项'}</button>` : ''}</div>${agents.map(agent => {
+    const state = capabilityAgentState(view, agent.id);
+    return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${state.count === 3 ? 'complete' : ''}">${state.count === 3 ? '已配置 ✓' : state.count ? '待补齐' : '待配置'}${state.custom ? ' · 自定义设置' : ''}</span></div><button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>${state.count === 3 ? '重新配置' : '配置'}</button></div>`;
+  }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}</div><p class="capability-intro capability-help">包含识图、生图和搜索工具。新增工具后请重新打开应用；首次使用按应用提示确认。已配置表示配置已写入。</p><details class="capability-advanced"><summary>高级设置</summary><p>模型来源、搜索服务和工具权限由内核统一管理。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="images" ${current.saving ? 'disabled' : ''}>模型与图片设置</button><button class="button secondary" data-capability-native="search" ${current.saving ? 'disabled' : ''}>搜索服务</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></details>` : `<p>${current.loading ? '正在读取配置…' : '配置暂未读取，请关闭后重试。'}</p>`;
+  overlay.innerHTML = `<div class="scrim"><section class="modal capability-modal recommendation-modal" role="dialog" aria-modal="true" aria-labelledby="capability-title"><div class="recommendation-header"><button class="icon-button modal-close" data-close aria-label="关闭" ${current.saving ? 'disabled' : ''}>${icon('close')}</button><h2 id="capability-title">图片与搜索</h2></div><div class="recommendation-body">${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress ? `<p class="capability-progress" role="status">${escapeHTML(current.progress)}</p>` : ''}${body}</div><div class="recommendation-footer"><div class="modal-actions"><button class="button secondary" data-close ${current.saving ? 'disabled' : ''}>完成</button><button class="button primary" data-save-capabilities ${!view || current.saving || !Object.keys(current.draft).length ? 'disabled' : ''}>${current.saving === 'models' ? '保存中…' : '保存模型设置'}</button></div></div></section></div>`;
   document.body.classList.add('overlay-open');
 }
 
 async function saveCapabilities() {
   const current = ui.capabilities;
-  if (!current?.view || current.saving) return;
-  current.saving = true;
+  if (!current?.view || current.saving || !Object.keys(current.draft).length) return;
+  current.saving = 'models';
   current.error = '';
   renderCapabilities();
   try {
-    const body = { provider: current.provider, agents: [...current.agents], ...current.draft };
+    const body = { provider: current.provider, modelsOnly: true, ...current.draft };
     current.view = await request('/runtime/capabilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     current.draft = {};
-    current.agents.clear();
-    toast('已保存到 Magpie；新增工具请重新打开 Agent');
+    toast('模型设置已保存');
   } catch (error) { current.error = error.message; }
   finally { current.saving = false; if (ui.capabilities === current) renderCapabilities(); }
+}
+
+async function configureCapabilities(target) {
+  const current = ui.capabilities;
+  if (!current?.view || current.saving) return;
+  const detected = (ui.status?.agents || []).filter(agent => agent.detected);
+  const agents = target === 'missing' ? detected.filter(agent => capabilityAgentState(current.view, agent.id).count < 3).map(agent => agent.id) : detected.filter(agent => agent.id === target).map(agent => agent.id);
+  if (!agents.length) return;
+  current.saving = 'tools'; current.error = ''; current.retry = false;
+  current.progress = '正在准备图片与搜索工具，首次配置可能需要几分钟…';
+  renderCapabilities();
+  try {
+    current.view = await request('/runtime/capabilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: current.provider, agents }) });
+    toast('工具已配置，请重新打开应用');
+  } catch (error) {
+    current.error = error.message; current.retry = true;
+    try { current.view = await request(`/runtime/capabilities?provider=${encodeURIComponent(current.provider)}`); } catch { /* keep the last known state and allow retry */ }
+  } finally { current.saving = false; current.progress = ''; if (ui.capabilities === current) renderCapabilities(); }
 }
 
 function disconnectLabel(id) {
@@ -809,7 +834,7 @@ function renderSetup() {
     const modelControl = inApp ? '<strong>在 WorkBuddy 任务内选择</strong><p>不替你设置统一默认模型</p>' : `<label class="field-label" for="setup-model">默认模型 · 推荐已选好</label><select id="setup-model" ${!recommendation.availableModels.length ? 'disabled' : ''}>${!recommendation.availableModels.length ? '<option>暂无兼容模型</option>' : recommendation.availableModels.map(model => `<option value="${escapeHTML(model)}" ${setup.model === model ? 'selected' : ''}>${escapeHTML(model)}</option>`).join('')}</select><p>${escapeHTML(agent.name)} → ${escapeHTML(setup.model || '待选择')} → ACU</p>`;
     overlay.innerHTML = `<div class="scrim"><section class="modal setup-modal recommendation-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title"><div class="recommendation-header"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><div class="recommendation-kicker">推荐配置</div><h2 id="setup-title">${escapeHTML(agent.name)} 接入 ACU</h2><p class="setup-key-label">${escapeHTML(choice.name || 'ACU')} · ${escapeHTML(choice.masked || '已选 Key')}</p></div><div class="recommendation-body"><p class="recommendation-summary">${escapeHTML(recommendation.summary)}</p><div class="recommendation-route">${modelControl}</div><p class="recommendation-impact">${escapeHTML(recommendation.change)}</p><details class="recommendation-models"><summary>查看原有与 ACU 模型 · ${recommendation.availableModels.length} 个可选</summary><dl class="recommendation-list"><div><dt>原有模型</dt><dd>${currentModels}</dd></div><div><dt>ACU 模型</dt><dd>${addedModels}</dd></div><div><dt>保持不变</dt><dd>${escapeHTML(recommendation.retained)}</dd></div></dl><p>${inApp ? '确认后显示推荐模型并收起其他 ACU 模型，当前使用项保留；可在全部模型中恢复。' : '确认后显示推荐模型，收起其他 ACU 模型；当前使用的模型保留。可在全部模型中恢复显示。'}</p></details><div class="recommendation-block"><h3>接入后，常用能力怎么用</h3>${setupToolsControl(setup)}<p class="capability-caption">${setup.loading ? '正在读取现有配置…' : '已有配置 ≠ 已验证可用；保留显式模型选择，新增工具由内核写入。'}</p><table class="capability-table"><thead><tr><th>能力</th><th>处理方式 / 来源</th><th>配置状态</th></tr></thead><tbody>${capabilityRows}</tbody></table></div></div><div class="recommendation-footer"><p class="setup-footnote">仅配置 ${escapeHTML(agent.name)}；需要重新打开时会提示。</p><div class="modal-actions"><button class="button secondary" data-close>取消</button><button class="button primary" data-confirm-setup ${setup.loading || !recommendation.availableModels.length ? 'disabled' : ''}>${inApp ? '同意并添加模型' : '同意并接入'} ${icon('arrow')}</button></div></div></section></div>`;
   } else {
-    overlay.innerHTML = `<div class="scrim"><section class="modal setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><div class="recommendation-kicker">推荐配置</div><h2 id="setup-title">按推荐值配置 ACU</h2><p class="setup-key-label">${escapeHTML(choice.name || 'ACU')} · ${escapeHTML(choice.masked)}</p><label class="field-label" for="setup-model">主模型</label><select id="setup-model">${recommendedModels(choice).map(model => `<option value="${escapeHTML(model)}" ${setup.model === model ? 'selected' : ''}>${escapeHTML(model)}</option>`).join('')}</select><div class="setup-toggles">${agents.map(agent => `<label class="switch-row"><span>${escapeHTML(agent.name)}</span><input type="checkbox" role="switch" data-setup-agent="${agent.id}" ${setup.agents.has(agent.id) ? 'checked' : ''}></label>`).join('')}<label class="switch-row auxiliary-switch"><span>同步其他模型角色</span><input id="setup-auxiliary" type="checkbox" role="switch" ${setup.auxiliary ? 'checked' : ''}></label></div>${setupToolsControl(setup)}<p class="setup-footnote">仅推荐近期验证过基础文本连通性的常用模型；更多模型在高级配置中选择。WorkBuddy 完整列表仍可单独管理。</p><div class="modal-actions"><button class="button secondary" data-close>取消</button><button class="button primary" data-confirm-setup ${!setup.agents.size || !setup.model ? 'disabled' : ''}>确认配置 ${setup.agents.size ? `(${setup.agents.size})` : ''}</button></div></section></div>`;
+    overlay.innerHTML = `<div class="scrim"><section class="modal setup-modal recommendation-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title"><div class="recommendation-header"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><h2 id="setup-title">一键配置</h2><p class="setup-key-label">${escapeHTML(choice.name || 'ACU')} · ${escapeHTML(choice.masked)}</p></div><div class="recommendation-body"><p class="recommendation-summary">为所选应用接入 ACU，准备识图、生图和免费搜索。已接入应用保留现有模型与工具设置。</p><div class="setup-app-options">${agents.map(agent => `<label class="setup-app-option"><input type="checkbox" data-setup-agent="${agent.id}" ${setup.agents.has(agent.id) ? 'checked' : ''}><span>${escapeHTML(agent.name)}</span><small>${agent.connected ? '保留现有模型' : '首次接入'}</small></label>`).join('')}</div><details class="setup-adjustments"><summary>调整推荐模型与配置范围</summary><label class="field-label" for="setup-model">首次接入的主模型</label><select id="setup-model">${recommendedModels(choice).map(model => `<option value="${escapeHTML(model)}" ${setup.model === model ? 'selected' : ''}>${escapeHTML(model)}</option>`).join('')}</select><label class="setup-app-option"><input id="setup-replace" type="checkbox" ${setup.replace ? 'checked' : ''}><span>同时替换已接入应用的主模型</span></label>${setupToolsControl(setup)}</details><p class="setup-footnote">首次准备工具可能需要几分钟，完成后按提示重新打开应用。</p></div><div class="recommendation-footer"><div class="modal-actions"><button class="button secondary" data-close>取消</button><button class="button primary" data-confirm-setup ${!setup.agents.size || !setup.model ? 'disabled' : ''}>确认配置 ${setup.agents.size ? `(${setup.agents.size})` : ''}</button></div></div></section></div>`;
   }
   document.body.classList.add('overlay-open');
 }
@@ -841,13 +866,14 @@ async function confirmSetup() {
       ui.progress = `配置中 ${index + 1}/${setup.agents.length}`;
       render();
       try {
-        const result = await request('/runtime/agents/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: setup.provider, model: setup.model, auxiliary: setup.auxiliary }) });
+        const preserve = setup.mode !== 'single' && !setup.replace && ui.status?.agents?.some(agent => agent.id === id && agent.connected);
+        const result = await request('/runtime/agents/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: setup.provider, model: setup.model, auxiliary: setup.auxiliary, ...(preserve ? { preserve: true } : {}) }) });
         const configured = result.agents?.find(current => current.id === id);
         if (!configured?.wired || configured.drift) throw new Error('未确认配置成功，请检查设置');
         connectedAgents.push(id);
-        await applyRecommendedVisibility(id, setup.provider, setup.model);
+        if (!preserve) await applyRecommendedVisibility(id, setup.provider, setup.model);
         ui.selected?.delete(id);
-        ui.results.push({ id, ok: true, message: setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
+        ui.results.push({ id, ok: true, message: preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
     if (setup.tools && connectedAgents.length) {
@@ -928,6 +954,7 @@ app.addEventListener('click', event => {
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
     capabilities: openCapabilities,
     'configure-agent': () => configureAgent(control.dataset.agentId),
+    'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
     'account-login': () => startAccountLogin(false), 'account-register': () => startAccountLogin(true),
     'account-cancel': cancelAccountLogin,
@@ -979,14 +1006,16 @@ overlay.addEventListener('click', event => {
   const inventoryBulk = event.target.closest('[data-inventory-bulk]');
   if (inventoryBulk) { bulkInventory(inventoryBulk.dataset.agentId, inventoryBulk.dataset.inventoryBulk); return; }
   if (event.target.closest('[data-save-capabilities]')) { saveCapabilities(); return; }
-  if (event.target.closest('[data-capability-library]')) { if (ui.capabilities?.saving) return; closeOverlay(); openNative('library'); return; }
+  const configureTools = event.target.closest('[data-configure-capabilities]');
+  if (configureTools) { configureCapabilities(configureTools.dataset.configureCapabilities); return; }
+  const advanced = event.target.closest('[data-capability-native]');
+  if (advanced) { if (ui.capabilities?.saving) return; const view = advanced.dataset.capabilityNative; closeOverlay(); if (view === 'library') openNative('library'); else openNative('settings', '', false, 'models', view === 'search' ? 'searchList' : 'imagesList'); return; }
   if (event.target.closest('[data-confirm-setup]')) { confirmSetup(); return; }
   if (event.target.closest('[data-confirm-disconnect]')) { confirmDisconnect(); return; }
   if (event.target.closest('[data-retry-disconnect]')) { openDisconnectDialog(ui.disconnect?.agentId); return; }
   if (event.target.matches('.scrim') || event.target.closest('[data-close]')) closeOverlay();
 });
 overlay.addEventListener('input', event => {
-  if (ui.capabilities && event.target.dataset?.capability === 'searchURL') { ui.capabilities.draft.searchURL = event.target.value; return; }
   if (event.target.id !== 'inventory-search') return;
   ui.inventoryQuery = event.target.value;
   filterModelInventory();
@@ -996,8 +1025,8 @@ overlay.addEventListener('change', event => {
   if (ui.capabilities) {
     const key = event.target.dataset?.capability;
     if (key) ui.capabilities.draft[key] = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
-    const id = event.target.dataset?.capabilityAgent;
-    if (id) { if (event.target.checked) ui.capabilities.agents.add(id); else ui.capabilities.agents.delete(id); }
+    const save = overlay.querySelector('[data-save-capabilities]');
+    if (save) save.disabled = !Object.keys(ui.capabilities.draft).length || !!ui.capabilities.saving;
     return;
   }
   if (!ui.setup) return;
@@ -1010,6 +1039,7 @@ overlay.addEventListener('change', event => {
     }
   }
   if (event.target.id === 'setup-auxiliary') ui.setup.auxiliary = event.target.checked;
+  if (event.target.id === 'setup-replace') ui.setup.replace = event.target.checked;
   const agent = event.target.dataset?.setupAgent;
   if (agent) { if (event.target.checked) ui.setup.agents.add(agent); else ui.setup.agents.delete(agent); renderSetup(); }
 });

@@ -192,3 +192,29 @@ func TestCapabilityFreeSearchUsesNoSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestCapabilityModelSaveDoesNotTouchTools(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	f.prefs["gateway"] = "unavailable"
+	f.servers = append(f.servers, map[string]any{"name": "acu-vision", "note": "user-owned"})
+	model := "acu-runtime/gpt-6.1-sol"
+	_, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", ModelsOnly: true, Vision: &model})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.writes) != 1 || f.writes[0] != "/api/settings" {
+		t.Fatalf("model save rewrote tools: %v", f.writes)
+	}
+	if f.prefs["imageGen"] != "" {
+		t.Fatal("filled an untouched model")
+	}
+}
+func TestCapabilityModelSaveRejectsMixedOperations(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	if _, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", ModelsOnly: true, Agents: []string{"codex"}}); err == nil {
+		t.Fatal("accepted mixed save")
+	}
+	if len(f.writes) > 0 {
+		t.Fatal("mutated on invalid request")
+	}
+}

@@ -225,3 +225,28 @@ func TestAgentSetupUsesExactNativeModelAndPreservesOtherSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentSetupPreserveDoesNotRewriteConnectedModel(t *testing.T) {
+	var writes int
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/providers":
+			io.WriteString(w, setupProviders)
+		case "/api/provider/key":
+			io.WriteString(w, `{"key":"fixture-secret"}`)
+		case "/api/state":
+			io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"fields":[{"key":"model","value":"other/custom-model"}]}]}`)
+		default:
+			writes++
+			io.WriteString(w, `{}`)
+		}
+	}))
+	host.cloudTransport = modelProbe(t, 200)
+	response := setupRequest(host, `{"agent":"codex","provider":"acu-runtime","model":"acu-auto","preserve":true}`)
+	if response.Code != 200 || writes != 0 {
+		t.Fatalf("replaced connected model: %d %d", response.Code, writes)
+	}
+	if !strings.Contains(response.Body.String(), "other/custom-model") {
+		t.Fatal("lost existing choice")
+	}
+}
