@@ -738,7 +738,7 @@ async function confirmDisconnect() {
 }
 
 function showModal(title, body, button, onConfirm) {
-  overlay.innerHTML = `<div class="scrim"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><div class="modal-glyph">${icon('shield')}</div><h2 id="dialog-title">${title}</h2><div class="modal-body">${body}</div><div class="modal-actions"><button class="button secondary" data-close>取消</button><button class="button primary" id="confirm-action">${button}</button></div></section></div>`;
+  overlay.innerHTML = `<div class="scrim"><section class="modal confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><div class="modal-glyph">${icon('shield')}</div><h2 id="dialog-title">${title}</h2><div class="modal-body">${body}</div><div class="modal-actions"><button class="button secondary" data-close>取消</button><button class="button primary" id="confirm-action">${button}</button></div></section></div>`;
   document.body.classList.add('overlay-open');
   document.getElementById('confirm-action').onclick = async () => { closeOverlay(); await onConfirm(); };
   overlay.querySelector('[data-close]').focus();

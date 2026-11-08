@@ -517,3 +517,11 @@ select[data-agent-model] {
 .capability-notes { padding-left: 18px; margin: 18px 0; }
 .capability-modal .modal-actions { flex-wrap: wrap; }
 @media (max-width: 640px) { .workbench-actions { flex-wrap: wrap; } .capability-modal { padding: 24px 18px; } }
+
+/* Keep confirmation controls reachable even with long release notes. */
+.confirmation-modal { display: flex; flex-direction: column; max-height: calc(100dvh - 50px); overflow: hidden; }
+.confirmation-modal > .modal-glyph, .confirmation-modal > h2, .confirmation-modal > .modal-actions { flex: 0 0 auto; }
+.confirmation-modal > h2 { padding-right: 22px; overflow-wrap: anywhere; }
+.confirmation-modal > .modal-body { min-height: 0; overflow-y: auto; overflow-wrap: anywhere; overscroll-behavior: contain; }
+.confirmation-modal > .modal-actions { flex-wrap: wrap; }
+@media (max-width: 600px) { .confirmation-modal { max-height: calc(100dvh - 36px); } }

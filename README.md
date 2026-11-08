@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.34
+# ACU Runtime 0.1.35
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,9 +8,9 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.34-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.34-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.34-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.35-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.35-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.35-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
