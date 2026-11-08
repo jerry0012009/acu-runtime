@@ -38,6 +38,14 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
     (Path(env["HERMES_HOME"]) / "config.yaml").write_text(
         'model:\n  default: fixture\nmcp_servers:\n  mine:\n    command: existing-fixture-mcp\n')
     (Path(env["CLAUDE_CONFIG_DIR"]) / "settings.json").write_text('{}')
+    # Inert vendor-install markers: a clean runner has no actual Agent CLIs.
+    # New kernels correctly mark config-only leftovers as uninstalled. This
+    # test exercises config APIs, not Agent execution or CLI installation.
+    (Path(env["HOME"]) / ".codex/packages/standalone").mkdir(parents=True)
+    (Path(env["HERMES_HOME"]) / "hermes-agent").mkdir()
+    claude_local = Path(env["HOME"]) / ".claude/local"
+    claude_local.mkdir(parents=True)
+    (claude_local / ("claude.exe" if os.name == "nt" else "claude")).touch()
     # macOS detects WorkBuddy by its bundle. This inert marker is never launched.
     bundle = Path(env["HOME"]) / "Applications/WorkBuddy.app/Contents"
     bundle.mkdir(parents=True)
