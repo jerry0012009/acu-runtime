@@ -280,6 +280,20 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		kernel.exe = executable
 		kernel.mu.Unlock()
 	}
+	policy, cancelPolicy := context.WithTimeout(ctx, 20*time.Second)
+	err := pauseKernelUpdates(policy, executable)
+	cancelPolicy()
+	if err != nil {
+		return err
+	}
+	for _, directory := range kernelConfigDirs(executable) {
+		probe, cancel := context.WithTimeout(ctx, 2*time.Second)
+		attached := kernel.attachExisting(probe, browserKernelLink(directory))
+		cancel()
+		if attached {
+			return nil
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -297,7 +311,8 @@ func (kernel *kernelState) start(ctx context.Context) error {
 	command := exec.Command(executable, "web", "--addr", address, "--no-open")
 	hideProcess(command)
 	command.Env = append(os.Environ(), "MAGPIE_WEB_KEY="+key)
-	command.Stdout, command.Stderr = io.Discard, io.Discard
+	output := &kernelOutput{}
+	command.Stdout, command.Stderr = output, io.Discard
 	kernel.mu.Lock()
 	if err := ctx.Err(); err != nil {
 		kernel.mu.Unlock()
@@ -314,7 +329,10 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		err := command.Wait()
 		kernel.mu.Lock()
 		if kernel.process == command {
-			kernel.process, kernel.endpoint, kernel.key = nil, nil, ""
+			kernel.process = nil
+			if kernel.endpoint != nil && kernel.endpoint.Host == address {
+				kernel.endpoint, kernel.key = nil, ""
+			}
 			if err != nil {
 				kernel.lastErr = "控制通道进程已退出；未停止原有内核进程"
 			}
@@ -322,6 +340,14 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		kernel.mu.Unlock()
 	}()
 	for attempt := 0; attempt < 24; attempt++ {
+		for _, link := range output.links() {
+			probe, cancel := context.WithTimeout(ctx, time.Second)
+			attached := kernel.attachExisting(probe, link)
+			cancel()
+			if attached {
+				return nil
+			}
+		}
 		probe, cancel := context.WithTimeout(ctx, time.Second)
 		err := kernel.authenticate(probe)
 		if err == nil {

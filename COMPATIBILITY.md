@@ -34,7 +34,7 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 
 安装包每次都更新自己的备用内核，不再因检测到外部 Magpie 而跳过。现有外部 Magpie、Key 与 Agent 配置不由安装器改写。Runtime 的外部内核选择仍遵循原有发现规则；显式 ACU_KERNEL_PATH 也保留。
 
-当前应用内安装包只支持 Windows x64。macOS 使用 0.1.32 新增的独立 DMG / ZIP 安装包，应用内不会执行下载安装；Windows ARM64 尚无对应安装包。独立 Magpie 不受 Runtime 更新器管理。
+当前应用内安装包只支持 Windows x64。macOS 使用 0.1.32 新增的独立 DMG / ZIP 安装包，应用内不会执行下载安装；Windows ARM64 尚无对应安装包。独立 Magpie 不由 Runtime 安装器覆盖或降级。0.1.39 起连接前使用内核 update auto off notify 和 settings set autoRestart off 关闭自动更新；手动升级保留。
 
 更新网络：优先使用显式 HTTP(S)_PROXY/NO_PROXY 环境设置，否则读取 Windows 手动系统代理。PAC 自动代理与国内镜像尚未接入。无法访问 GitHub 时保留现有安装，可稍后重试。
 
@@ -85,3 +85,11 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 
 - 通用工具统一检查，取消逐应用常驻配置按钮；单独重试仅限本次检查失败应用。
 - 前端覆盖逐应用请求、失败原因展示、成功保留、定向重试、重试成功移除按钮与共享模型草稿保留。
+
+## 0.1.39 内核复用与更新
+
+优先读取 Magpie web-page.json 的已启用管理服务，在回环地址鉴权并验证 /api/state 后复用。未开启或连接失败时才启动原生 web 控制进程；原生内核复用已运行的推理网关。支持 web 命令返回已有服务链接后正常退出的场景，不记录管理密钥。退出只终止自己启动的控制进程。
+
+自动更新开关通过 Magpie 原生命令修改，保留其余设置。独立安装保持原路径和版本，不自动降级。该策略不保证用户手动升级后的新版本兼容。已在更新前下载暂存的升级不由 Runtime 清除。
+
+0.1.39 本机隔离实测：已有管理服务时 ready=true、Runtime 常驻 Magpie 子进程为 0；无管理服务时 ready=true、控制子进程为 1。两条路径均确认 noAutoUpdate=true、noAutoDownload=true、autoRestart=false。测试没有发送收费推理请求。
