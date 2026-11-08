@@ -2,6 +2,11 @@ body.acu-embedded { background: var(--bg) !important; }
 body.acu-embedded > header, body.acu-embedded #nav, body.acu-embedded .titlebar, body.acu-embedded .nav-brand { display: none !important; }
 body.acu-embedded { padding: 0 !important; --side-w: 0px; }
 body.acu-embedded #side, body.acu-embedded #ptabs { display: none !important; }
+/* The kernel moves page tabs into its sidebar in side-nav mode. Runtime
+   supplies its own sidebar, so keep the original page tabs accessible. */
+body.acu-embedded.side-nav :is(#usageTab, #view-library .lib-tabs, #view-plugins .lib-tabs, #setTabs) { display: flex !important; flex-wrap: wrap; }
+body.acu-embedded.side-nav :is(#view-library .lib-head, #view-plugins .pm-head, #view-settings .set-head) { position: sticky; top: 0; left: auto; right: auto; height: auto; padding: 8px 0; flex-wrap: wrap; justify-content: flex-start; pointer-events: auto; }
+body.acu-embedded.side-nav #view-library .lib-headacts { flex-wrap: wrap; }
 body.acu-embedded .profiles { display: none !important; }
 .acu-focused-agent { outline: 2px solid var(--acu-accent) !important; outline-offset: 5px; border-radius: 8px; }
 body[data-acu-agent] #agents:has(.acu-focused-agent) .row.agent:not(.acu-focused-agent) { display: none !important; }

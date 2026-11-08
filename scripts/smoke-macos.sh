@@ -7,6 +7,13 @@ port=43871
 runtime_pid=$!
 cleanup() {
     kill "$runtime_pid" 2>/dev/null || true
+    # Wails can keep its Cocoa event loop alive after SIGTERM. Reap the
+    # process with a bounded grace period so packaging cannot wait forever.
+    for attempt in 1 2 3 4 5; do
+        kill -0 "$runtime_pid" 2>/dev/null || break
+        sleep 1
+    done
+    kill -KILL "$runtime_pid" 2>/dev/null || true
     wait "$runtime_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
