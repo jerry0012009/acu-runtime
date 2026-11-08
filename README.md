@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.38
+# ACU Runtime 0.1.46
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,9 +8,9 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.38-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.38-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.38-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.46-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.46-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.46-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
@@ -116,7 +116,7 @@ node scripts/test-native-login.cjs
 新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。
 
 
-### 0.1.38 简化日常配置
+### 0.1.46 简化日常配置
 
 工作台「一键配置」默认只需选择应用，首次接入使用推荐模型并自动准备图片与搜索工具。调整模型和范围放在折叠项中；已接入应用默认保留主模型与可见性。想替换时须显式勾选。部分失败只重试未完成应用或工具。
 
