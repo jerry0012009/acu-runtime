@@ -1,4 +1,4 @@
-# Runtime 0.1.49 / Magpie 0.1.3852
+# Runtime 0.1.50 / Magpie 0.1.3852
 
 本次配套内核为 v0.1.3852（2026-11-12 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。
 
@@ -105,7 +105,7 @@ Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程�
 路由跟踪确认原生 OpenAI 与 ACU 请求属于不同 session；一键配置不重写已存在的聊天选模。推荐预览与路由页说明保留聊天选模及按模型来源路由的行为。
 
 
-## 0.1.49 本地验证（2026-11-12）
+## 0.1.50 本地验证（2026-11-12）
 
 - Windows x64 官方 CLI v0.1.3852 完整下载摘要为 `10b65d013d51547609e3f33b57193494f314b051bcb73e95101f0378bae77e51`，与 GitHub 官方 release 元数据一致。其余平台固定官方摘要，仍需对应 runner/设备验证。
 - 新内核 `optionLists/options` 索引已在 Runtime 内部展开，原生界面仍读取自己的格式；模型选择、四 Agent 配置、重复 MCP 保留、仅存共享模型不改 Agent 文件的隔离测试通过。无 ChatGPT 账号的隔离 Codex 配置确认使用 magpie provider 且无 auth.json。

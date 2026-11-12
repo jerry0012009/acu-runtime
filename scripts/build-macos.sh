@@ -62,10 +62,14 @@ mkdir -p "$stage"
 ditto "$app" "$stage/ACU Runtime.app"
 ln -sfn /Applications "$stage/Applications"
 image="dist/release/ACU-Runtime-$version-macos-$arch.dmg"
+# hdiutil's automatic sizing can underestimate space for the signed kernel.
+# Reserve filesystem metadata and copy headroom explicitly for both architectures.
+stage_kib="$(du -sk "$stage" | awk '{print $1}')"
+image_mib=$(( (stage_kib + 1023) / 1024 + 128 ))
 # DiskImages can briefly report EBUSY on shared CI hosts. Retry the same
 # output without weakening signing, startup checks or packaging failures.
 for attempt in 1 2 3; do
-    if hdiutil create -volname 'ACU Runtime' -srcfolder "$stage" -ov -format UDZO "$image"; then
+    if hdiutil create -volname 'ACU Runtime' -srcfolder "$stage" -size "${image_mib}m" -fs HFS+ -ov -format UDZO "$image"; then
         break
     fi
     [[ "$attempt" -lt 3 ]] || exit 1
