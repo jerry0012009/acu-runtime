@@ -614,7 +614,7 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
-		case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
+		case (request.Method == http.MethodGet || request.Method == http.MethodPut) && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
 			host.accountPreferences(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/prices":
 			host.modelPrices(response, request)
