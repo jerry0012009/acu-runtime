@@ -57,6 +57,8 @@ async function main() {
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     await page.getByRole('searchbox').fill('sol');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1);
+    assert(await page.getByRole('columnheader', {name:'倍率',exact:true}).isVisible());
+    assert(await page.getByText('0.06×', {exact:true}).isVisible());
     await page.getByText('计费详情', { exact: true }).click();
     await page.getByText(/272,000/).waitFor();
     failPrices = true;

@@ -1,6 +1,16 @@
+# ACU Runtime 0.1.57
+
+- 修复 Windows ChatGPT / Codex 接入时反复闪退重启：暂停 Runtime 自己的空闲内核后写入配置，实际核验登录身份、配置与模型，再恢复服务。失败或取消恢复原配置，接入/断开/高级模型设置使用同一流程。
+- Runtime 和配套内核一起更新，安装器直接校验本次打包的版本、架构和 SHA-256，修复新版内核被旧安装器清单误判不兼容。
+- 配套 Magpie 内核升级到 0.1.3940，固定官方摘要；迁移默认目录的旧内核前等待请求完成，不改写其他 Agent 的连接。
+- 保留 0.1.56 的偏好完整编辑和草稿保护，合并动态向量图、六小时缓存、Agent 更新入口和开机后台启动设置。
+
 # ACU Runtime 0.1.56
 
 修正偏好时显示完整规则、适用范围与例外，仅提交改动字段。编辑草稿在搜索、图谱选择和刷新时保留，退出或切换账户时清除。偏好图谱增加缩放、悬停预览、搜索高亮和直接定位修正入口。
+
+# ACU Runtime 0.1.54
+
 
 “我的偏好”加入交互式偏好向量图，支持选择方向查看规则和适用范围。完整目录折叠展示，保留搜索、来源和近期变化。登录后可修正偏好与适用范围，或停用、恢复记录；修改会核对最新版本，避免覆盖同时进行的学习。此页不改变模型 Key 或 Agent 配置。
 
@@ -32,9 +42,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.52-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.52-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.52-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.57-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.57-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.57-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

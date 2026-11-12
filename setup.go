@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -213,6 +214,20 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		host.json(response, 400, map[string]string{"error": "PDF 组件路径同步失败：" + err.Error()})
 		return
 	}
+	if input.Preserve && target.Wired && host.desktop && runtime.GOOS == "windows" && input.Agent == "codex" {
+		for _, field := range target.Fields {
+			if field.Key != "model" {
+				continue
+			}
+			for _, option := range field.Options {
+				if option.Value == field.Value && strings.HasPrefix(option.Ref, input.Provider+"/") {
+					input.Model = strings.TrimPrefix(option.Ref, input.Provider+"/")
+					input.Preserve = false
+					break
+				}
+			}
+		}
+	}
 	if input.Preserve && target.Wired {
 		if err := host.ensureACUContext(ctx, input.Provider); err != nil {
 			host.json(response, 400, map[string]string{"error": err.Error()})
@@ -231,6 +246,26 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		return
 	}
 	var result map[string]json.RawMessage
+	if host.desktop && runtime.GOOS == "windows" && input.Agent == "codex" {
+		fields := []string{"model"}
+		if input.Auxiliary {
+			fields = append(fields, "small", "opus", "sonnet", "haiku", "fable", "subagent", "subagent_model")
+		}
+		changes := []codexFieldChange{}
+		for _, field := range fields {
+			if value := pickACU(target.Fields, field, input.Provider, input.Model); value != "" {
+				changes = append(changes, codexFieldChange{field, value})
+			}
+		}
+		result, err = host.kernel.changeCodexQuietly(ctx, changes, false)
+		if err != nil {
+			host.json(response, 409, map[string]string{"error": err.Error()})
+			return
+		}
+		result["runtimeSetup"], _ = json.Marshal(map[string]any{"reopenDesktop": true, "auxiliaryApplied": len(changes) - 1})
+		host.json(response, 200, result)
+		return
+	}
 	if !target.Wired {
 		if err := host.kernel.exchange(ctx, "POST", "/api/agents/connect/"+input.Agent, map[string]any{}, &result); err != nil {
 			host.json(response, 400, map[string]string{"error": err.Error()})

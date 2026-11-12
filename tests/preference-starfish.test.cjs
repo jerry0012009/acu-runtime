@@ -1,0 +1,12 @@
+const assert = require('node:assert/strict');
+const test = require('node:test');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const context=vm.createContext({});vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../web/preference-starfish.js'),'utf8'),context);
+const {preferenceRayLengths:lengths,bipolarRayGeometry:axis}=context.ACUStarfishGeometry;
+test('clustered strengths retain visible relative differences',()=>{const r=lengths([76,81,85,89,90]);assert(r[4]/r[0]>2);assert(r[4]-r[0]>120);assert.deepEqual([...r],[...r].sort((a,b)=>a-b));});
+test('equal strengths keep equal lengths across input order',()=>{const r=lengths([90,76,90,85]);assert.equal(r[0],r[2]);assert.deepEqual([...lengths([85,90,76,90])],[r[3],r[0],r[1],r[2]]);});
+test('small strength differences do not fill the entire radius',()=>{const r=lengths([88,89,90]);assert(r[2]-r[0]<20);});
+test('empty single and boundary strengths stay finite and bounded',()=>{assert.equal(lengths([]).length,0);for(const s of [[88],[88,88,88],[0,1],[99,100],[0,50,100]])assert(lengths(s).every(r=>Number.isFinite(r)&&r>=64&&r<=250));});
+test('opposite bipolar positions reverse direction at the same length; midpoint has none',()=>{const a=axis('W01.1',12,192,18),b=axis('W01.1',12,192,102);assert.equal(a.radius,b.radius);assert(Math.abs(a.angle-b.angle-Math.PI)<.00001);assert.equal(axis('W01.1',12,192,60).radius,0);assert.equal(axis('W01.1',12,192,0).radius,250);assert.equal(axis('W01.1',12,192,120).radius,250);});
+test('axis layout is stable and distinct by ID',()=>{assert.deepEqual(axis('I01.1',0,192,18),axis('I01.1',0,192,18));assert.notEqual(axis('I01.1',0,192,18).angle,axis('I01.2',1,192,18).angle);});

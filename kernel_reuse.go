@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/url"
 	"os"
@@ -18,11 +19,38 @@ import (
 // Use Magpie's own commands for settings writes: these validate, lock and
 // preserve the rest of the user's configuration, including newer settings.
 func pauseKernelUpdates(ctx context.Context, executable string) error {
+	if kernelSettingsMatch(executable, func(settings map[string]json.RawMessage) bool {
+		var noUpdate, notifyOnly, restart bool
+		return json.Unmarshal(settings["noAutoUpdate"], &noUpdate) == nil && noUpdate &&
+			json.Unmarshal(settings["noAutoDownload"], &notifyOnly) == nil && notifyOnly &&
+			(len(settings["autoRestart"]) == 0 || json.Unmarshal(settings["autoRestart"], &restart) == nil && !restart)
+	}) {
+		return nil
+	}
 	return pauseKernelUpdatesWith(func(args []string) error {
 		command := exec.CommandContext(ctx, executable, args...)
 		hideProcess(command)
 		return command.Run()
 	})
+}
+
+// Read only to avoid re-launching the settings CLI after each safe route
+// transaction. Missing, malformed or uncertain settings still use native writes.
+func kernelSettingsMatch(executable string, matches func(map[string]json.RawMessage) bool) bool {
+	for _, directory := range kernelConfigDirs(executable) {
+		file, err := os.Open(filepath.Join(directory, "settings.json"))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return false
+		}
+		var settings map[string]json.RawMessage
+		err = json.NewDecoder(io.LimitReader(file, 4<<20)).Decode(&settings)
+		file.Close()
+		return err == nil && matches(settings)
+	}
+	return false
 }
 
 func pauseKernelUpdatesWith(run func([]string) error) error {

@@ -220,6 +220,73 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 	s := &host.agentInstall
 	defer func() { s.mu.Lock(); s.running = false; s.mu.Unlock() }()
 	fail := func(err error) { s.phase("error", err.Error()) }
+	if update {
+		key, label := "chatgpt", "ChatGPT"
+		if id == "workbuddy" {
+			key, label = "workbuddy-desktop", "WorkBuddy"
+		}
+		info, ok := host.desktopAgentVersions(ctx)[key]
+		if !ok || !info.Installed {
+			fail(errors.New("未检测到 " + label + " 桌面端，请使用安装入口"))
+			return
+		}
+		if info.Error != "" || info.Latest == "" {
+			fail(errors.New("最新版本尚未确认，请重新检查更新"))
+			return
+		}
+		if !info.Update {
+			s.phase("complete", label+" 已是最新版本（"+info.Version+"）")
+			return
+		}
+		if id == "codex" {
+			if running, probeErr := codexDesktopOpen(); probeErr != nil || running {
+				fail(errors.New("更新客户端前请保存并退出 ChatGPT；更新只替换客户端，不修改 ACU 配置"))
+				return
+			}
+			if err := host.prepareChatGPT(ctx, true); err != nil {
+				fail(err)
+				return
+			}
+		} else {
+			pkg, err := latestWorkBuddyPackage(ctx, runtime.GOOS, runtime.GOARCH)
+			if err != nil {
+				fail(err)
+				return
+			}
+			file := cachedWorkBuddyPackage(pkg)
+			if file == "" {
+				dir, err := agentPackageCache()
+				if err != nil {
+					fail(err)
+					return
+				}
+				file = filepath.Join(dir, pkg.Name)
+				if regularFile(file) {
+					if err = os.Remove(file); err != nil {
+						fail(err)
+						return
+					}
+				}
+				s.phase("downloading", "正在下载 WorkBuddy 官方更新")
+				err = downloadAgentPackage(ctx, agentDownloadClient(), pkg.URL, file, pkg.SHA256, nil)
+				if err != nil {
+					fail(err)
+					return
+				}
+			}
+			s.phase("installing", "正在更新 WorkBuddy，请按官方安装器提示保存工作")
+			if err = installWorkBuddy(ctx, file); err != nil {
+				fail(err)
+				return
+			}
+		}
+		s.phase("complete", label+" 桌面端已更新，账号与 ACU 接入配置保留。")
+		host.agentVersions.Lock()
+		host.agentVersions.at = time.Time{}
+		host.agentVersions.Unlock()
+		return
+	}
+
 	exists, err := host.detectedAgent(ctx, id)
 	if err != nil {
 		fail(err)
@@ -358,11 +425,11 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 400, map[string]string{"error": "不支持的应用安装请求"})
 		return
 	}
-	if in.Update && in.Agent != "codex" {
+	if in.Update && in.Agent != "codex" && in.Agent != "workbuddy" {
 		host.json(w, 400, map[string]string{"error": "此应用请使用客户端内更新"})
 		return
 	}
-	if in.Provider == "" || in.Model == "" {
+	if !in.Update && (in.Provider == "" || in.Model == "") {
 		host.json(w, 400, map[string]string{"error": "请先连接 ACU 并选择可用模型"})
 		return
 	}
@@ -374,11 +441,13 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	valid := false
-	for _, p := range host.connection(ctx).Choices {
-		if p.ID == in.Provider {
-			for _, m := range p.Models {
-				valid = valid || m == in.Model
+	valid := in.Update
+	if !in.Update {
+		for _, p := range host.connection(ctx).Choices {
+			if p.ID == in.Provider {
+				for _, m := range p.Models {
+					valid = valid || m == in.Model
+				}
 			}
 		}
 	}
