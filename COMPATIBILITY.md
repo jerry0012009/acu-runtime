@@ -1,6 +1,8 @@
-## Runtime 0.1.55 lifecycle
+## Windows Runtime 0.1.55 candidate / Magpie 0.1.3935
 
-On Windows the verified bundled/managed CLI takes priority over a separately installed Magpie GUI. Automatic migration only retires an older gateway whose PID executable is the known per-user default Magpie path, after verified download and confirmed idle requests/tools. Custom installations are not terminated. Codex configuration requires an actually serving compatible engine (0.1.3909 or newer), rather than requiring the desktop to be closed. Desktop package replacement still requires closing that client. Existing ChatGPT processes are not launched again. Non-Windows old external engine migration reports the incompatibility instead of guessing how to replace an unrelated process.
+The known desktop failure involves both a prefixed model absent from the effective catalog and the upstream gateway ending ChatGPT's hosted app-server on route changes. Windows configuration now sets native Magpie API routing, validates retained ChatGPT identity and actual model visibility, and changes routes with the owned idle gateway stopped. The existing desktop is left running until the user reopens it. Snapshot rollback includes native ownership metadata and catalogs; cancellation does not leave the gateway stopped. Advanced model/disconnect routes use the same transaction. Headless validators/configuration commands use owned Windows jobs, never a broad process-name kill.
+
+The official 0.1.3935 assets are pinned for all four kernel targets. Windows isolated native acceptance includes an actual signed-in profile copy. This candidate still requires the requested real desktop user test before formal publication; see ACCEPTANCE-0155.md. macOS retains its existing integration behavior and needs separate native acceptance.
 
 # Runtime 0.1.51 / Magpie 0.1.3909
 

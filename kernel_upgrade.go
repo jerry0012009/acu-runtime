@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,6 +21,14 @@ type servingKernel struct {
 }
 
 func gatewayBase() string {
+	if value := os.Getenv("MAGPIE_ADDR"); value != "" {
+		if host, port, err := net.SplitHostPort(value); err == nil && loopback(host) {
+			if n, e := strconv.Atoi(port); e == nil && n > 0 && n <= 65535 {
+				return "http://" + net.JoinHostPort(host, port)
+			}
+		}
+	}
+
 	port := 3425
 	home, _ := os.UserHomeDir()
 	var settings struct {
@@ -95,7 +105,7 @@ func (kernel *kernelState) ensureCompatibleGateway(ctx context.Context) error {
 		return nil
 	}
 	kernel.mu.Lock()
-	kernel.phase = "正在更新配套内核；将等待当前请求完成后自动连接"
+	kernel.phase = "正在更新配套内核 " + info.Version + " → " + strings.TrimPrefix(kernelVersion, "v") + "；等待当前请求完成后自动连接"
 	kernel.mu.Unlock()
 	return upgradeOldGateway(ctx, info)
 }

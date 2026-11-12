@@ -98,6 +98,15 @@ jobs:
           ACU_CHATGPT_INSTALL_SMOKE: '1'
         shell: pwsh
         run: go test -run '^TestOfficialChatGPTInstallSmoke$' -v -timeout 35m .
+      - name: Verify quiet Codex routing with the installed native CLI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ACU_QUIET_CODEX_SMOKE: '1'
+        run: |
+          $env:ACU_QUIET_KERNEL = (Resolve-Path 'dist/windows-amd64/kernel/acu-kernel.exe').Path
+          go test -run '^TestQuietCodexNativeIsolation$' -v -timeout 4m .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package and smoke test native macOS app
         if: runner.os == 'macOS'
         env:

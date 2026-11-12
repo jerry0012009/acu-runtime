@@ -66,6 +66,9 @@ type agentModelOption struct {
 }
 
 type kernelState struct {
+	codexValidate  func(context.Context, string) error
+	stopRequested  bool
+	routeMu        sync.Mutex
 	mu             sync.Mutex
 	exe            string
 	endpoint       *url.URL
@@ -353,6 +356,10 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		kernel.mu.Unlock()
 		return err
 	}
+	if kernel.stopRequested {
+		kernel.mu.Unlock()
+		return context.Canceled
+	}
 	if err := command.Start(); err != nil {
 		kernel.mu.Unlock()
 		return errors.New("无法启动已有内核的控制通道")
@@ -401,6 +408,13 @@ func (kernel *kernelState) start(ctx context.Context) error {
 	}
 	kernel.close()
 	return errors.New("控制通道启动超时；请检查内核版本或已有进程，不会切换 Agent")
+}
+
+func (kernel *kernelState) shutdown() {
+	kernel.mu.Lock()
+	kernel.stopRequested = true
+	kernel.mu.Unlock()
+	kernel.close()
 }
 
 func (kernel *kernelState) close() {
@@ -542,6 +556,9 @@ func (host *server) proxy(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 	if !host.allowDesktopMutation(response, request, path) {
+		return
+	}
+	if host.handleQuietCodexMutation(response, request, path) {
 		return
 	}
 	endpoint, err := host.kernel.target(path)
@@ -782,7 +799,7 @@ func main() {
 		log.Fatal(err)
 	}
 	kernel.enforceVersion = desktopEnabled && *endpoint == "" && os.Getenv("ACU_KERNEL_PATH") == ""
-	defer kernel.close()
+	defer kernel.shutdown()
 	if *endpoint != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err := kernel.authenticate(ctx)

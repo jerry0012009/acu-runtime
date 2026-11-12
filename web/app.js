@@ -215,7 +215,7 @@ function overviewPage() {
   return `${header('', '你的 Agent，一处管理。', '连接 ACU，继续用你熟悉的工具。', ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">快捷面板</button>' : '')}
     <div id="home-preparation">${kernelBanner()}</div><div id="home-connection">${compactConnection()}</div>
     <div id="connection-manager" ${ui.connectionOpen ? '' : 'hidden'}>${ui.connectionOpen ? `<section class="panel setup-stage"><div class="manager-heading"><h2>管理连接</h2><button class="text-button" data-action="manage-connection">收起</button></div>${connectionContent()}</section>` : ''}</div>
-    <div id="home-updates">${homeUpdates()}</div><div id="home-workbench">${usageGuide()}${agentsPage()}</div>`;
+    <div id="home-workbench">${usageGuide()}${agentsPage()}</div>`;
 }
 
 function agentsPage() {
@@ -224,7 +224,7 @@ function agentsPage() {
   const restarting = agents.filter(agent => agent.connected && agent.restartRequired);
   const configured = activeChoice() && detected.some(agent => agent.connected && !agent.needsRepair);
   return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${configured ? '已接入，可前往 WorkBuddy 等应用选择 ACU 模型试用。' : activeChoice() ? '点击一键配置，自动接入模型与常用工具。' : '先登录或连接 ACU，再一键配置。'}</p></div><div class="workbench-actions"><button class="text-button workbench-utility" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片与搜索</button><button class="icon-button workbench-utility" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button primary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
-    ${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.map(agentCard).join('')}</div>` : ''}
+    <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.map(agentCard).join('')}</div>` : ''}
     ${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片与搜索' : result.id))}</strong><span>${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
     ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && result.id === 'tools') ? '<button class="button secondary" data-action="capabilities">处理未完成工具</button>' : ''}
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
@@ -1045,7 +1045,7 @@ async function confirmSetup() {
         connectedAgents.push(id);
         if (!preserve) await applyRecommendedVisibility(id, setup.provider, setup.model);
         ui.selected?.delete(id);
-        ui.results.push({ id, ok: true, message: preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
+        ui.results.push({ id, ok: true, message: result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
     if (setup.tools && connectedAgents.length) {

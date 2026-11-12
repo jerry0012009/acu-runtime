@@ -53,7 +53,7 @@ func TestDesktopGuardAllowsCompatibleAndBlocksOldOrUnknownKernel(t *testing.T) {
 		err     error
 		allowed bool
 	}{
-		{"0.1.3909", nil, true}, {"0.1.3359", nil, false}, {"", errors.New("cannot inspect serving engine"), false},
+		{"0.1.3935", nil, true}, {"0.1.3359", nil, false}, {"", errors.New("cannot inspect serving engine"), false},
 	} {
 		host := &server{desktop: true, kernelProbe: func() (string, error) { return tc.version, tc.err }}
 		if got := host.allowCodexDesktopChange(httptest.NewRecorder()); got != tc.allowed {
