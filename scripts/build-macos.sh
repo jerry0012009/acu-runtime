@@ -62,10 +62,14 @@ mkdir -p "$stage"
 ditto "$app" "$stage/ACU Runtime.app"
 ln -sfn /Applications "$stage/Applications"
 image="dist/release/ACU-Runtime-$version-macos-$arch.dmg"
+# Automatic sizing can underestimate compressed third-party CLI contents.
+# Reserve room from actual staged bytes, with filesystem metadata headroom.
+stage_kb="$(du -sk "$stage" | awk '{print $1}')"
+image_mb="$(( (stage_kb * 2 + 1023) / 1024 + 64 ))"
 # DiskImages can briefly report EBUSY on shared CI hosts. Retry the same
 # output without weakening signing, startup checks or packaging failures.
 for attempt in 1 2 3; do
-    if hdiutil create -volname 'ACU Runtime' -srcfolder "$stage" -ov -format UDZO "$image"; then
+    if hdiutil create -size "${image_mb}m" -volname 'ACU Runtime' -srcfolder "$stage" -ov -format UDZO "$image"; then
         break
     fi
     [[ "$attempt" -lt 3 ]] || exit 1
