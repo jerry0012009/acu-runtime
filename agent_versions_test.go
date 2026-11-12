@@ -50,3 +50,23 @@ func TestClientUpdateDoesNotConfigureAnAlreadyCurrentAgent(t *testing.T) {
 		t.Fatal("current desktop update did not preserve configured account")
 	}
 }
+
+func TestWorkBuddyBuildCommitResolvesFullVersion(t *testing.T) {
+	for _, tc := range []struct {
+		commit    string
+		wantError bool
+	}{{"d4692421", false}, {"", true}, {"12345678", true}} {
+		host := &server{}
+		host.agentVersions.probe = func(context.Context) map[string]string {
+			return map[string]string{"workbuddy-desktop": "5.9.3", "workbuddy-commit": tc.commit}
+		}
+		host.agentVersions.latest = func(context.Context, string) (string, error) { return "5.9.3.42398134+d4692421", nil }
+		got := host.desktopAgentVersions(context.Background())["workbuddy-desktop"]
+		if got.Update || (got.Error != "") != tc.wantError {
+			t.Fatalf("unreliable build comparison: %+v", got)
+		}
+		if !tc.wantError && got.Version != got.Latest {
+			t.Fatalf("matching official build not resolved: %+v", got)
+		}
+	}
+}

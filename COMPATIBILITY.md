@@ -1,3 +1,7 @@
+## Runtime 0.1.55 lifecycle
+
+On Windows the verified bundled/managed CLI takes priority over a separately installed Magpie GUI. Automatic migration only retires an older gateway whose PID executable is the known per-user default Magpie path, after verified download and confirmed idle requests/tools. Custom installations are not terminated. Codex configuration requires an actually serving compatible engine (0.1.3909 or newer), rather than requiring the desktop to be closed. Desktop package replacement still requires closing that client. Existing ChatGPT processes are not launched again. Non-Windows old external engine migration reports the incompatibility instead of guessing how to replace an unrelated process.
+
 # Runtime 0.1.51 / Magpie 0.1.3909
 
 本次配套内核为 v0.1.3909（2026-11-12 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。

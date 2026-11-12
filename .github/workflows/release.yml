@@ -34,6 +34,7 @@ jobs:
           node --check web/app.js
           node --check web/billing.js
           node --check web/preferences.js
+          node --check web/preference-starfish.js
           node --test tests/*.test.cjs
       - name: Test Go and native desktop
         shell: bash
@@ -54,6 +55,7 @@ jobs:
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
           export ACU_TEST_WORKSPACE="$RUNNER_TEMP/acu-preference-browser"
           node scripts/test-preferences.cjs
+          node scripts/test-starfish.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -71,6 +73,15 @@ jobs:
           $env:ACU_NATIVE_TEST_EXE = "$env:RUNNER_TEMP/preferences-native-smoke.exe"
           node scripts/test-native-login.cjs
           node scripts/test-native-restore.cjs
+          $env:ACU_NATIVE_STARFISH_MODE = "bipolar"
+          $env:ACU_NATIVE_INSPECT_PORT = "9236"
+          node scripts/test-native-login.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: starfish-screenshots-${{ matrix.platform }}
+          path: ${{ runner.temp }}/acu-preference-browser/output/runtime-starfish/*.png
+          if-no-files-found: ignore
       - name: Package Windows installer
         if: runner.os == 'Windows'
         env:

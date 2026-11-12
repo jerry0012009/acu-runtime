@@ -5,9 +5,13 @@ const { spawn } = require('node:child_process');
 
 const root = process.env.ACU_TEST_WORKSPACE || path.resolve(__dirname, '../..');
 const { chromium } = process.env.PLAYWRIGHT_MODULE ? require(process.env.PLAYWRIGHT_MODULE) : createRequire(path.join(root, '.build/package.json'))('playwright');
+const fs = require('node:fs');
+const os = require('node:os');
+const ownedProfile = !process.env.ACU_NATIVE_PROFILE;
+const profile = process.env.ACU_NATIVE_PROFILE || fs.mkdtempSync(path.join(os.tmpdir(), 'acu-native-login-'));
 const port = Number(process.env.ACU_NATIVE_INSPECT_PORT || 9231);
 const native = spawn(process.env.ACU_NATIVE_TEST_EXE || path.join(root, '.build/acu-runtime-native-login-smoke.exe'), ['-test.run', '^TestNativeLoginSmoke$', '-test.v'], {
-  env: { ...process.env, ACU_NATIVE_LOGIN_SMOKE: '1', ACU_NATIVE_INSPECT_PORT: String(port) },
+  env: { ...process.env, ACU_NATIVE_LOGIN_SMOKE: '1', ACU_NATIVE_PROFILE: profile, ACU_NATIVE_INSPECT_PORT: String(port) },
   windowsHide: true,
 });
 let output = '';
@@ -36,6 +40,7 @@ async function run() {
     });
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
     const context = browser.contexts()[0];
+    await context.route('http://127.0.0.1:*/runtime/update/check', route => route.fulfill({contentType:'application/json',body:JSON.stringify({phase:'current',current:'0.1.55'})}));
     if (process.env.ACU_NATIVE_PROFILE) await context.addCookies([{ name: 'acu-isolated-persistence-check', value: 'fixture-only', url: 'https://acu.best', httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now()/1000)+3600 }]);
     await context.route('https://acu.best/**', async route => {
       const request = route.request();
@@ -87,6 +92,7 @@ async function run() {
     for(const colorScheme of ['light','dark'])for(const width of [920,1240]){
       await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:850});
       await page.waitForFunction(theme=>document.documentElement.dataset.acuTheme===theme,colorScheme);
+      await page.evaluate(()=>scrollTo(0,0));
       await page.screenshot({path:path.join(graphOutput,`native-${process.env.ACU_NATIVE_STARFISH_MODE||'ordinary'}-${colorScheme}-${width}.png`),fullPage:false});
     }
     assert.equal((await call('/runtime/status')).account.selected, 9, 'viewing preferences must preserve the selected Key');
@@ -103,6 +109,10 @@ async function run() {
       } catch {}
     }
     if (browser) await browser.close().catch(() => {});
+    await Promise.race([exited, pause(15000)]);
+    if (ownedProfile && native.exitCode !== null && path.dirname(profile) === os.tmpdir() && path.basename(profile).startsWith('acu-native-login-')) {
+      await fs.promises.rm(profile, {recursive:true,force:true,maxRetries:50,retryDelay:200});
+    }
   }
 }
 

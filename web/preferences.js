@@ -1,5 +1,5 @@
 globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: esc }) => {
-  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', selected: '', controller: null, revoked: false, refreshTimer: null, retryDelay: 1500 };
+  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', selected: '', controller: null, revoked: false, refreshTimer: null, retryDelay: 1500, retries: 0 };
   const graph = globalThis.createACUStarfish?.({ escapeHTML: esc, sourceList });
   const preferenceCacheMs = 6 * 60 * 60 * 1000;
   const titles = { profile: '偏好概览', library: '偏好记录', activity: '近期摘要变化', settings: '学习与参考状态', controls: '管理偏好' };
@@ -7,7 +7,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
   const note = text => `<p class="preference-note" role="status">${esc(text)}</p>`;
   function clear() {
     graph?.reset();
-    state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.selected = ''; state.revoked = false; state.retryDelay = 1500;
+    state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.selected = ''; state.revoked = false; state.retryDelay = 1500; state.retries = 0;
   }
   function syncAccount() {
     const identity = ui.status?.account?.loggedIn ? ui.status.account.identity : '';
@@ -36,9 +36,11 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       }
     }));
     if (generation === state.generation) {
-      state.busy = false; state.loaded = retry ? 0 : Date.now(); update();
+      state.retries = retry ? state.retries + 1 : 0;
+      const retrySoon = retry && state.retries <= 3;
+      state.busy = false; state.loaded = retrySoon ? 0 : Date.now(); update();
       clearTimeout(state.refreshTimer);
-      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retry ? state.retryDelay : preferenceCacheMs + 10);
+      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retrySoon ? state.retryDelay : preferenceCacheMs + 10);
       state.retryDelay = retry ? Math.min(state.retryDelay * 2, 30000) : 1500;
 
     }

@@ -213,9 +213,9 @@ function usageGuide() {
 
 function overviewPage() {
   return `${header('', '你的 Agent，一处管理。', '连接 ACU，继续用你熟悉的工具。', ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">快捷面板</button>' : '')}
-    <div id="home-preparation">${kernelBanner()}</div><div id="home-updates">${homeUpdates()}</div><div id="home-connection">${compactConnection()}</div>
+    <div id="home-preparation">${kernelBanner()}</div><div id="home-connection">${compactConnection()}</div>
     <div id="connection-manager" ${ui.connectionOpen ? '' : 'hidden'}>${ui.connectionOpen ? `<section class="panel setup-stage"><div class="manager-heading"><h2>管理连接</h2><button class="text-button" data-action="manage-connection">收起</button></div>${connectionContent()}</section>` : ''}</div>
-    <div id="home-workbench">${usageGuide()}${agentsPage()}</div>`;
+    <div id="home-updates">${homeUpdates()}</div><div id="home-workbench">${usageGuide()}${agentsPage()}</div>`;
 }
 
 function agentsPage() {

@@ -1,55 +1,9 @@
-# 我的偏好
+# 我的偏好：向量图谱与管理
 
-Runtime adds a read-only personal preference page without requiring an account
-for the existing model Key workflow. Preference-only native login does not
-select, reveal or apply a model Key. Existing official WebView authentication
-and background access-token renewal remain in use.
+The primary view uses the Console aa68dd7cd starfish handoff and geometry, not a filled radar chart. Ordinary rays and acu-preference-v5-bipolar axes share the Console length/angle rules. All 192 axes remain selectable, including midpoint and inapplicable axes that intentionally have no arrow. Selection links to saved source summaries and scope. Unknown schemas retain readable records without inventing geometry.
 
-The contract is Console main `cdf8172`,
-`docs/implementation/2026-11-12-runtime-preferences.md`. Console application
-`b3a309d58` was deployed on 2026-11-12. No Console or Router release is required
-by this Runtime change.
+Cache is scoped to the logged-in account in memory for six hours. A visible page refreshes after expiry, and manual refresh bypasses the cache. Generation status never causes a 10-second polling loop. Transient 503 failures receive at most three quick retries, then use the normal interval. A saved profile accompanying profile_refresh_failed remains visible.
 
-The local authenticated `/runtime/preferences/{profile,library,activity,settings}`
-GET routes read the corresponding official account endpoints. Library and
-activity require version 1. Cloud access tokens remain in Go memory. An opaque
-per-account/session identity scopes the memory-only 60-second page cache.
-Logout, account switch and confirmed authorization failure clear private data;
-in-flight replies from a previous session cannot populate the new page.
+Preference correction, disable and restore retain revision-based conflict checks from 0.1.54. Viewing preferences does not change learning flags or model Key selection. Logout/account switching aborts pending reads and clears the in-memory account data.
 
-The page shows saved interpretations, full source descriptions, domains and
-scope, plus recent summary changes with collapsed previous summaries. It does
-not display source/run IDs, raw conversations, Markdown diffs, accuracy or
-growth counters. Identical updated summaries are omitted. Empty, partial,
-unsupported, failed and saved/stale profile states remain distinct. Learning
-and reference settings are read only; opening the page never changes them.
-
-## Verification
-
-```powershell
-go test ./...
-go test -tags desktop,production ./...
-go vet -tags desktop,production ./...
-node --test tests/*.test.cjs
-node scripts/test-preferences.cjs
-go test -c -tags desktop,production -o ../.build/preferences-native-smoke.exe
-$env:ACU_NATIVE_TEST_EXE = (Resolve-Path ../.build/preferences-native-smoke.exe).Path
-node scripts/test-native-login.cjs
-```
-
-Browser tests use an isolated loopback fixture, not a production account. They
-check 320/390/768/1440px in both themes, long Chinese/English text, escaping,
-search, keyboard comparisons, missing sources, unchanged summaries, saved
-profiles, empty/404/error/revoked responses, cache, late account-switch replies
-and logout. Tests never send paid model requests or alter real Agent files.
-
-Windows native tests use an isolated profile and instance ID, covering login,
-Key switching, access expiry, transient renewal failure and recovery, plus the
-preference page and keyboard comparison. They do not close the user's Runtime.
-Screenshots are written to `output/runtime-preferences`.
-
-For CI or nonstandard layouts, set `PLAYWRIGHT_MODULE` to the installed
-Playwright directory and `ACU_TEST_WORKSPACE` to an artifact workspace. Optional
-`CHROMIUM_PATH` selects the test browser. macOS CI builds and starts the actual
-native app; a fixture browser run is distinct from authenticated native
-production acceptance.
+`node scripts/test-starfish.cjs` checks geometry rendering, 0/1/3/100 ordinary rays, all 192 bipolar axes, selection, zoom, sources, themes, narrow view and reduced motion. `scripts/test-native-login.cjs` captures Windows WebView2 screenshots; set ACU_NATIVE_STARFISH_MODE=bipolar for the full bipolar fixture. Fixture screenshots are separate from live-account evidence. macOS native appearance requires separate visual acceptance.

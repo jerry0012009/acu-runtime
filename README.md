@@ -1,3 +1,5 @@
+Current release development: **0.1.55** combines animated preference vectors, six-hour preference refresh, Agent-scoped version-aware updates, visible price multipliers, pinned Windows engine migration and default background startup. Startup can be disabled in Settings and stays disabled across relaunches.
+
 # ACU Runtime 0.1.52
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
