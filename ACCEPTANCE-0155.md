@@ -23,3 +23,11 @@ Also passed: normal and desktop-tag Go suites, vet, 114 JS tests, billing/prefer
 Remaining: the user performs their requested real desktop enable/reopen/use test. No assertion of zero future crashes or completed real-desktop acceptance is made from isolated tests.
 
 Opt-in isolated regression (Windows): ACU_QUIET_CODEX_SMOKE=1, ACU_QUIET_KERNEL=absolute official CLI path; optionally ACU_QUIET_CHATGPT_AUTH=absolute auth.json path for the signed-in case. Run go test -run ^TestQuietCodexNativeIsolation$ -v -timeout 4m . . The auth source is only copied into a disposable profile; the user's live profile stays disconnected.
+
+## Installer repair and local installation
+
+The previous installer rejected a valid 0.1.3935 payload because setup still pinned 0.1.3909. Setup now receives version/name/digest pins from the same built Runtime, and the Windows build runs the actual GUI-subsystem installer in --verify-only mode with an explicitly awaited exit code. A deliberately mismatched installer is rejected before target installation. Setup-specific regression tests cover missing and conflicting pins.
+
+The repaired setup installed successfully on the user's Windows machine (exit 0). Installed Runtime and built app hashes matched; account restoration and ready=true were confirmed, with the serving 0.1.3935 CLI owned by Runtime and no standalone Magpie process. Codex remained disconnected. No fresh desktop fatal or identity errors were found during this installation check. The user's real Codex enable/reopen test is still pending.
+
+Compatible default GUI gateways are also retired after path/PID verification and idle checks without replacing their newer binary. Tests verify newer GUI binaries remain unchanged and custom processes are rejected for takeover. This avoids attaching to an external gateway that cannot participate in safe Codex transactions.
