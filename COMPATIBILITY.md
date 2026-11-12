@@ -107,10 +107,10 @@ Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程�
 
 ## 0.1.48 本地验证（2026-11-12）
 
-- Windows x64 官方 CLI v0.1.3909 完整下载摘要为 `10b65d013d51547609e3f33b57193494f314b051bcb73e95101f0378bae77e51`，与 GitHub 官方 release 元数据一致。其余平台固定官方摘要，仍需对应 runner/设备验证。
+- Windows x64 官方 CLI v0.1.3909 完整下载摘要为 `4764c41e57da50371ba8b664f5b387a2b17fb26deac0937725fd9674789ae2cf`，与 GitHub 官方 release 元数据一致。其余平台固定官方摘要，仍需对应 runner/设备验证。
 - 新内核 `optionLists/options` 索引已在 Runtime 内部展开，原生界面仍读取自己的格式；模型选择、四 Agent 配置、重复 MCP 保留、仅存共享模型不改 Agent 文件的隔离测试通过。无 ChatGPT 账号的隔离 Codex 配置确认使用 magpie provider 且无 auth.json。
 - 官方 ChatGPT x64 MSIX 版本 26.1106.6628.0，SHA-256 `785189c1960a47db3c241b9bb84c4a4979c26b79329af5c0019afb016f1e56a3`，本机 Windows 验签 Valid，发布者与 OpenAI.Codex 架构验证通过。此摘要仅为本次下载证据；官方 URL 指向 latest，运行时依靠 Windows 签名与身份验证。未替换本机正在使用的 ChatGPT。
-- 包清单无外部 framework 依赖，含 CodexSandboxService，需要 Windows 系统安装权限。安装器保留 UAC，不强停已有应用、不降级。首次干净设备部署与 API 模式完整桌面任务尚待验收。
+- 包清单无外部 framework 依赖，含 CodexSandboxService，需要 Windows 系统安装权限。安装器保留 UAC，不强停已有应用、不降级。干净 Windows 部署与 API 实际任务已验收，完整 GUI 点击任务尚未验收。
 - 首页通知与更新确认、CLI 更新、失败保留、批量更新后再升级 Runtime 均有前端回归；macOS Runtime 自动安装更新尚未提供，Mac ChatGPT DMG 验签与架构判断尚无实机验收。
 
 ## 0.1.48 发布验收补充
