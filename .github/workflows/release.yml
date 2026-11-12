@@ -89,6 +89,8 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/build-windows.ps1
+          go test -tags setup ./cmd/setup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $version = [regex]::Match((Get-Content update.go -Raw), 'const appVersion = "([^"]+)"').Groups[1].Value
           New-Item -ItemType Directory -Force dist/release | Out-Null
           Copy-Item -LiteralPath 'dist/windows-amd64/ACU Runtime Setup.exe' -Destination "dist/release/ACU-Runtime-$version-windows-amd64-Setup.exe"

@@ -64,6 +64,46 @@ func upgradeOldGateway(ctx context.Context, info servingKernel) error {
 	if err = windows.TerminateProcess(process, 0); err != nil {
 		return errors.New("内核已更新，但旧进程尚未退出")
 	}
-	_, err = windows.WaitForSingleObject(process, 10000)
-	return err
+	result, err := windows.WaitForSingleObject(process, 10000)
+	if err != nil {
+		return err
+	}
+	if result != windows.WAIT_OBJECT_0 {
+		return errors.New("旧内核退出超时，未改变 Codex 配置")
+	}
+	return nil
+}
+
+// Quiet Codex transactions require an owned gateway, including when a
+// separately launched GUI happens to have the compatible or a newer version.
+// Keep its on-disk binary; retire only the verified idle default GUI process.
+func retireCompatibleGateway(ctx context.Context, info servingKernel) error {
+	process, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION|windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, false, info.PID)
+	if err != nil {
+		return errors.New("无法接管正在运行的独立内核")
+	}
+	defer windows.CloseHandle(process)
+	buffer := make([]uint16, 32768)
+	size := uint32(len(buffer))
+	if windows.QueryFullProcessImageName(process, 0, &buffer[0], &size) != nil {
+		return errors.New("无法核实独立内核位置，未停止进程")
+	}
+	target := filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "magpie", "magpie.exe")
+	if !strings.EqualFold(filepath.Clean(windows.UTF16ToString(buffer[:size])), filepath.Clean(target)) {
+		return errors.New("正在运行的内核位于自定义目录，已保留；请退出该内核后重试")
+	}
+	if err = waitGatewayIdle(ctx); err != nil {
+		return err
+	}
+	if err = windows.TerminateProcess(process, 0); err != nil {
+		return errors.New("独立内核尚未退出，未改变 Codex 配置")
+	}
+	result, err := windows.WaitForSingleObject(process, 10000)
+	if err != nil {
+		return err
+	}
+	if result != windows.WAIT_OBJECT_0 {
+		return errors.New("独立内核退出超时，未改变 Codex 配置")
+	}
+	return nil
 }

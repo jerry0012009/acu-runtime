@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +103,12 @@ func (kernel *kernelState) ensureCompatibleGateway(ctx context.Context) error {
 		return nil
 	}
 	if !desktopVersionNewer(kernelVersion, info.Version) {
+		kernel.mu.Lock()
+		owned := kernel.process != nil && kernel.process.Process != nil && uint32(kernel.process.Process.Pid) == info.PID
+		kernel.mu.Unlock()
+		if runtime.GOOS == "windows" && !owned {
+			return retireCompatibleGateway(ctx, info)
+		}
 		return nil
 	}
 	kernel.mu.Lock()
