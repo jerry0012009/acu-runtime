@@ -33,3 +33,10 @@ func TestLoginWindowBootstrapsBeforeNavigatingToTheWebsite(t *testing.T) {
 		t.Fatal("native bridge bootstrap or document-start helper is missing")
 	}
 }
+
+func TestRestoredLoginWindowStartsHiddenWithPinnedSession(t *testing.T) {
+	options := accountWindowOptions(loginTicket{Site: billingSite, State: "restore-nonce", SessionID: "pinned-session", Restore: true, Expires: time.Now().Add(time.Minute)})
+	if !options.Hidden || strings.Contains(options.HTML, "/sign-in") || !strings.Contains(options.JS, "pinned-session") {
+		t.Fatal("restoration must use a hidden official window and the remembered session")
+	}
+}

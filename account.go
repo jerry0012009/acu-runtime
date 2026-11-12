@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -17,10 +18,12 @@ import (
 )
 
 type loginTicket struct {
-	Site     string    `json:"site"`
-	State    string    `json:"state"`
-	Register bool      `json:"register"`
-	Expires  time.Time `json:"-"`
+	Site      string    `json:"site"`
+	State     string    `json:"state"`
+	Register  bool      `json:"register"`
+	Restore   bool      `json:"restore,omitempty"`
+	SessionID string    `json:"sessionId,omitempty"`
+	Expires   time.Time `json:"-"`
 }
 
 type accountKey struct {
@@ -30,6 +33,7 @@ type accountKey struct {
 }
 
 type accountView struct {
+	Identity    string       `json:"identity,omitempty"`
 	LoggedIn    bool         `json:"loggedIn"`
 	Username    string       `json:"username,omitempty"`
 	Site        string       `json:"site,omitempty"`
@@ -39,6 +43,7 @@ type accountView struct {
 	Pending     bool         `json:"pending"`
 	WindowReady bool         `json:"windowReady"`
 	Refreshing  bool         `json:"refreshing"`
+	Restoring   bool         `json:"restoring"`
 	Error       string       `json:"error,omitempty"`
 }
 
@@ -58,8 +63,12 @@ func (account *accountState) snapshot() accountView {
 	account.mu.Lock()
 	defer account.mu.Unlock()
 	view := account.view
+	if view.LoggedIn {
+		view.Identity = fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprint(account.userID)+"/"+account.session.State+"/"+account.sessionID)))
+	}
 	view.Refreshing = view.LoggedIn && account.expires <= time.Now().Unix()
 	view.Pending = account.ticket.State != "" && time.Now().Before(account.ticket.Expires)
+	view.Restoring = view.Pending && account.ticket.Restore
 	return view
 }
 
@@ -248,7 +257,9 @@ func (host *server) cloudJSON(ctx context.Context, method, address, bearer strin
 	if err != nil {
 		return errors.New("无效的 ACU 请求")
 	}
-	request.Header.Set("Authorization", "Bearer "+bearer)
+	if bearer != "" {
+		request.Header.Set("Authorization", "Bearer "+bearer)
+	}
 	request.Header.Set("Accept", "application/json")
 	client := http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("ACU 认证请求不跟随重定向") }}
 	if host.cloudTransport != nil {
@@ -376,6 +387,15 @@ func (host *server) completeAccountLogin(ctx context.Context, windowName, sender
 	if user.ID <= 0 || user.Username == "" {
 		return errors.New("无法确认 ACU 账号")
 	}
+	if ticket.Restore {
+		host.account.mu.Lock()
+		matches := host.account.userID == user.ID && (host.account.sessionID == "" || host.account.sessionID == input.SessionID)
+		host.account.mu.Unlock()
+		if !matches {
+			host.forgetAccount()
+			return errors.New("官网会话已切换，请重新登录 ACU")
+		}
+	}
 	var listed struct {
 		Total int `json:"total"`
 		Items []struct {
@@ -389,16 +409,21 @@ func (host *server) completeAccountLogin(ctx context.Context, windowName, sender
 	}
 	keyError := host.cloudJSON(ctx, http.MethodGet, ticket.Site+"/api/token/?p=1&page_size=100", input.AccessToken, &listed)
 	view := accountView{LoggedIn: true, Username: user.Username, Site: ticket.Site, Total: listed.Total, Keys: []accountKey{}}
+	if ticket.Restore {
+		host.account.mu.Lock()
+		view.Selected = host.account.view.Selected
+		host.account.mu.Unlock()
+	}
 	for _, key := range listed.Items {
 		available := key.ID > 0 && key.Status == 1 && (key.Expired <= 0 || key.Expired > time.Now().Unix()) && (key.Unlimited || key.Remaining > 0)
 		view.Keys = append(view.Keys, accountKey{ID: key.ID, Name: key.Name, Available: available})
-		if view.Selected == 0 && available {
+		if view.Selected == 0 && available && !ticket.Restore {
 			view.Selected = key.ID
 		}
 	}
 	if keyError != nil {
 		view.Error = "账号已登录，但 Key 列表读取失败；可重试登录或直接使用 API Key。"
-	} else if view.Selected == 0 {
+	} else if view.Selected == 0 && !ticket.Restore {
 		view.Error = "账号下没有可用 Key，请在网站创建后重新登录。"
 	}
 	host.account.mu.Lock()
@@ -410,13 +435,14 @@ func (host *server) completeAccountLogin(ctx context.Context, windowName, sender
 	host.account.session, host.account.userID, host.account.sessionID = ticket, user.ID, input.SessionID
 	host.account.renewalError = false
 	host.account.mu.Unlock()
-	if view.Selected > 0 {
+	if view.Selected > 0 && !ticket.Restore {
 		if err := host.useAccountKey(ctx, view.Selected); err != nil {
 			host.account.mu.Lock()
 			host.account.view.Error = "已登录，但默认 Key 未连接：" + err.Error()
 			host.account.mu.Unlock()
 		}
 	}
+	host.rememberAccount()
 	return nil
 }
 
@@ -451,6 +477,7 @@ func (host *server) useAccountKey(ctx context.Context, selected int) error {
 	host.account.view.Selected = selected
 	host.account.view.Error = ""
 	host.account.mu.Unlock()
+	host.rememberAccount()
 	return nil
 }
 

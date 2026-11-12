@@ -30,11 +30,13 @@ ui.agentUpdates = {};
 if (launchQuery.get('page') === 'overview' || launchQuery.has('native')) ui.page = 'overview';
 let pendingNative = launchQuery.get('native');
 const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usage', 'routing', 'plugins', 'masking']);
+const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML });
+const preferences = globalThis.createACUPreferences?.({ app, ui, request, navigation, escapeHTML });
 
 async function request(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'X-ACU-Token': token, ...options.headers } });
   const result = await response.json();
-  if (!response.ok || result.error) throw new Error(result.error || `请求失败（${response.status}）`);
+  if (!response.ok || result.error) { const error = new Error(result.error || `请求失败（${response.status}）`); error.status = response.status; throw error; }
   return result;
 }
 
@@ -69,6 +71,8 @@ async function refresh(rescan = false, quiet = false) {
     const previousAccount = ui.status?.account;
     const previousState = JSON.stringify(ui.status);
     ui.status = await request('/runtime/status');
+    billing?.syncAccount();
+    preferences?.syncAccount();
     if (ui.status.desktop && ui.status.update?.supported && !ui.startupUpdateChecked) {
       ui.startupUpdateChecked = true;
       // One read-only release check per window session. Installation is
@@ -116,7 +120,7 @@ async function refresh(rescan = false, quiet = false) {
 
 function navigation() {
   return `<aside class="sidebar"><a class="brand" href="#overview" data-page="overview" aria-label="ACU Runtime 首页"><span class="brand-symbol">A</span><span>ACU<span class="brand-sub">RUNTIME</span></span></a>
-    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['usage', 'clock', '用量'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>
+    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['preferences', 'shield', '我的偏好'], ['usage', 'clock', '用量与费用'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>
     <div class="sidebar-bottom"><span class="sidebar-signature">LESS COST.<br>MORE POSSIBILITY.</span></div></aside>`;
 }
 
@@ -696,6 +700,8 @@ function settingsPage() {
 }
 
 function render() {
+  if (ui.page === 'preferences' && preferences) { preferences.render(); return; }
+  if (ui.page === 'usage' && billing) { billing.render(); return; }
   if (ui.frame) return;
   if (ui.page === 'capabilities') { if (!document.getElementById('capability-page')) renderCapabilities(); return; }
   if (['agents', 'connection', 'tools'].includes(ui.page)) {
@@ -1034,7 +1040,8 @@ async function confirmSetup() {
 }
 
 async function startAccountLogin(register) {
-  if (ui.applying || ui.accountBusy || ui.status?.account?.pending || !ui.status?.desktop) return;
+  if (ui.applying || ui.accountBusy || (ui.status?.account?.pending && !ui.status?.account?.restoring) || !ui.status?.desktop) return;
+  preferences?.beginLogin();
   const site = 'acucompute.com';
   ui.connectionOpen = false;
   app.innerHTML = '';
@@ -1072,7 +1079,12 @@ async function configureConnection(input) {
 }
 
 function openNative(view, agent = '', developer = false, tab = '', focus = '', action = '', extra = new URLSearchParams()) {
-
+  if (view === 'usage' && billing) {
+    const query = new URLSearchParams();
+    for (const key of ['req', 'provider', 'computer', 'period', 'day', 'q']) if (extra.get(key)) query.set(key, extra.get(key));
+    if (tab) query.set('tab', tab);
+    billing.open('local', query); return;
+  }
   if (!ui.status?.ready) { connectKernel(); return; }
     ui.frame = { view, agent, developer };
     const query = new URLSearchParams({ view, 'acu-view': view, 'acu-agent': agent, 'acu-developer': developer ? '1' : '0' });
@@ -1088,6 +1100,8 @@ function openNative(view, agent = '', developer = false, tab = '', focus = '', a
 
 app.addEventListener('click', event => {
   if (ui.applying || ui.accountBusy) return;
+  if (preferences?.click(event)) return;
+  if (billing?.click(event)) return;
   const page = event.target.closest('[data-page]');
   if (page) { const navigate = () => { ui.capabilityReturn = false; ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); }; if (ui.page === 'capabilities') leaveCapabilities(navigate); else navigate(); return; }
   if (event.target.closest('[data-capability-back]')) { returnFromCapabilities(); return; }
@@ -1128,7 +1142,9 @@ app.addEventListener('click', event => {
   };
   actions[control.dataset.action]?.();
 });
+app.addEventListener('input', event => { billing?.input(event); preferences?.input(event); });
 app.addEventListener('change', event => {
+  if (billing?.change(event)) return;
   if (event.target.dataset?.capability) { changeCapabilityModel(event.target); return; }
   if (event.target.dataset?.agentModel) { setAgentModel(event.target.dataset.agentModel, event.target.value, event.target.dataset.agentRole || 'model'); return; }
   if (event.target.id === 'quick-key') {

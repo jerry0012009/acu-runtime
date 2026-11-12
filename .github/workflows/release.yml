@@ -32,6 +32,8 @@ jobs:
           version=$(sed -n 's/^const appVersion = "\([^"]*\)"/\1/p' update.go)
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then test "$GITHUB_REF_NAME" = "v$version"; fi
           node --check web/app.js
+          node --check web/billing.js
+          node --check web/preferences.js
           node --test tests/*.test.cjs
       - name: Test Go and native desktop
         shell: bash

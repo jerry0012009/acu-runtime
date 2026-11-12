@@ -53,6 +53,9 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 		return err
 	}
 	dataDirectory = filepath.Join(dataDirectory, "ACURuntime")
+	if host.accountFile == "" {
+		host.accountFile = filepath.Join(dataDirectory, "account-session.json")
+	}
 	if err := os.MkdirAll(dataDirectory, 0700); err != nil {
 		return err
 	}
@@ -70,6 +73,13 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 		go func() { <-ready; application.InvokeAsync(func() { window.Restore(); window.Show(); window.Focus() }) }()
 	}
 	windows := application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: filepath.Join(dataDirectory, "WebView2")}
+	instanceID := "com.acu.runtime.desktop"
+	if os.Getenv("ACU_NATIVE_LOGIN_SMOKE") == "1" {
+		instanceID += ".isolated-login-test"
+		if os.Getenv("ACU_NATIVE_RESTORE_SMOKE") == "1" {
+			instanceID += ".restart"
+		}
+	}
 	if inspectPort != 0 {
 		windows.AdditionalBrowserArgs = []string{fmt.Sprintf("--remote-debugging-port=%d", inspectPort), "--remote-debugging-address=127.0.0.1"}
 	}
@@ -88,7 +98,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 			var incoming struct {
 				Type string `json:"type"`
 			}
-			if json.Unmarshal([]byte(message), &incoming) != nil || (incoming.Type != "acu-account-login" && incoming.Type != "acu-account-ready" && incoming.Type != "acu-account-refresh" && incoming.Type != "acu-account-refresh-error") {
+			if json.Unmarshal([]byte(message), &incoming) != nil || (incoming.Type != "acu-account-login" && incoming.Type != "acu-account-ready" && incoming.Type != "acu-account-refresh" && incoming.Type != "acu-account-refresh-error" && incoming.Type != "acu-account-restore-error") {
 				return
 			}
 			go func() {
@@ -102,6 +112,10 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 					if err := host.acknowledgeAccountWindow(source.Name(), origin.Origin, top, message); err != nil {
 						log.Print("ACU login window handshake rejected")
 					}
+					return
+				}
+				if incoming.Type == "acu-account-restore-error" {
+					_ = host.accountRestoreError(source.Name(), origin.Origin, top, message)
 					return
 				}
 				result := map[string]any{"ok": true}
@@ -127,7 +141,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 				source.ExecJS(`window.dispatchEvent(new CustomEvent('acu-runtime-account-result',{detail:` + string(encoded) + `}))`)
 			}()
 		},
-		SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.acu.runtime.desktop", OnSecondInstanceLaunch: func(application.SecondInstanceData) { show() }},
+		SingleInstance: &application.SingleInstanceOptions{UniqueID: instanceID, OnSecondInstanceLaunch: func(application.SecondInstanceData) { show() }},
 		OnShutdown:     shutdown,
 	})
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -247,7 +261,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 								if !hidden && time.Since(started) > 15*time.Second {
 									host.account.mu.Lock()
 									if host.account.ticket.State == ticket.State && !host.account.view.WindowReady && host.account.view.Error == "" {
-										host.account.view.Error = "登录窗口未连接应用，请重试登录或直接填 Key。"
+										host.account.view.Error = "官网会话暂未连接，请检查网络后重试登录；已有 Key 不受影响。"
 									}
 									host.account.mu.Unlock()
 								}
@@ -258,7 +272,14 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 									}
 									if !hidden {
 										hidden = true
-										application.InvokeAsync(func() { login.Hide(); window.Restore(); window.Show(); window.Focus() })
+										application.InvokeAsync(func() {
+											login.Hide()
+											if !ticket.Restore {
+												window.Restore()
+												window.Show()
+												window.Focus()
+											}
+										})
 									}
 									if host.account.refreshDue(ticket.State) && time.Since(started) >= 15*time.Second {
 										login.ExecJS(`window.dispatchEvent(new Event('acu-runtime-account-refresh'))`)
@@ -272,6 +293,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 			}
 		}
 	}()
+	app.Event.RegisterApplicationEventHook(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { host.restoreAccount() })
 	log.Printf("ACU Runtime native desktop v%s starting", appVersion)
 	return app.Run()
 }
@@ -281,9 +303,12 @@ func accountWindowOptions(ticket loginTicket) application.WebviewWindowOptions {
 	if ticket.Register {
 		path = "/sign-up"
 	}
+	if ticket.Restore {
+		path = "/"
+	}
 	address, _ := json.Marshal(ticket.Site + path)
-	encoded, _ := json.Marshal(map[string]any{"site": ticket.Site, "state": ticket.State, "expiresAt": ticket.Expires.Unix()})
+	encoded, _ := json.Marshal(map[string]any{"site": ticket.Site, "state": ticket.State, "expiresAt": ticket.Expires.Unix(), "restore": ticket.Restore, "sessionId": ticket.SessionID})
 	script, _ := assets.ReadFile("web/account-login.js")
 	bootstrap := `<!doctype html><meta charset="utf-8"><title>正在打开 ACU 登录</title><body>正在打开 ACU 登录…<script>const bridge=window.chrome?.webview||window.webkit?.messageHandlers?.external;if(bridge){bridge.postMessage('wails:runtime:ready')}location.replace(` + string(address) + `)</script>`
-	return application.WebviewWindowOptions{Name: "acu-login-" + ticket.State, Title: "登录 ACU · 完成后自动返回", HTML: bootstrap, JS: strings.Replace(string(script), "__ACU_LOGIN_TICKET__", string(encoded), 1), Width: 1060, Height: 800, MinWidth: 720, MinHeight: 600, Windows: application.WindowsWindow{Theme: application.SystemDefault}}
+	return application.WebviewWindowOptions{Name: "acu-login-" + ticket.State, Hidden: ticket.Restore, Title: "登录 ACU · 完成后自动返回", HTML: bootstrap, JS: strings.Replace(string(script), "__ACU_LOGIN_TICKET__", string(encoded), 1), Width: 1060, Height: 800, MinWidth: 720, MinHeight: 600, Windows: application.WindowsWindow{Theme: application.SystemDefault}}
 }

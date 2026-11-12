@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -29,11 +30,12 @@ func TestNativeLoginSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer windows.CoUninitialize()
-	cache, err := os.MkdirTemp("", "acu-runtime-native-smoke-")
-	if err != nil {
-		t.Fatal(err)
+	cache := os.Getenv("ACU_NATIVE_PROFILE")
+	if cache == "" {
+		cache = t.TempDir()
 	}
 	t.Setenv("LOCALAPPDATA", cache)
+	restoring := os.Getenv("ACU_NATIVE_RESTORE_SMOKE") == "1"
 	var mu sync.Mutex
 	var provider map[string]any
 	providerWrites, renewals := 0, 0
@@ -60,6 +62,13 @@ func TestNativeLoginSmoke(t *testing.T) {
 			io.WriteString(response, `{"key":"fixture-model-key"}`)
 		case "/api/state":
 			io.WriteString(response, `{"agents":[{"id":"codex","fields":[]},{"id":"claude","fields":[]},{"id":"workbuddy","fields":[]},{"id":"hermes","fields":[]}]}`)
+		case "/api/groups", "/api/agents/cli", "/api/agent-models/codex", "/api/agent-models/claude", "/api/agent-models/workbuddy", "/api/agent-models/hermes":
+			if request.Method != http.MethodGet {
+				t.Errorf("unexpected mutation: %s", request.URL.Path)
+			}
+			io.WriteString(response, `{}`)
+		case "/":
+			io.WriteString(response, `<!doctype html><title>隔离内核</title>`)
 		case "/favicon.ico":
 			response.WriteHeader(404)
 		default:
@@ -88,6 +97,7 @@ func TestNativeLoginSmoke(t *testing.T) {
 		}
 	})
 	host.desktop = true
+	host.accountFile = filepath.Join(cache, "ACURuntime", "account-session.json")
 	host.quitRequests = make(chan struct{}, 1)
 	host.loginRequests = make(chan loginTicket, 1)
 	web, _ := fs.Sub(assets, "web")
@@ -129,6 +139,12 @@ func TestNativeLoginSmoke(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	if restoring {
+		if providerWrites != 0 || renewals == 0 {
+			t.Fatalf("restore rewrote Key or failed to validate renewed identity: writes=%d renewals=%d", providerWrites, renewals)
+		}
+		return
+	}
 	if provider == nil {
 		t.Fatal("native login never saved the default Key")
 	}

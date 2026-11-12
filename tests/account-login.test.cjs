@@ -20,7 +20,7 @@ function setup(platform = 'windows', origin = 'https://acu.best', readyState = '
   const bridge = { postMessage(message) { messages.push(JSON.parse(message)); } };
   if (platform === 'windows') window.chrome = { webview: bridge };
   if (platform === 'mac') window.webkit = { messageHandlers: { external: bridge } };
-  const ticket = { site: 'https://acu.best', state: 'isolated-one-use-nonce', expiresAt: 2000000000 };
+  const ticket = { site: 'https://acu.best', state: 'isolated-one-use-nonce', expiresAt: 2000000000, ...options.ticket };
   const location = { origin, pathname: '/sign-in' };
   const context = vm.createContext({
     window,
@@ -38,10 +38,10 @@ function setup(platform = 'windows', origin = 'https://acu.best', readyState = '
       getElementById: () => body.child,
       createElement: () => ({ style: {}, children: [], append(...children) { this.children.push(...children); } }),
     },
-    fetch: async (address, options) => {
-      requests.push({ address, options });
+    fetch: async (address, fetchOptions) => {
+      requests.push({ address, options: fetchOptions });
       if (instance.respond) return instance.respond();
-      return { ok: true, json: async () => ({ success: true, data: { access_token: 'isolated-session', access_expires_at: 2000000000 } }) };
+      return { ok: true, json: async () => ({ success: true, data: { access_token: 'isolated-session', access_expires_at: 2000000000, session: options.ticket?.sessionId ? { sid: options.ticket.sessionId } : undefined } }) };
     },
   });
   const instance = { body, messages, requests, context, listeners, intervals, timers, location, storage, advance: milliseconds => { now += milliseconds; } };
@@ -192,4 +192,34 @@ test('document-start injection waits for the body and automatically connects aft
   assert.equal(instance.messages[1].type, 'acu-account-login');
   instance.intervals[0]();
   assert.equal(instance.requests.length, 1);
+});
+
+test('startup restoration immediately refreshes the pinned server session on sign-in pages', async () => {
+  const instance = setup('windows', 'https://acu.best', 'complete', { ticket: { restore: true, sessionId: 'restore-session' } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(instance.requests.length, 1);
+  assert.equal(instance.requests[0].options.headers['X-Auth-Session'], 'restore-session');
+  assert.equal(instance.messages.at(-1).type, 'acu-account-login');
+  assert.equal(instance.messages.at(-1).sessionId, 'restore-session');
+});
+
+test('startup network failure remains retryable while revoked sessions stop restoration', async () => {
+  const instance = setup('windows', 'https://acu.best', 'complete', { ticket: { restore: true } });
+  await new Promise(resolve => setImmediate(resolve));
+  instance.listeners['acu-runtime-account-result']({ detail: { ok: false } });
+  instance.advance(15001);
+  instance.respond = () => { throw new TypeError('network'); };
+  instance.intervals[0]();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(instance.messages.at(-1).type, 'acu-account-restore-error');
+  assert.equal(instance.messages.at(-1).expired, false);
+  instance.advance(30001);
+  instance.respond = () => ({ ok: false, status: 401, json: async () => ({ success: false, code: 'AUTH_UNAUTHORIZED' }) });
+  instance.intervals[0]();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(instance.messages.at(-1).expired, true);
+  const requests = instance.requests.length;
+  instance.advance(600001);
+  instance.intervals[0]();
+  assert.equal(instance.requests.length, requests);
 });

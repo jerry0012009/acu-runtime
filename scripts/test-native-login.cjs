@@ -36,6 +36,7 @@ async function run() {
     });
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
     const context = browser.contexts()[0];
+    if (process.env.ACU_NATIVE_PROFILE) await context.addCookies([{ name: 'acu-isolated-persistence-check', value: 'fixture-only', url: 'https://acu.best', httpOnly: true, secure: true, sameSite: 'Lax', expires: Math.floor(Date.now()/1000)+3600 }]);
     await context.route('https://acu.best/**', async route => {
       const request = route.request();
       if (new URL(request.url()).pathname === '/api/user/auth/refresh') {
@@ -50,7 +51,7 @@ async function run() {
       }
       await route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><title>隔离登录测试</title><button id="fixture-login" onclick="history.pushState({},\'\',\'/dashboard\');this.remove()">登录隔离测试账号</button>' });
     });
-    page = await until(() => context.pages().find(candidate => candidate.url().startsWith('http://127.0.0.1:')));
+    page = await until(() => context.pages().find(candidate => candidate.url().startsWith('http://127.0.0.1:') && !candidate.url().includes('/panel')));
     await page.waitForSelector('meta[name="acu-token"]', { state: 'attached' });
     const call = (endpoint, input) => page.evaluate(async ({ endpoint, input }) => {
       const token = document.querySelector('meta[name="acu-token"]').content;

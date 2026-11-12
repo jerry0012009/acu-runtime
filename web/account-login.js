@@ -22,7 +22,7 @@
     let replyTimer;
     let completed = !!saved;
     let stopped = false;
-    let sessionId = saved?.sessionId || '';
+    let sessionId = saved?.sessionId || ticket.sessionId || '';
     let expiresAt = saved?.expiresAt || 0;
     let retryAt = 0;
     let failures = 0;
@@ -33,7 +33,7 @@
       button.disabled = false;
     };
     const connect = async (automatic = false, renewing = completed) => {
-      if (button.disabled || stopped || (renewing && Date.now() < retryAt)) return;
+      if (button.disabled || stopped || ((renewing || ticket.restore) && Date.now() < retryAt)) return;
       button.disabled = true;
       if (!renewing) text.textContent = '正在连接账号与 API Key…';
       try {
@@ -46,10 +46,10 @@
         const { response, result } = typeof navigator !== 'undefined' && navigator.locks
           ? await navigator.locks.request('new-api:auth-refresh', { signal: AbortSignal.timeout(15000) }, request)
           : await request();
-        if (renewing && ((response.status === 401 && ['AUTH_UNAUTHORIZED', 'AUTH_SESSION_REVOKED', 'AUTH_TOKEN_EXPIRED'].includes(result.code)) || (response.status === 409 && result.code === 'AUTH_SESSION_MISMATCH'))) {
+        if ((renewing || ticket.restore) && ((response.status === 401 && ['AUTH_UNAUTHORIZED', 'AUTH_SESSION_REVOKED', 'AUTH_TOKEN_EXPIRED', 'AUTH_REFRESH_EXPIRED', 'AUTH_REFRESH_MISSING', 'AUTH_SESSION_EXPIRED'].includes(result.code)) || (response.status === 409 && result.code === 'AUTH_SESSION_MISMATCH'))) {
           stopped = true;
           try { sessionStorage.removeItem(storageKey); } catch {}
-          send({ type: 'acu-account-refresh-error', expired: true });
+          send({ type: renewing ? 'acu-account-refresh-error' : 'acu-account-restore-error', expired: true });
           return;
         }
         if (!response.ok || !result.success || !result.data?.access_token) throw new Error('请先完成 ACU 登录，成功后会自动连接。');
@@ -66,6 +66,7 @@
       } catch (error) {
         retry();
         if (renewing) send({ type: 'acu-account-refresh-error', expired: false });
+        else if (ticket.restore) send({ type: 'acu-account-restore-error', expired: false });
         else text.textContent = automatic ? '请完成登录；若未自动返回，可点击右侧连接。' : error instanceof TypeError ? '未能连接 ACU 网站，请重试或回到应用直接填 Key。' : error.message;
       }
     };
@@ -96,8 +97,9 @@
     const poll = setInterval(() => {
       if (stopped || (!completed && Date.now() / 1000 >= ticket.expiresAt)) { clearInterval(poll); return; }
       if (completed) { renew(); return; }
-      if (!/^\/(sign-in|sign-up|otp|oauth|auth)(\/|$)/.test(location.pathname) && !button.disabled && attempts < 3) { attempts++; connect(true); }
+      if ((ticket.restore || !/^\/(sign-in|sign-up|otp|oauth|auth)(\/|$)/.test(location.pathname)) && !button.disabled && (ticket.restore || attempts < 3)) { attempts++; connect(true); }
     }, 2000);
+    if (ticket.restore) connect(true, false);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });
   else mount();

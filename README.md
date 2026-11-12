@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.48
+# ACU Runtime 0.1.49
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,9 +8,9 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.48-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.48-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.48-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.49-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.49-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.49-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
@@ -42,7 +42,7 @@ Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`�
 
 Windows 已验证真实 acu.best 会话回传、账号 Key 读取、默认 Key 入核；另有隔离原生测试验证 Key 切换。未完成：console.acucompute.com 真实登录、ACU 云端推荐配置自动导入、CC Switch 检测、节省 / 纠偏数据、服务端控制更新、开机启动、签名 / 卸载、Mac 完整业务验收、异步视频。一键接入使用选定 ACU 来源的主模型；WorkBuddy 保留全部可选模型与应用内选择，不主动关闭其他来源。不等于已验证全部多模态能力。
 
-账号访问令牌只保存在 Go 内存中，到期前两分钟通过隐藏的官网窗口自动续期；断网、限流和网站验证故障退避重试，不因短期令牌到期要求重新登录，也不重新选择或覆盖模型 Key。只有续期会话被确认失效、撤销或切换时才要求重新登录。续期 Cookie 仍由系统 WebView 管理，不读取或复制到 Go。退出应用后需再次点击登录，可复用 WebView 的官网会话；本轮不实现启动时自动恢复账号。已保存的模型 Key 仍在内核中，无需重复连接。原生消息校验官方来源、窗口与随机状态，不经 URL、日志或跨站本机请求；刷新还校验账号与服务端会话一致。账号列表最多读取前 100 个 Key；无可用 Key 时保留手填兜底。
+账号访问令牌只保存在 Go 内存中，到期前两分钟通过隐藏的官网窗口自动续期；断网、限流和网站验证故障退避重试，不因短期令牌到期要求重新登录，也不重新选择或覆盖模型 Key。只有续期会话被确认失效、撤销或切换时才要求重新登录。续期 Cookie 仍由系统 WebView 管理，不读取或复制到 Go。登录后保存无令牌的账号与会话标识；重启时通过隐藏官网窗口自动恢复同一会话，不重复选择或覆盖 Key。旧版升级后需先登录一次。已保存的模型 Key 仍在内核中，无需重复连接。原生消息校验官方来源、窗口与随机状态，不经 URL、日志或跨站本机请求；刷新还校验账号与服务端会话一致。账号列表最多读取前 100 个 Key；无可用 Key 时保留手填兜底。
 
 ## 构建与测试
 
@@ -116,7 +116,7 @@ node scripts/test-native-login.cjs
 新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。
 
 
-### 0.1.48 简化日常配置
+### 0.1.49 简化日常配置
 
 工作台「一键配置」默认只需选择应用，首次接入使用推荐模型并自动准备图片与搜索工具。调整模型和范围放在折叠项中；已接入应用默认保留主模型与可见性。想替换时须显式勾选。部分失败只重试未完成应用或工具。
 
@@ -163,7 +163,7 @@ ChatGPT 使用 OpenAI 官方完整 MSIX（Windows x64/ARM64）或 DMG（macOS）
 安装流程后台状态支持页面重载恢复、避免重复并发安装。正常测试不安装第三方应用；发行 CI 在一次性 Windows/Mac runner 上显式执行 ACU_AGENT_INSTALL_SMOKE=1 的官方包安装检查。
 
 
-### 0.1.48 首页更新与启动通知
+### 0.1.49 首页更新与启动通知
 
 桌面窗口启动后自动检查一次 Runtime 正式版；发现新版本时显示确认弹窗，每个窗口会话同一版本只提醒一次，取消后首页仍保留入口。用户确认后才下载并校验 SHA-256，Windows 默认安装一起替换 Runtime 与配套内核、重启；已有 Key 和 Agent 配置保留。配套内核是发行版验证后固定的最新版，不在运行中盲目追踪上游 latest，也不覆盖独立 Magpie。macOS Runtime 应用内更新安装仍未实现。
 
@@ -177,6 +177,12 @@ Windows 首页及设置另有“更新 ChatGPT 桌面端”，用户确认后重
 默认只发布轻量 Runtime 安装器（本轮 Windows x64 构建约 62 MB），包含配套内核，不默认捆绑约 450 MB 的 WorkBuddy 与约 1.06 GB 的 ChatGPT。只有用户点击安装相应客户端时才下载该客户端；已安装应用直接复用。完整下载放在用户缓存中，每次安装前仍校验签名/摘要。ChatGPT 使用强 ETag + Range / If-Range 续传，同一版本中断后可续，latest 变更时重新下载，已完成且 ETag 未变时跳过重复下载。客户端自己的增量更新保留，Runtime 的完整包更新作为备用入口。
 
 可选离线分发（不进入普通更新包）：先执行 build-windows.ps1，再将两个原版官方包放到指定目录，执行 `scripts/build-offline-windows.ps1 -PackageDirectory <目录>`。生成独立 ZIP，解压后安装器与 agent-packages 同级，安装时复制到本机，按需安装时重新验证。该包用于不能在线下载或集中部署的场景。
+
+
+### 用量与费用
+
+新增“本机用量 / ACU 账户 / 模型价格”三个子页。保留原生本机统计；账户页读取官网余额与全部 Key 的历史消费，支持 24 小时 / 7 天 / 30 天及分页，精确费用来自云端历史记录，旧记录明确标注额度换算。价格页支持搜索、单价排序、缓存与长上下文价格详情。无需修改 ACU frontend；数据范围、登录恢复和验证见 [BILLING.md](BILLING.md)。
+
 
 ### Windows ChatGPT 国内滚动线路
 

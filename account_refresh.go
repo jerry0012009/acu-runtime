@@ -35,15 +35,19 @@ func (host *server) completeAccountRefresh(ctx context.Context, windowName, send
 		}
 	}
 	if input.Type == "acu-account-refresh-error" {
+		if input.Expired {
+			host.forgetAccount()
+			host.account.mu.Lock()
+			host.account.view.Error = "登录已失效，请重新登录；已配置的 API Key 不受影响。"
+			host.account.mu.Unlock()
+			return nil
+		}
 		host.account.mu.Lock()
 		defer host.account.mu.Unlock()
 		if host.account.session.State != session.State {
 			return errors.New("账号续期已取消")
 		}
-		if input.Expired {
-			host.account.session, host.account.bearer = loginTicket{}, ""
-			host.account.view = accountView{Error: "登录已失效，请重新登录；已配置的 API Key 不受影响。"}
-		} else if host.account.expires <= time.Now().Unix() {
+		if host.account.expires <= time.Now().Unix() {
 			host.account.renewalError = true
 			host.account.view.Error = "账号续期暂未完成，正在自动重试；已配置的 API Key 不受影响。"
 		}

@@ -90,6 +90,9 @@ type server struct {
 	desktopActions   chan desktopAction
 	lifecycle        context.Context
 	account          accountState
+	accountFile      string
+	accountFileMu    sync.Mutex
+	prices           priceCache
 	loginRequests    chan loginTicket
 	cloudTransport   http.RoundTripper
 	health           keyHealth
@@ -607,6 +610,15 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
+		case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
+			host.accountPreferences(response, request)
+		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/prices":
+			host.modelPrices(response, request)
+		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/account":
+			host.accountBilling(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/account/logout":
+			host.forgetAccount()
+			host.json(response, 200, map[string]bool{"ok": true})
 		case (request.URL.Path == "/runtime/agents/install" && (request.Method == http.MethodGet || request.Method == http.MethodPost)) || (request.URL.Path == "/runtime/agents/install/cancel" && request.Method == http.MethodPost):
 			host.agentInstaller(response, request)
 		case request.URL.Path == "/runtime/capabilities" && (request.Method == http.MethodGet || request.Method == http.MethodPost):
