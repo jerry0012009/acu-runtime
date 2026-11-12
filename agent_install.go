@@ -240,7 +240,8 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 	}
 	if !exists {
 		if id == "workbuddy" && !workBuddyInstalled() {
-			pkg, e := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+			s.phase("checking", "正在检查 WorkBuddy 官方最新版本")
+			pkg, e := latestWorkBuddyPackage(ctx, runtime.GOOS, runtime.GOARCH)
 			if e != nil {
 				fail(e)
 				return

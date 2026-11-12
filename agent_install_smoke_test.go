@@ -20,7 +20,7 @@ func TestOfficialWorkBuddyInstallSmoke(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
-	pkg, err := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+	pkg, err := latestWorkBuddyPackage(ctx, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,7 +25,8 @@ func TestMirrorRejectsLagInvalidDigestAndExpiredMetadata(t *testing.T) {
 		{"latest", "1.2.3.4", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 0, true},
 		{"lag", "1.2.3.5", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 0, false},
 		{"digest", "1.2.3.4", "1.2.3.4", "bad", 0, false},
-		{"expired", "1.2.3.4", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 8 * 24 * time.Hour, false},
+		{"stableOfficialLatest", "1.2.3.4", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 8 * 24 * time.Hour, true},
+		{"expiredOffline", "", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 8 * 24 * time.Hour, false},
 		{"offlineOfficial", "", "1.2.3.4", base64.StdEncoding.EncodeToString(make([]byte, 32)), 0, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

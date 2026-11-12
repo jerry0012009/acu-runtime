@@ -65,6 +65,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/build-macos.sh
+      - name: Verify Runtime first installation and native startup on clean Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/smoke-windows-install.ps1 -Installer 'dist/windows-amd64/ACU Runtime Setup.exe'
       - name: Verify packaged kernel and Runtime API compatibility
         shell: bash
         run: |

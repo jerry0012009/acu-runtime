@@ -79,7 +79,7 @@ func selectChatGPTMirror(ctx context.Context, client *http.Client, arch string) 
 	if !ok || !release.Downloadable || err != nil || len(hash) != 32 || release.ContentLength <= 0 || release.ContentLength > 2<<30 {
 		return chatGPTDownloadChoice{}, errors.New("镜像版本信息无效")
 	}
-	if !validAppxVersion(release.Version) || age < -time.Hour || age > 7*24*time.Hour {
+	if !validAppxVersion(release.Version) || age < -time.Hour || (officialErr != nil && age > 7*24*time.Hour) {
 		return chatGPTDownloadChoice{}, errors.New("镜像版本信息已过期")
 	}
 	if officialErr == nil && (official.PackageIdentity != "OpenAI.Codex" || !validAppxVersion(official.BuildVersion) || release.Version != official.BuildVersion) {
@@ -160,12 +160,17 @@ func prepareLatestChatGPT(ctx context.Context, platform, arch, target string, pr
 				return nil
 			}
 			if err = downloadChatGPTPackage(ctx, client, choice.URL, target, progress); err == nil {
-				err = verifyChatGPTDownload(target, choice)
+				if err = verifyChatGPTDownload(target, choice); err == nil {
+					return nil
+				}
+				_ = os.Remove(target + ".download.json")
+			} else {
+				// Retain same-source progress for the next attempt. Switching to
+				// official would overwrite it with a different ETag/source.
+				if info, e := os.Stat(target + ".partial"); e == nil && info.Size() > 0 {
+					return err
+				}
 			}
-			if err == nil {
-				return nil
-			}
-			_ = os.Remove(target + ".download.json")
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
