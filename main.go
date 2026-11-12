@@ -86,6 +86,7 @@ type server struct {
 	host             string
 	web              http.Handler
 	desktop          bool
+	desktopProbe     func() (bool, error)
 	quitRequests     chan struct{}
 	desktopActions   chan desktopAction
 	lifecycle        context.Context
@@ -515,6 +516,9 @@ func (host *server) proxy(response http.ResponseWriter, request *http.Request) {
 	}
 	if strings.Contains(path, "..") || strings.HasPrefix(path, "//") {
 		http.Error(response, "invalid kernel path", 400)
+		return
+	}
+	if !host.allowDesktopMutation(response, request, path) {
 		return
 	}
 	endpoint, err := host.kernel.target(path)

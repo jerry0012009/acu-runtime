@@ -32,7 +32,24 @@ func TestNativeLoginSmoke(t *testing.T) {
 	defer windows.CoUninitialize()
 	cache := os.Getenv("ACU_NATIVE_PROFILE")
 	if cache == "" {
-		cache = t.TempDir()
+		var err error
+		cache, err = os.MkdirTemp("", "acu-native-smoke-*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			// WebView2 releases its metrics file shortly after app.Run returns.
+			deadline := time.Now().Add(10 * time.Second)
+			for {
+				if err := os.RemoveAll(cache); err == nil {
+					return
+				} else if time.Now().After(deadline) {
+					t.Errorf("remove isolated WebView profile: %v", err)
+					return
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+		})
 	}
 	t.Setenv("LOCALAPPDATA", cache)
 	restoring := os.Getenv("ACU_NATIVE_RESTORE_SMOKE") == "1"
@@ -78,6 +95,14 @@ func TestNativeLoginSmoke(t *testing.T) {
 	}))
 	host.cloudTransport = accountTransport(func(request *http.Request) (*http.Response, error) {
 		switch request.URL.Path {
+		case "/api/user/self/acu-preference-profile":
+			return cloudFixture(`{"success":true,"data":{"status":"ready","generatedAt":"2026-11-12T12:00:00Z","profile":{"summary":"偏好可核验的交付。","rays":[{"id":"native-ray","label":"交付验收","category":"交付","summary":"交付应可安装并完成启动验证。","scope":"软件交付","sourceIds":["native-source"]}]}}}`), nil
+		case "/api/user/self/acu-preference-library":
+			return cloudFixture(`{"success":true,"data":{"version":1,"records":[{"id":"native-source","summary":"交付应可安装并完成启动验证。"}]}}`), nil
+		case "/api/user/self/acu-preference-activity":
+			return cloudFixture(`{"success":true,"data":{"version":1,"events":[{"trigger":"explicit_user_preference","recordedAt":"2026-11-12T12:00:00Z","changes":[{"kind":"updated","before":"交付应可安装。","after":"交付应可安装并完成启动验证。"}]}],"partial":false,"moreAvailable":false}}`), nil
+		case "/api/user/self/acu-advisor/settings":
+			return cloudFixture(`{"success":true,"data":{"learningEnabled":false,"injectionEnabled":false}}`), nil
 		case "/api/user/self":
 			if request.Header.Get("Authorization") == "Bearer fixture-renewed-access" {
 				mu.Lock()

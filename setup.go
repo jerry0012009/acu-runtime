@@ -166,6 +166,9 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
 	defer cancel()
+	if input.Agent == "codex" && !host.allowCodexDesktopChange(response) {
+		return
+	}
 	available := false
 	for _, choice := range host.connection(ctx).Choices {
 		if choice.ID != input.Provider {

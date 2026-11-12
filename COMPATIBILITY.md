@@ -123,3 +123,6 @@ Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程�
 
 
 用量与费用、云端历史账单及重启自动恢复登录的验证见 BILLING.md。Windows 隔离原生退出重启、Cookie 保留、Key 保留及零 Provider 写入已通过。
+
+
+Windows Runtime rejects Codex route/model/restart writes while the OpenAI.Codex Store app is open (409), before forwarding to Magpie. Unknown process state also blocks these writes. Read-only requests and other agents remain available. This prevents Runtime-triggered app-server termination and hosted identity/relaunch failures; it does not change independent Magpie automation.

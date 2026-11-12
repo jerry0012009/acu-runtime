@@ -1,12 +1,42 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+
+func TestPreferenceOnlyLoginDoesNotSelectOrWriteModelKey(t *testing.T) {
+	host := &server{}
+	ticket := loginTicket{Site: billingSite, State: "preference-login", Preferences: true, Expires: time.Now().Add(time.Minute)}
+	host.account.ticket = ticket
+	var paths []string
+	host.cloudTransport = accountTransport(func(r *http.Request) (*http.Response, error) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/api/user/self":
+			return cloudFixture(`{"success":true,"data":{"id":42,"username":"preference-reader"}}`), nil
+		case "/api/token/":
+			return cloudFixture(`{"success":true,"data":{"total":1,"items":[{"id":7,"status":1,"unlimited_quota":true}]}}`), nil
+		default:
+			t.Fatalf("preference login must not reveal or apply a model Key: %s", r.URL.Path)
+			return nil, nil
+		}
+	})
+	message, _ := json.Marshal(map[string]any{"type": "acu-account-login", "state": ticket.State, "accessToken": "fixture-access", "expiresAt": time.Now().Add(time.Hour).Unix(), "sessionId": "fixture-session"})
+	if err := host.completeAccountLogin(context.Background(), "acu-login-"+ticket.State, billingSite, billingSite, string(message)); err != nil {
+		t.Fatal(err)
+	}
+	view := host.account.snapshot()
+	if !view.LoggedIn || view.Selected != 0 || len(paths) != 2 {
+		t.Fatalf("preference-only login changed model connection: %+v %v", view, paths)
+	}
+}
 
 func TestPreferencesSessionAccessAndContract(t *testing.T) {
 	for _, test := range []struct {
@@ -65,7 +95,10 @@ func TestPreferencesDiscardAccountSwitchAndLogoutResponses(t *testing.T) {
 		oldIdentity := host.account.snapshot().Identity
 		host.cloudTransport = accountTransport(func(*http.Request) (*http.Response, error) {
 			if logout {
-				host.forgetAccount()
+				host.account.mu.Lock()
+				host.account.view = accountView{}
+				host.account.bearer = ""
+				host.account.mu.Unlock()
 			} else {
 				host.account.mu.Lock()
 				host.account.userID = 43

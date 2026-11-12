@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.51
+# ACU Runtime 0.1.52
+
+统一合并模型价格、账户余额与历史消费、重启登录恢复、我的偏好、客户端按需安装与 Magpie 3909 配套内核。偏好页登录只建立账户会话，不自动选择或写入模型 Key。
+
+Windows 增加桌面配置安全防护：ChatGPT / Codex 桌面端仍在运行时，Runtime 拒绝可能触发内核重启的推荐配置、接入、断开、模型写入及重启请求，提示保存工作、完全退出后再配置。只读查看与其他 Agent 保持可用。此防护针对 Runtime 发起的配置操作；独立 Magpie 的操作不在保护范围内。
+
+偏好页面遇到登录后台续期（503）时自动退避重试，不把短暂续期失败缓存一分钟。合并验收覆盖 Windows 原生登录、Key 切换、续期恢复、偏好对照、完整退出再启动、Cookie 保留和零 Provider 重写。
 
 新增“用量与费用”三个子页：保留原生本机统计，展示 ACU 账户余额、Key 额度和云端历史消费，以及可搜索、可排序的模型价格与长上下文计费详情。历史费用来自官网消费记录，不按当前价格重算；旧记录明确标注额度换算。无需修改 ACU frontend。
 
@@ -22,9 +28,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.51-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.51-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.51-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.52-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.52-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.52-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

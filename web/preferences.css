@@ -8,7 +8,7 @@
 .preference-account { margin: 28px 0 16px; }
 .preference-actions,.preference-filters,.preference-map { display: flex; flex-wrap: wrap; gap: 8px; }
 .preference-search { display: grid; gap: 12px; margin: 24px 0; }
-.preference-search input { width: 100%; min-width: 0; }
+.preference-search input { width: 100%; min-width: 0; border: 1px solid var(--acu-line); background: var(--acu-surface); color: var(--acu-text); border-radius: 7px; padding: 11px 13px; }
 .preference-page { width: 100%; }
 @media(max-width:600px) { .sidebar nav { flex-wrap: wrap; } .nav-item { min-width: 88px; flex-basis: 28%; } }
 .preference-filters button[aria-pressed=true] { border-color: var(--acu-accent); }

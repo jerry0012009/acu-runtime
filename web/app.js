@@ -33,6 +33,7 @@ const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usag
 const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML });
 const preferences = globalThis.createACUPreferences?.({ app, ui, request, navigation, escapeHTML });
 
+
 async function request(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'X-ACU-Token': token, ...options.headers } });
   const result = await response.json();
@@ -1049,7 +1050,7 @@ async function startAccountLogin(register) {
   ui.error = '';
   render();
   try {
-    await request('/runtime/account/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site, register }) });
+    await request('/runtime/account/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site, register, preferences: ui.page === 'preferences' }) });
     ui.keySelection = null;
   } catch (error) { toast(error.message); }
   finally { ui.accountBusy = false; await refresh(); }

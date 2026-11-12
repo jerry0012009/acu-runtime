@@ -1,13 +1,13 @@
 globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: esc }) => {
-  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', controller: null, revoked: false };
+  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', controller: null, revoked: false, refreshTimer: null, retryDelay: 1500 };
   const titles = { profile: '偏好概览', library: '偏好记录', activity: '近期摘要变化', settings: '学习与参考状态' };
   const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN') : '时间未提供';
   const note = text => `<p class="preference-note" role="status">${esc(text)}</p>`;
   function clear() {
-    state.controller?.abort(); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.revoked = false;
+    state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.revoked = false; state.retryDelay = 1500;
   }
   function syncAccount() {
-    const identity = ui.status?.account?.loggedIn ? ui.status.account.identity || `${ui.status.account.site}/${ui.status.account.username}` : '';
+    const identity = ui.status?.account?.loggedIn ? ui.status.account.identity : '';
     if (identity === state.identity) return;
     clear(); state.identity = identity;
     if (ui.page === 'preferences') { render(); load(); }
@@ -15,6 +15,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
   async function load() {
     if (!state.identity || state.revoked || state.busy || Date.now() - state.loaded < 60000) return;
     const generation = state.generation;
+    let retry = false;
     const controller = new AbortController(); state.controller = controller; state.busy = true; state.errors = {}; update();
     await Promise.all(Object.keys(titles).map(async name => {
       try {
@@ -28,9 +29,15 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
           clear(); state.revoked = true; state.errors.session = '登录会话已失效或无权限，请重新登录。'; update(); return;
         }
         state.errors[name] = error.status === 404 ? '当前服务暂不支持此视图。' : error.message;
+        if (error.status === 503) retry = true;
       }
     }));
-    if (generation === state.generation) { state.busy = false; state.loaded = Date.now(); update(); }
+    if (generation === state.generation) {
+      state.busy = false; state.loaded = retry ? 0 : Date.now(); update();
+      clearTimeout(state.refreshTimer);
+      state.refreshTimer = setTimeout(retry ? load : update, retry ? state.retryDelay : 60010);
+      state.retryDelay = retry ? Math.min(state.retryDelay * 2, 30000) : 1500;
+    }
   }
   function sourceList(ray) {
     const records = state.data.library?.records || [];

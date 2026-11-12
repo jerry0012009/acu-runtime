@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { createRequire } = require('node:module');
-const root = path.resolve(__dirname, '../..');
+const root = process.env.ACU_TEST_WORKSPACE || path.resolve(__dirname, '../..');
 const { chromium } = createRequire(path.join(root,'.build/package.json'))('playwright');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(),'acu-billing-restore-'));
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve,milliseconds));
@@ -15,7 +15,7 @@ async function main() {
   const persisted = fs.readFileSync(path.join(profile,'ACURuntime/account-session.json'),'utf8');
   assert.equal(JSON.parse(persisted).selected,9);
   assert(!persisted.includes('access_token') && !persisted.includes('fixture-model-key'));
-  const native = spawn(path.join(root,'.build/acu-runtime-native-login-smoke.exe'),['-test.run','^TestNativeLoginSmoke$','-test.v'],{ env:{...process.env,ACU_NATIVE_LOGIN_SMOKE:'1',ACU_NATIVE_RESTORE_SMOKE:'1',ACU_NATIVE_PROFILE:profile,ACU_NATIVE_INSPECT_PORT:'9238'},windowsHide:true });
+  const native = spawn(process.env.ACU_NATIVE_TEST_EXE || path.join(root,'.build/acu-runtime-native-login-smoke.exe'),['-test.run','^TestNativeLoginSmoke$','-test.v'],{ env:{...process.env,ACU_NATIVE_LOGIN_SMOKE:'1',ACU_NATIVE_RESTORE_SMOKE:'1',ACU_NATIVE_PROFILE:profile,ACU_NATIVE_INSPECT_PORT:'9238'},windowsHide:true });
   let output=''; native.stdout.on('data',chunk=>output+=chunk); native.stderr.on('data',chunk=>output+=chunk);
   const exited = new Promise(resolve=>native.once('exit',resolve));
   let browser,page;

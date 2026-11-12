@@ -46,6 +46,31 @@ jobs:
           ACU_AGENT_INSTALL_SMOKE: '1'
         shell: bash
         run: go test -run '^TestOfficialWorkBuddyInstallSmoke$' -v -timeout 25m .
+      - name: Verify preference page in both themes and all widths
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/acu-preference-browser" playwright
+          node "$RUNNER_TEMP/acu-preference-browser/node_modules/playwright/cli.js" install chromium
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
+          export ACU_TEST_WORKSPACE="$RUNNER_TEMP/acu-preference-browser"
+          node scripts/test-preferences.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preference-screenshots-${{ matrix.platform }}
+          path: ${{ runner.temp }}/acu-preference-browser/output/runtime-preferences/*.png
+          if-no-files-found: ignore
+      - name: Verify native Windows preference page and session renewal
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          go test -c -tags desktop,production -o "$env:RUNNER_TEMP/preferences-native-smoke.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PLAYWRIGHT_MODULE = "$env:RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
+          $env:ACU_TEST_WORKSPACE = "$env:RUNNER_TEMP/acu-preference-browser"
+          $env:ACU_NATIVE_TEST_EXE = "$env:RUNNER_TEMP/preferences-native-smoke.exe"
+          node scripts/test-native-login.cjs
+          node scripts/test-native-restore.cjs
       - name: Package Windows installer
         if: runner.os == 'Windows'
         env:
@@ -98,6 +123,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release
+          pattern: "@(windows-amd64|macos-arm64|macos-amd64)"
           merge-multiple: true
       - name: Publish complete release
         env:

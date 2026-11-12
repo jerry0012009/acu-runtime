@@ -18,12 +18,13 @@ import (
 )
 
 type loginTicket struct {
-	Site      string    `json:"site"`
-	State     string    `json:"state"`
-	Register  bool      `json:"register"`
-	Restore   bool      `json:"restore,omitempty"`
-	SessionID string    `json:"sessionId,omitempty"`
-	Expires   time.Time `json:"-"`
+	Preferences bool      `json:"preferences,omitempty"`
+	Site        string    `json:"site"`
+	State       string    `json:"state"`
+	Register    bool      `json:"register"`
+	Restore     bool      `json:"restore,omitempty"`
+	SessionID   string    `json:"sessionId,omitempty"`
+	Expires     time.Time `json:"-"`
 }
 
 type accountKey struct {
@@ -294,8 +295,9 @@ func (host *server) cloudJSON(ctx context.Context, method, address, bearer strin
 
 func (host *server) beginAccountLogin(response http.ResponseWriter, request *http.Request) {
 	var input struct {
-		Site     string `json:"site"`
-		Register bool   `json:"register"`
+		Site        string `json:"site"`
+		Register    bool   `json:"register"`
+		Preferences bool   `json:"preferences"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(response, request.Body, 4096)).Decode(&input) != nil {
 		host.json(response, 400, map[string]string{"error": "请选择登录站点"})
@@ -310,7 +312,7 @@ func (host *server) beginAccountLogin(response http.ResponseWriter, request *htt
 		host.json(response, 400, map[string]string{"error": "请在 ACU Runtime 桌面应用中登录"})
 		return
 	}
-	ticket := loginTicket{Site: site, State: secret(), Register: input.Register, Expires: time.Now().Add(10 * time.Minute)}
+	ticket := loginTicket{Site: site, State: secret(), Register: input.Register, Preferences: input.Preferences, Expires: time.Now().Add(10 * time.Minute)}
 	host.account.mu.Lock()
 	host.account.ticket = ticket
 	host.account.view.Error = ""
@@ -417,13 +419,13 @@ func (host *server) completeAccountLogin(ctx context.Context, windowName, sender
 	for _, key := range listed.Items {
 		available := key.ID > 0 && key.Status == 1 && (key.Expired <= 0 || key.Expired > time.Now().Unix()) && (key.Unlimited || key.Remaining > 0)
 		view.Keys = append(view.Keys, accountKey{ID: key.ID, Name: key.Name, Available: available})
-		if view.Selected == 0 && available && !ticket.Restore {
+		if view.Selected == 0 && available && !ticket.Restore && !ticket.Preferences {
 			view.Selected = key.ID
 		}
 	}
 	if keyError != nil {
 		view.Error = "账号已登录，但 Key 列表读取失败；可重试登录或直接使用 API Key。"
-	} else if view.Selected == 0 && !ticket.Restore {
+	} else if view.Selected == 0 && !ticket.Restore && !ticket.Preferences {
 		view.Error = "账号下没有可用 Key，请在网站创建后重新登录。"
 	}
 	host.account.mu.Lock()
@@ -435,7 +437,7 @@ func (host *server) completeAccountLogin(ctx context.Context, windowName, sender
 	host.account.session, host.account.userID, host.account.sessionID = ticket, user.ID, input.SessionID
 	host.account.renewalError = false
 	host.account.mu.Unlock()
-	if view.Selected > 0 && !ticket.Restore {
+	if view.Selected > 0 && !ticket.Restore && !ticket.Preferences {
 		if err := host.useAccountKey(ctx, view.Selected); err != nil {
 			host.account.mu.Lock()
 			host.account.view.Error = "已登录，但默认 Key 未连接：" + err.Error()
