@@ -1,12 +1,12 @@
-# Runtime 0.1.47 / Magpie 0.1.3337
+# Runtime 0.1.48 / Magpie 0.1.3852
 
-本次配套内核为 v0.1.3337（2026-11-09 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。
+本次配套内核为 v0.1.3852（2026-11-12 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。
 
 发布新增 `scripts/test-kernel-compatibility.py`：使用打包内核和 Runtime，在临时 HOME、Agent 配置与随机回环端口中验证自动更新设置命令、四 Agent 接入与模型写入、共享识图/生图设置、三 MCP HTTP 工具清单、重复配置无重复项、原有 MCP 保留及仅保存共享模型不重写 Agent 文件。使用假 Key，不验证真实推理、登录或外部搜索服务效果。各平台通过情况以对应发行流水线结果为准。
 
 发布平台：Windows 10/11 x64、macOS 12+ Apple Silicon / Intel。macOS 通过对应架构 GitHub runner 原生构建（desktop,production + CGO），不再将服务端交叉编译作为桌面包。
 
-发布流水线对每个平台执行 Go 测试、原生 desktop/production 测试、vet 与前端测试；macOS 另检查应用 Info.plist、ad-hoc 签名、原生桌面进程启动及本地界面。安装包附带固定摘要校验的 Magpie v0.1.3337，路径为 Windows 的应用目录 `kernel/acu-kernel.exe` 或 macOS `.app/Contents/MacOS/kernel/acu-kernel`。
+发布流水线对每个平台执行 Go 测试、原生 desktop/production 测试、vet 与前端测试；macOS 另检查应用 Info.plist、ad-hoc 签名、原生桌面进程启动及本地界面。安装包附带固定摘要校验的 Magpie v0.1.3852，路径为 Windows 的应用目录 `kernel/acu-kernel.exe` 或 macOS `.app/Contents/MacOS/kernel/acu-kernel`。
 
 Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applications 内应用；不支持应用内安装。Windows ARM64 尚未发布安装包。当前没有 Windows 代码签名、Apple Developer ID 签名与公证。CI 启动检查不等于真实账号登录、全部 Agent 与多模态业务验收。
 
@@ -103,3 +103,12 @@ Windows x64 继续支持应用内更新。macOS 通过 DMG 或 ZIP 替换 Applic
 Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程属性。随包内核官方 CLI 的 Go 构建标签为 nogui；不启动 gui/tray、不创建 Magpie 快捷方式或桌面自启。隔离配置使用随包 CLI 实测：管理服务复用时无常驻子进程，备用控制路径一个子进程且 MainWindowHandle=0、ready=true。本机已有独立桌面 Magpie 保留。
 
 路由跟踪确认原生 OpenAI 与 ACU 请求属于不同 session；一键配置不重写已存在的聊天选模。推荐预览与路由页说明保留聊天选模及按模型来源路由的行为。
+
+
+## 0.1.48 本地验证（2026-11-12）
+
+- Windows x64 官方 CLI v0.1.3852 完整下载摘要为 `10b65d013d51547609e3f33b57193494f314b051bcb73e95101f0378bae77e51`，与 GitHub 官方 release 元数据一致。其余平台固定官方摘要，仍需对应 runner/设备验证。
+- 新内核 `optionLists/options` 索引已在 Runtime 内部展开，原生界面仍读取自己的格式；模型选择、四 Agent 配置、重复 MCP 保留、仅存共享模型不改 Agent 文件的隔离测试通过。无 ChatGPT 账号的隔离 Codex 配置确认使用 magpie provider 且无 auth.json。
+- 官方 ChatGPT x64 MSIX 版本 26.1106.6628.0，SHA-256 `785189c1960a47db3c241b9bb84c4a4979c26b79329af5c0019afb016f1e56a3`，本机 Windows 验签 Valid，发布者与 OpenAI.Codex 架构验证通过。此摘要仅为本次下载证据；官方 URL 指向 latest，运行时依靠 Windows 签名与身份验证。未替换本机正在使用的 ChatGPT。
+- 包清单无外部 framework 依赖，含 CodexSandboxService，需要 Windows 系统安装权限。安装器保留 UAC，不强停已有应用、不降级。首次干净设备部署与 API 模式完整桌面任务尚待验收。
+- 首页通知与更新确认、CLI 更新、失败保留、批量更新后再升级 Runtime 均有前端回归；macOS Runtime 自动安装更新尚未提供，Mac ChatGPT DMG 验签与架构判断尚无实机验收。

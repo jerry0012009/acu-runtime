@@ -572,4 +572,9 @@ select[data-agent-model] {
 .agent-install-panel .agent-install-status { color: var(--ink); }
 .capability-check-actions .button { flex-shrink: 0; }
 .capability-tool-error { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; max-width: 560px; }
+.home-update-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 12px; margin: 0 0 18px; }
+.home-update-bar > div { display: flex; flex-wrap: wrap; gap: 12px; }
+.home-update-bar .text-button { font-size: 12px; }
+.home-update-bar small { flex-basis: 100%; }
+.agent-update-result { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 @media(max-width:600px) { .capability-check-actions { align-items: stretch; flex-direction: column; gap: 12px; } }

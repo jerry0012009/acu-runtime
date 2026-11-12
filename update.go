@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.47"
+const appVersion = "0.1.48"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
@@ -239,6 +239,16 @@ func (host *server) updates(response http.ResponseWriter, request *http.Request)
 		return
 	}
 	action := strings.TrimPrefix(request.URL.Path, "/runtime/update/")
+	if action == "install" {
+		host.agentInstall.mu.Lock()
+		installingAgent := host.agentInstall.running
+		host.agentInstall.mu.Unlock()
+		if installingAgent {
+			u.mu.Unlock()
+			host.json(response, 409, map[string]string{"error": "请等待 Agent 安装完成后再更新 Runtime"})
+			return
+		}
+	}
 	candidate := u.view.Release
 	switch action {
 	case "check":

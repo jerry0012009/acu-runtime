@@ -36,3 +36,32 @@ func TestOfficialWorkBuddyInstallSmoke(t *testing.T) {
 	}
 	t.Log("official package installed without modifying sign-in or client credentials")
 }
+
+func TestOfficialChatGPTInstallSmoke(t *testing.T) {
+	if os.Getenv("ACU_CHATGPT_INSTALL_SMOKE") != "1" {
+		t.Skip("requires disposable installation runner")
+	}
+	if chatGPTInstalled() {
+		t.Fatal("runner already has ChatGPT; refusing to alter it")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	pkg, err := chatGPTPackage(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), pkg.Name)
+	if err = prepareLatestChatGPT(ctx, runtime.GOOS, runtime.GOARCH, path, nil, func(s string) { t.Log(s) }); err != nil {
+		t.Fatal(err)
+	}
+	if err = verifyChatGPTPackage(ctx, path); err != nil {
+		t.Fatal(err)
+	}
+	if err = installChatGPT(ctx, path); err != nil {
+		t.Fatal(err)
+	}
+	if !chatGPTInstalled() {
+		t.Fatal("app registration missing after installation")
+	}
+	t.Log("official signed ChatGPT package installed on a clean profile")
+}

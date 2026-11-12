@@ -234,6 +234,9 @@ func (kernel *kernelState) readState(ctx context.Context) (map[string]json.RawMe
 	if _, ok := result["agents"]; !ok {
 		return nil, errors.New("内核状态缺少 agents 字段，请核对兼容版本")
 	}
+	if err := expandKernelOptions(result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -671,9 +674,17 @@ func main() {
 	webMode := flag.Bool("web", !desktopEnabled, "developer browser mode instead of the native desktop window")
 	inspectPort := flag.Int("inspect-port", 0, "developer WebView inspection port; disabled by default")
 	installTo := flag.String("install-to", "", "installer-only destination directory")
+	agentPackagesFrom := flag.String("agent-packages-from", "", "optional offline vendor packages beside the installer")
+	agentPackagesJSON := flag.Bool("agent-packages-json", false, "print official desktop package metadata")
 	releaseJSON := flag.Bool("kernel-release-json", false, "print the pinned kernel package metadata")
 	searchReleaseJSON := flag.Bool("search-runtime-release-json", false, "print the pinned search runtime metadata")
 	flag.Parse()
+	if *agentPackagesJSON {
+		workbuddy, _ := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+		chatgpt, _ := chatGPTPackage(runtime.GOOS, runtime.GOARCH)
+		json.NewEncoder(os.Stdout).Encode(map[string]agentPackage{"workbuddy": workbuddy, "chatgpt": chatgpt})
+		return
+	}
 	if *searchReleaseJSON {
 		release, err := searchRuntimeRelease(runtime.GOOS, runtime.GOARCH)
 		if err != nil {
@@ -704,6 +715,11 @@ func main() {
 		}
 		if err := prepareInstallation(filepath.Dir(executable), *installTo, release); err != nil {
 			log.Fatal(err)
+		}
+		if *agentPackagesFrom != "" {
+			if err := copyOfflineAgentPackages(*agentPackagesFrom, *installTo); err != nil {
+				log.Fatal(err)
+			}
 		}
 		return
 	}

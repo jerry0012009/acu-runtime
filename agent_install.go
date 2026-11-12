@@ -24,6 +24,7 @@ type agentInstallView struct {
 	Message    string `json:"message"`
 	Downloaded int64  `json:"downloaded"`
 	Total      int64  `json:"total"`
+	Update     bool   `json:"update,omitempty"`
 }
 
 type agentInstallState struct {
@@ -46,6 +47,36 @@ func (s *agentInstallState) phase(phase, message string) {
 }
 
 type agentPackage struct{ URL, SHA256, Name string }
+
+func verifiedAgentPackage(path, digest string) bool {
+	if !digestPattern.MatchString(digest) {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	h := sha256.New()
+	n, err := io.Copy(h, io.LimitReader(f, (1<<30)+1))
+	return err == nil && n <= 1<<30 && hex.EncodeToString(h.Sum(nil)) == digest
+}
+
+func cachedWorkBuddyPackage(pkg agentPackage) string {
+	if executable, err := os.Executable(); err == nil {
+		path := filepath.Join(filepath.Dir(executable), "agent-packages", pkg.Name)
+		if verifiedAgentPackage(path, pkg.SHA256) {
+			return path
+		}
+	}
+	if dir, err := agentPackageCache(); err == nil {
+		path := filepath.Join(dir, pkg.Name)
+		if verifiedAgentPackage(path, pkg.SHA256) {
+			return path
+		}
+	}
+	return ""
+}
 
 // Vendor's domestic CDN, fixed version and digests from its public update API.
 // No mirror operator can choose or change executable bytes.
@@ -185,7 +216,7 @@ func (host *server) configureInstalledAgent(ctx context.Context, id, provider, m
 	return err
 }
 
-func (host *server) runAgentInstall(ctx context.Context, id, provider, model string) {
+func (host *server) runAgentInstall(ctx context.Context, id, provider, model string, update bool) {
 	s := &host.agentInstall
 	defer func() { s.mu.Lock(); s.running = false; s.mu.Unlock() }()
 	fail := func(err error) { s.phase("error", err.Error()) }
@@ -194,6 +225,19 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 		fail(err)
 		return
 	}
+	if id == "codex" && (!chatGPTInstalled() || update) {
+		if err = host.prepareChatGPT(ctx, update); err != nil {
+			fail(err)
+			return
+		}
+		// Native installation registers the app before its first launch. Open
+		// only after configuration below, so a fresh user needn't sign in first.
+		exists, err = host.detectedAgent(ctx, id)
+		if err != nil {
+			fail(err)
+			return
+		}
+	}
 	if !exists {
 		if id == "workbuddy" && !workBuddyInstalled() {
 			pkg, e := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
@@ -201,18 +245,27 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 				fail(e)
 				return
 			}
-			dir, e := os.MkdirTemp("", "acu-agent-*")
-			if e != nil {
-				fail(e)
-				return
-			}
-			defer os.RemoveAll(dir)
-			path := filepath.Join(dir, pkg.Name)
-			s.phase("downloading", "正在从国内官方下载线路准备 WorkBuddy")
-			err = downloadAgentPackage(ctx, agentDownloadClient(), pkg.URL, path, pkg.SHA256, func(done, total int64) { s.mu.Lock(); s.view.Downloaded, s.view.Total = done, total; s.mu.Unlock() })
-			if err != nil {
-				fail(err)
-				return
+			path := cachedWorkBuddyPackage(pkg)
+			if path == "" {
+				dir, e := agentPackageCache()
+				if e != nil {
+					fail(e)
+					return
+				}
+				path = filepath.Join(dir, pkg.Name)
+				// Only the fixed cache candidate is removed, never a user app.
+				if regularFile(path) {
+					if e := os.Remove(path); e != nil {
+						fail(e)
+						return
+					}
+				}
+				s.phase("downloading", "正在从国内官方下载线路准备 WorkBuddy")
+				err = downloadAgentPackage(ctx, agentDownloadClient(), pkg.URL, path, pkg.SHA256, func(done, total int64) { s.mu.Lock(); s.view.Downloaded, s.view.Total = done, total; s.mu.Unlock() })
+				if err != nil {
+					fail(err)
+					return
+				}
 			}
 			s.phase("installing", "正在安装 WorkBuddy；如有系统确认，请按提示完成")
 			if err = installWorkBuddy(ctx, path); err != nil {
@@ -226,8 +279,8 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 			}
 			s.phase("waiting", "应用已安装，正在等待首次启动；如出现登录页，请按应用提示登录。")
 		} else if id == "codex" {
-			s.phase("waiting", "请在官方安装页面完成 ChatGPT 安装；完成后将自动接入 ACU。下载受限时可返回选择国内可下载的 WorkBuddy。")
-			if err = openChatGPTInstaller(ctx); err != nil {
+			s.phase("waiting", "请完成系统安装提示并打开一次 ChatGPT；无需先登录 ChatGPT 账号，检测完成后将配置 ACU。")
+			if err := openInstalledAgent(ctx, id); err != nil {
 				fail(err)
 				return
 			}
@@ -263,6 +316,9 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 		return
 	}
 	message := "接入配置已完成，已有账号和登录状态保留。首次使用请按应用提示确认工具权限。"
+	if id == "codex" {
+		message += " 没有 ChatGPT 账号时，ACU 内核自动使用 API 模式。已有窗口请保存工作后重新打开；云端账号功能仍需官方登录。"
+	}
 	if id == "workbuddy" {
 		message += " 如应用要求登录，请使用微信、手机号等官方方式完成；ACU 模型已准备。请保存工作后重新打开应用，让新增模型和工具生效。"
 	}
@@ -284,18 +340,25 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/runtime/agents/install/cancel" {
 		s.mu.Lock()
-		if s.view.Phase == "waiting" && s.cancel != nil {
+		if (s.view.Phase == "waiting" || s.view.Phase == "downloading" || s.view.Phase == "checking") && s.cancel != nil {
 			s.cancel()
 		}
 		s.mu.Unlock()
 		host.json(w, 200, s.snapshot())
 		return
 	}
-	var in struct{ Agent, Provider, Model string }
+	var in struct {
+		Agent, Provider, Model string
+		Update                 bool
+	}
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 	d.DisallowUnknownFields()
 	if d.Decode(&in) != nil || d.Decode(&struct{}{}) != io.EOF || (in.Agent != "workbuddy" && in.Agent != "codex") {
 		host.json(w, 400, map[string]string{"error": "不支持的应用安装请求"})
+		return
+	}
+	if in.Update && in.Agent != "codex" {
+		host.json(w, 400, map[string]string{"error": "此应用请使用客户端内更新"})
 		return
 	}
 	if in.Provider == "" || in.Model == "" {
@@ -330,17 +393,17 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.running = true
-	s.view = agentInstallView{Agent: in.Agent, Phase: "checking", Message: "正在检查已有应用；已有安装和登录状态将保留"}
+	s.view = agentInstallView{Agent: in.Agent, Phase: "checking", Message: "正在检查已有应用；已有安装和登录状态将保留", Update: in.Update}
 	base := host.lifecycle
 	if base == nil {
 		base = context.Background()
 	}
-	ctxRun, cancelRun := context.WithTimeout(base, 35*time.Minute)
+	ctxRun, cancelRun := context.WithTimeout(base, 60*time.Minute)
 	s.cancel = cancelRun
 	s.mu.Unlock()
 	go func() {
 		defer cancelRun()
-		host.runAgentInstall(ctxRun, in.Agent, in.Provider, in.Model)
+		host.runAgentInstall(ctxRun, in.Agent, in.Provider, in.Model, in.Update)
 	}()
 	host.json(w, 202, s.snapshot())
 }

@@ -54,6 +54,12 @@ jobs:
           $version = [regex]::Match((Get-Content update.go -Raw), 'const appVersion = "([^"]+)"').Groups[1].Value
           New-Item -ItemType Directory -Force dist/release | Out-Null
           Copy-Item -LiteralPath 'dist/windows-amd64/ACU Runtime Setup.exe' -Destination "dist/release/ACU-Runtime-$version-windows-amd64-Setup.exe"
+      - name: Verify ChatGPT first installation on clean Windows
+        if: runner.os == 'Windows'
+        env:
+          ACU_CHATGPT_INSTALL_SMOKE: '1'
+        shell: pwsh
+        run: go test -run '^TestOfficialChatGPTInstallSmoke$' -v -timeout 35m .
       - name: Package and smoke test native macOS app
         if: runner.os == 'macOS'
         env:

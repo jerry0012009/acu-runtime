@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.47
+# ACU Runtime 0.1.48
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -8,13 +8,13 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.47-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.47-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.47-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.48-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.48-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.48-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
-安装包自带 Magpie `v0.1.3337` 备用内核。Runtime 优先连接本机已有 Magpie；安装或更新 ACU Runtime 时都会刷新安装目录内的备用内核，既有 Agent 配置保留。找不到独立 Magpie 时使用此备用内核；单独运行未附带内核的应用时，首次启动会从官方 Release 下载并校验 SHA-256。内核包支持 Windows / macOS 的 amd64、arm64；macOS 原生桌面在对应架构 runner 构建并进行启动检查；真实账号与 Agent 业务验证需在对应设备完成。
+安装包自带 Magpie `v0.1.3852` 备用内核。Runtime 优先连接本机已有 Magpie；安装或更新 ACU Runtime 时都会刷新安装目录内的备用内核，既有 Agent 配置保留。找不到独立 Magpie 时使用此备用内核；单独运行未附带内核的应用时，首次启动会从官方 Release 下载并校验 SHA-256。内核包支持 Windows / macOS 的 amd64、arm64；macOS 原生桌面在对应架构 runner 构建并进行启动检查；真实账号与 Agent 业务验证需在对应设备完成。
 
 老用户可以在“设置 → 应用更新”一键检查并更新。Runtime 从 ACU Runtime 正式版读取发布信息；下载与安装包的 SHA-256 相符才继续。确认后安装器等待当前进程退出，一起更新 Runtime 与它管理的备用内核，再自动重启。失败时保留或恢复旧程序和内核；Key、Agent 与本地配置保留。独立安装的 Magpie 不会被安装器覆盖或降级；连接前调用 Magpie 原生命令关闭自动检查、自动下载和自动重启更新，用户仍可在 Magpie 中手动升级。每个 Runtime 发行版固定经过检查的备用内核版本，详细验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 
@@ -96,7 +96,7 @@ node scripts/test-native-login.cjs
 
 - `ACU_KERNEL_PATH` 可指定已有可执行文件；开发者使用 `--kernel-url` 连接已有本机管理接口，管理 Key 通过 `ACU_KERNEL_KEY`，不进入页面。不要把模型网关端口当管理端口。
 - 管理服务只监听回环 IP；写入校验本机会话、Host / Origin / FetchSite。代理支持 SSE，前端不接触上游鉴权 Cookie。
-- 原版 HTML / JS / CSS 由本地代理嵌入；本版本针对 Magpie `v0.1.3337` 做 API 与 Agent 模型目录兼容检查，不承诺任意版本 DOM 都兼容。升级内核须通过固定版本与校验清单发布，不直接跟随 latest。
+- 原版 HTML / JS / CSS 由本地代理嵌入；本版本针对 Magpie `v0.1.3852` 做 API 与 Agent 模型目录兼容检查，不承诺任意版本 DOM 都兼容。升级内核须通过固定版本与校验清单发布，不直接跟随 latest。
 - 安装、主题与嵌入测试使用隔离目录 / API，不发收费模型请求、不替用户应用推荐配置。配置入口不等于所有模型已经支持图片、PDF、搜索或视频。
 
 需求与分工见上层 `ACU-Runtime-开发文档-v1.19.md`。开源许可见安装目录中的 `THIRD-PARTY-NOTICES.txt`。
@@ -116,7 +116,7 @@ node scripts/test-native-login.cjs
 新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。
 
 
-### 0.1.47 简化日常配置
+### 0.1.48 简化日常配置
 
 工作台「一键配置」默认只需选择应用，首次接入使用推荐模型并自动准备图片与搜索工具。调整模型和范围放在折叠项中；已接入应用默认保留主模型与可见性。想替换时须显式勾选。部分失败只重试未完成应用或工具。
 
@@ -156,6 +156,28 @@ WorkBuddy 已安装官方 `external-packages/pdf-cli/workbuddy-pdf.exe` 时，�
 
 工作台在未检测到任何 Agent 时显示“安装并配置 WorkBuddy”。用户先连接 ACU，再显式点击安装；运行时使用国内腾讯官方 download.codebuddy.cn 固定 5.9.3.42398134 的 Windows/macOS 架构包及官方 API 提供的 SHA-256，不需要境外镜像或额外包管理器。Windows 使用厂商 NSIS 静默安装并核验腾讯签名；Mac 使用官方 ZIP 校验签名，安装到 ~/Applications，不覆盖已有应用。第一次启动由官方客户端初始化目录，内核重新检测后复用现有配置接口；已有模型、共享工具选择和登录状态保留，新增工具可能需要保存工作后重开应用。WorkBuddy 是否要求账号由客户端决定，不绕过登录、协议或安全确认。
 
-ChatGPT 作为折叠的其他入口，打开官方安装页面；不下载第三方重新打包文件。安装完成后通过内核自动接入，网络不通可停止等待后选择 WorkBuddy。没有 ChatGPT 账号的网关模式依赖客户端支持，Runtime 不伪造 auth.json、不清除已有登录。纯国内网络优先保证 WorkBuddy 官方下载路径；不能将官方客户端的账号登录或原生云服务访问承诺为 ACU 可替代。
+ChatGPT 使用 OpenAI 官方完整 MSIX（Windows x64/ARM64）或 DMG（macOS），直接下载 persistent.oaistatic.com，不再跳转 Microsoft Store 网页安装器。Windows 验证 Store 签名、固定发布者、OpenAI.Codex 身份和架构后交给 Add-AppxPackage；含系统服务，可能需要当前用户确认管理员权限。Mac 验证 Developer ID、公证与架构，安装到 ~/Applications，已有应用不覆盖。完整包约 1 GB，下载完成后保留在用户缓存 ACURuntime/agent-packages；也支持在 Runtime 可执行文件旁的 agent-packages 中预放原版官方包，每次使用仍验证签名。正式普通安装包尚未内含第三方客户端。
+
+没有 ChatGPT 账号时，Magpie 0.1.3852 根据客户端登录状态自动使用本地 API provider，ACU 复用此逻辑，不写入或伪造 auth.json、不清除已有登录。隔离测试确认 config.toml 指向 magpie，未要求 OpenAI 认证，未生成 auth.json；已有登录由内核保留。该模式提供本地 Agent 与所配置模型，云端账号功能仍需官方登录。没有账号的完整桌面交互仍需新用户设备验收。下载地址在本机关闭代理后 HEAD 可直达，但不能据此保证所有国内运营商可用。
 
 安装流程后台状态支持页面重载恢复、避免重复并发安装。正常测试不安装第三方应用；发行 CI 在一次性 Windows/Mac runner 上显式执行 ACU_AGENT_INSTALL_SMOKE=1 的官方包安装检查。
+
+
+### 0.1.48 首页更新与启动通知
+
+桌面窗口启动后自动检查一次 Runtime 正式版；发现新版本时显示确认弹窗，每个窗口会话同一版本只提醒一次，取消后首页仍保留入口。用户确认后才下载并校验 SHA-256，Windows 默认安装一起替换 Runtime 与配套内核、重启；已有 Key 和 Agent 配置保留。配套内核是发行版验证后固定的最新版，不在运行中盲目追踪上游 latest，也不覆盖独立 Magpie。macOS Runtime 应用内更新安装仍未实现。
+
+首页低强调更新栏提供检查更新和全部更新。Agent 卡片仅在 Magpie `/api/agents/cli` 明确报告 `update=true` 时显示更新按钮，调用原生 `/api/agents/cli/{id}`，按原来的安装方式更新。Codex CLI 明确标注为 CLI，不能冒充 ChatGPT 桌面版本；WorkBuddy 桌面目前无此原生 CLI 更新接口，继续使用应用内更新。全部更新逐个处理可更新项，保留逐项结果；全成功后才更新 Runtime，失败时不自动退出掩盖错误。
+
+Windows 首页及设置另有“更新 ChatGPT 桌面端”，用户确认后重新下载官方 latest 完整包，验证签名并使用系统部署，不降级已有更新版本。客户端自带更新保持开启。该入口不宣称提前检测到桌面新版；它与 Magpie 的条件 CLI 更新按钮分开表达。
+
+
+### 安装包大小与按需下载
+
+默认只发布轻量 Runtime 安装器（本轮 Windows x64 构建约 62 MB），包含配套内核，不默认捆绑约 450 MB 的 WorkBuddy 与约 1.06 GB 的 ChatGPT。只有用户点击安装相应客户端时才下载该客户端；已安装应用直接复用。完整下载放在用户缓存中，每次安装前仍校验签名/摘要。ChatGPT 使用强 ETag + Range / If-Range 续传，同一版本中断后可续，latest 变更时重新下载，已完成且 ETag 未变时跳过重复下载。客户端自己的增量更新保留，Runtime 的完整包更新作为备用入口。
+
+可选离线分发（不进入普通更新包）：先执行 build-windows.ps1，再将两个原版官方包放到指定目录，执行 `scripts/build-offline-windows.ps1 -PackageDirectory <目录>`。生成独立 ZIP，解压后安装器与 agent-packages 同级，安装时复制到本机，按需安装时重新验证。该包用于不能在线下载或集中部署的场景。
+
+### Windows ChatGPT 国内滚动线路
+
+使用 https://codexapp.agentsmirror.com/latest/win-x64 （ARM64 对应 win-arm64），只允许该服务和已经核对的 IHEP 对象存储路径重定向；备用 OpenAI 官方完整包。每次在线安装读取镜像清单与官方 windows-store-update.json，官方明确更新时拒绝滞后镜像；官方暂不可达时只接受七天内镜像清单。镜像下载验证清单 SHA-256、大小和 Appx 版本，再验证官方签名及身份；这些检查不依赖镜像声称可信。普通缓存不能跳过 latest 查询，显式离线包另行处理。下载已在关闭代理的本机验证，不能承诺所有国内运营商时刻可用。没有改动或重启 ACU 生产 API。

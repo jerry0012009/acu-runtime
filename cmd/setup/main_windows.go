@@ -23,7 +23,7 @@ import (
 //go:embed payload.zip
 var payload []byte
 
-const setupKernelVersion = "v0.1.3337"
+const setupKernelVersion = "v0.1.3852"
 
 func verifyBundledKernel(path, digest string) bool {
 	if len(digest) != 64 {
@@ -126,7 +126,14 @@ func install(waitPID int, requestedTarget string) error {
 	if !filepath.IsAbs(target) || filepath.Clean(target) != filepath.Clean(filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "ACU Runtime")) {
 		return fmt.Errorf("更新目录不受信任")
 	}
-	command = exec.Command(filepath.Join(staging, "ACU Runtime.exe"), "--install-to", target)
+	args := []string{"--install-to", target}
+	if executable, err := os.Executable(); err == nil {
+		offline := filepath.Join(filepath.Dir(executable), "agent-packages")
+		if info, err := os.Stat(offline); err == nil && info.IsDir() {
+			args = append(args, "--agent-packages-from", offline)
+		}
+	}
+	command = exec.Command(filepath.Join(staging, "ACU Runtime.exe"), args...)
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("%s", output)

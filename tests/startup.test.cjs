@@ -15,7 +15,7 @@ async function setup(state, handler) {
   const elements = Object.fromEntries(['app', 'overlay', 'toast'].map(name => [name, { innerHTML: '', classList: { add() {}, remove() {} }, querySelector: () => ({ focus() {} }), addEventListener(event, callback) { if (listeners[name]) listeners[name][event] = callback; } }]));
   const context = vm.createContext({
     document: {
-      getElementById: name => elements[name],
+      getElementById: name => elements[name] || (name === 'confirm-action' ? (elements[name] = {}) : undefined),
       querySelector: () => ({ content: 'isolated-session', focus() {} }),
       addEventListener: (event, callback) => { listeners.document[event] = callback; },
       body: { classList: { add() {}, remove() {} } },
@@ -802,4 +802,70 @@ test('install action supplies selected ACU model and keeps credentials out of re
  const call=posts(instance).find(c=>c.route==='/runtime/agents/install');
  assert.deepEqual(JSON.parse(call.body),{agent:'workbuddy',provider:'acu-runtime',model:'acu-auto'});
  assert(!call.body.includes('sk-'));
+});
+
+test('desktop checks releases once at startup and never installs without confirmation', async()=>{
+ const instance=await setup({desktop:true,ready:true,agents:[codex()],update:{supported:true,phase:'idle'}});
+ await instance.refresh();await instance.refresh();
+ assert.equal(posts(instance).filter(c=>c.route==='/runtime/update/check').length,1);
+ assert(!posts(instance).some(c=>c.route==='/runtime/update/install'));
+});
+
+test('new release notifies once and remains available on homepage after dismissal', async()=>{
+ const state={desktop:true,ready:true,agents:[codex()],update:{supported:true,phase:'available',release:{version:'0.1.99',notes:'fixture'}}};
+ const instance=await setup(state);
+ assert(instance.elements.overlay.innerHTML.includes('更新到 ACU Runtime 0.1.99'));
+ assert.equal(posts(instance).length,0);
+ instance.run('closeOverlay()');await instance.refresh();
+ assert.equal(instance.elements.overlay.innerHTML,'');
+ assert(instance.elements.app.innerHTML.includes('更新 Runtime 与内核'));
+ assert(instance.elements.app.innerHTML.includes('全部更新'));
+ await instance.run('updateAgents([],true)');
+ await instance.elements['confirm-action'].onclick();
+ assert.equal(posts(instance).filter(c=>c.route==='/runtime/update/install').length,1);
+});
+
+test('release notification waits for Agent installation and is shown after completion',async()=>{
+ const state={desktop:true,ready:true,agents:[codex()],agentInstall:{agent:'codex',phase:'downloading'},update:{supported:true,phase:'available',release:{version:'0.1.99'}}};
+ const instance=await setup(state);
+ assert.equal(instance.elements.overlay.innerHTML,'');
+ assert.equal(instance.run('ui.notifiedUpdate'),undefined);
+ state.agentInstall={agent:'codex',phase:'complete'};
+ await instance.refresh();
+ assert(instance.elements.overlay.innerHTML.includes('更新到 ACU Runtime 0.1.99'));
+ assert(!posts(instance).some(c=>c.route==='/runtime/update/install'));
+});
+
+test('homepage offers only native confirmed Agent updates and labels Codex CLI explicitly',async()=>{
+ const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async route=>route==='/kernel/api/agents/cli'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'2',latest:'2',update:false}}}}:undefined);
+ await instance.run('checkAgentVersions()');
+ assert(instance.elements.app.innerHTML.includes('更新 Codex CLI'));
+ assert(!instance.elements.app.innerHTML.includes('更新 Claude Code'));
+ assert(instance.elements.app.innerHTML.includes('全部更新'));
+ assert.equal(posts(instance).length,0);
+ await instance.run('updateAgents(["codex"])');
+ assert(instance.elements.overlay.innerHTML.includes('Codex CLI'));
+ assert.equal(posts(instance).length,0);
+ await instance.elements['confirm-action'].onclick();
+ assert.equal(posts(instance).filter(c=>c.route==='/kernel/api/agents/cli/codex').length,1);
+ assert(!posts(instance).some(c=>c.route.includes('/api/set')||c.route.includes('/runtime/agents/configure')));
+});
+
+test('all Agent updates retain individual failures and postpone Runtime restart',async()=>{
+ const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}],update:{supported:true,phase:'available',release:{version:'0.1.99'}}},async(route,options)=>route==='/kernel/api/agents/cli'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'1',latest:'2',update:true}}}}:route==='/kernel/api/agents/cli/codex'&&options.method==='POST'?{ok:false,body:{error:'fixture failed'}}:undefined);
+ instance.run('closeOverlay()');await instance.run('checkAgentVersions()');
+ await instance.run('updateAgents(["codex","claude"],true)');
+ await instance.elements['confirm-action'].onclick();
+ assert(posts(instance).some(c=>c.route==='/kernel/api/agents/cli/claude'));
+ assert(!posts(instance).some(c=>c.route==='/runtime/update/install'));
+ assert(instance.elements.app.innerHTML.includes('fixture failed'));
+ assert(instance.elements.app.innerHTML.includes('更新完成'));
+});
+
+test('ChatGPT full package update is explicit and sends no account credentials',async()=>{
+ const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async(route,options)=>route==='/runtime/agents/install'&&options.method==='POST'?{body:{agent:'codex',phase:'downloading',update:true,message:'official'}}:undefined);
+ assert(instance.elements.app.innerHTML.includes('更新 ChatGPT 桌面端'));
+ await instance.run('installAgent("codex",true)');
+ const input=JSON.parse(posts(instance).find(c=>c.route==='/runtime/agents/install').body);
+ assert.deepEqual(input,{agent:'codex',provider:'acu-runtime',model:'acu-auto',update:true});
 });

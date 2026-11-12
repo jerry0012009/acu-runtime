@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -85,6 +86,28 @@ func TestAgentInstallEndpointRejectsUnsafeAndNonDesktopRequests(t *testing.T) {
 		if w.Code != 400 {
 			t.Fatal("accepted arbitrary install command", w.Code)
 		}
+	}
+}
+
+func TestOfflinePackageCopyOnlyIncludesKnownRegularFiles(t *testing.T) {
+	source, target := t.TempDir(), t.TempDir()
+	pkg, err := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Skip("unsupported platform")
+	}
+	os.WriteFile(filepath.Join(source, pkg.Name), []byte("inert fixture; install still verifies signature"), 0600)
+	os.WriteFile(filepath.Join(source, "arbitrary.exe"), []byte("not allowed"), 0600)
+	if err := copyOfflineAgentPackages(source, target); err != nil {
+		t.Fatal(err)
+	}
+	if !regularFile(filepath.Join(target, "agent-packages", pkg.Name)) {
+		t.Fatal("missing offline candidate")
+	}
+	if regularFile(filepath.Join(target, "agent-packages", "arbitrary.exe")) {
+		t.Fatal("copied arbitrary file")
+	}
+	if verifiedAgentPackage(filepath.Join(target, "agent-packages", pkg.Name), pkg.SHA256) {
+		t.Fatal("inert fixture accepted as a vendor installer")
 	}
 }
 

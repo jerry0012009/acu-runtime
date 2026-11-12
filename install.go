@@ -5,7 +5,36 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 )
+
+// Vendor packages are inert sidecars, never executed by Runtime's installer.
+// Agent installation independently revalidates the digest/signature. Only
+// fixed first-party filenames can be copied, not arbitrary user files.
+func copyOfflineAgentPackages(source, target string) error {
+	if !filepath.IsAbs(source) || !filepath.IsAbs(target) {
+		return errors.New("离线安装包目录无效")
+	}
+	workbuddy, _ := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
+	chatgpt, _ := chatGPTPackage(runtime.GOOS, runtime.GOARCH)
+	for _, pkg := range []agentPackage{workbuddy, chatgpt} {
+		if pkg.Name == "" {
+			continue
+		}
+		path := filepath.Join(source, pkg.Name)
+		info, err := os.Lstat(path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 2<<30 {
+			return errors.New("离线应用包无效")
+		}
+		if err := copyInstalledFile(path, filepath.Join(target, "agent-packages", pkg.Name), 0600); err != nil {
+			return errors.New("无法保存离线应用安装包")
+		}
+	}
+	return nil
+}
 
 func copyInstalledFile(source, target string, mode os.FileMode) error {
 	input, err := os.Open(source)

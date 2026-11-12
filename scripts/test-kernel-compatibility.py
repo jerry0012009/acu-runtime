@@ -77,7 +77,15 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             response = connection.getresponse()
             payload = response.read()
             assert response.status == 200, (url, response.status, payload[:500])
-            return json.loads(payload)
+            result = json.loads(payload)
+            # 0.1.3852 sends each option once, referenced by a field's
+            # one-based list and the list's zero-based option indexes.
+            if isinstance(result, dict) and "optionLists" in result:
+                for agent in result.get("agents", []):
+                    for field in agent.get("fields", []):
+                        if field.get("list"):
+                            field["options"] = [result["options"][i] for i in result["optionLists"][field["list"] - 1]]
+            return result
         finally:
             connection.close()
 
@@ -117,6 +125,14 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                     field = next(f for f in agents[name]["fields"] if f["key"] == "model")
                     option = next(o for o in field["options"] if o.get("ref") == "acu-runtime/acu-auto")
                     request(origin + "/api/set", {"agent": name, "field": "model", "value": option["value"]})
+            # Fresh user: Magpie chooses its API provider without manufacturing
+            # a ChatGPT login. This is the same kernel path Runtime delegates.
+            codex_config = (Path(env["CODEX_HOME"]) / "config.toml").read_text()
+            assert 'model_provider = "magpie"' in codex_config, codex_config
+            assert "requires_openai_auth = true" not in codex_config, codex_config
+            assert not (Path(env["CODEX_HOME"]) / "auth.json").exists()
+            # Explicit Magpie API choice is available and uses its native API.
+            request(origin + "/api/set", {"agent": "codex", "field": "login", "value": "api"})
             processes.append(subprocess.Popen([runtime, "--web", "--listen", rt.split("//")[1], "--kernel-url", origin],
                 env=env, stdout=log, stderr=log, **flags))
             html = wait(rt)
@@ -150,7 +166,8 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                     assert expected in data, (tool["name"], data[:500])
             print(json.dumps({"runtime": status["version"], "fourAgentsConfigured": True,
                 "kernelPolicyCLI": True, "repeatNoDuplicates": True, "existingMCPPreserved": True,
-                "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True}))
+                "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True,
+                "freshCodexUsesAPIWithoutChatGPTAccount": True}))
         except Exception:
             time.sleep(0.5)
             log.flush()

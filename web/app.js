@@ -25,6 +25,8 @@ const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, character =
 const ui = { page: 'overview', status: null, busy: false, frame: null, error: '', autoStarted: false, selected: null, applying: false, results: [], progress: '', accountBusy: false, keySelection: null, providerSelection: null, setup: null, disconnect: null, inventory: null, inventoryTab: 'all', inventoryBulk: null, inventorySaving: false, polling: false, connectionOpen: false };
 const launchQuery = new URLSearchParams(globalThis.location?.search || '');
 ui.agentInstall = null;
+ui.agentVersions = {};
+ui.agentUpdates = {};
 if (launchQuery.get('page') === 'overview' || launchQuery.has('native')) ui.page = 'overview';
 let pendingNative = launchQuery.get('native');
 const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usage', 'routing', 'plugins', 'masking']);
@@ -67,6 +69,17 @@ async function refresh(rescan = false, quiet = false) {
     const previousAccount = ui.status?.account;
     const previousState = JSON.stringify(ui.status);
     ui.status = await request('/runtime/status');
+    if (ui.status.desktop && ui.status.update?.supported && !ui.startupUpdateChecked) {
+      ui.startupUpdateChecked = true;
+      // One read-only release check per window session. Installation is
+      // always behind the visible confirmation, never the startup check.
+      if (!['checking', 'available', 'downloading', 'restarting'].includes(ui.status.update.phase)) {
+        request('/runtime/update/check', { method: 'POST' }).catch(() => {});
+      }
+    }
+    if (ui.status.ready && ui.status.desktop && !ui.agentVersionChecking && (!ui.agentVersionChecked || Date.now() - ui.agentVersionChecked > (ui.agentVersionsPending ? 5000 : 60000))) {
+      checkAgentVersions();
+    }
     if (ui.status.agentInstall?.phase) ui.agentInstall = ui.status.agentInstall;
     if (ui.providerSelection !== null && !(ui.status.connection?.choices || []).some(choice => choice.id === ui.providerSelection)) ui.providerSelection = '';
     if (previousAccount?.username !== ui.status.account?.username || previousAccount?.site !== ui.status.account?.site) ui.keySelection = null;
@@ -98,7 +111,7 @@ async function refresh(rescan = false, quiet = false) {
       if (nativeViews.has(view)) openNative(view, '', false, launchQuery.get('tab') || '', '', '', launchQuery);
     }
   } catch (error) { ui.error = error.message; if (ui.status) ui.status.connection = { known: false, configured: false, choices: [] }; if (quiet && ['agents', 'overview'].includes(ui.page) && !ui.setup) render(); }
-  finally { ui.polling = false; ui.busy = false; if (!quiet) render(); refresh.timer = setTimeout(() => refresh(false, true), ui.status?.starting || ui.status?.account?.pending ? 1500 : 4000); }
+  finally { ui.polling = false; ui.busy = false; if (!quiet) render(); maybeNotifyUpdate(); refresh.timer = setTimeout(() => refresh(false, true), ui.status?.starting || ui.status?.account?.pending ? 1500 : 4000); }
 }
 
 function navigation() {
@@ -192,7 +205,7 @@ function usageGuide() {
 
 function overviewPage() {
   return `${header('', '你的 Agent，一处管理。', '连接 ACU，继续用你熟悉的工具。', ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">快捷面板</button>' : '')}
-    <div id="home-preparation">${kernelBanner()}</div><div id="home-connection">${compactConnection()}</div>
+    <div id="home-preparation">${kernelBanner()}</div><div id="home-updates">${homeUpdates()}</div><div id="home-connection">${compactConnection()}</div>
     <div id="connection-manager" ${ui.connectionOpen ? '' : 'hidden'}>${ui.connectionOpen ? `<section class="panel setup-stage"><div class="manager-heading"><h2>管理连接</h2><button class="text-button" data-action="manage-connection">收起</button></div>${connectionContent()}</section>` : ''}</div>
     <div id="home-workbench">${usageGuide()}${agentsPage()}</div>`;
 }
@@ -215,14 +228,14 @@ function agentInstallPanel(count) {
   const running = install && !['complete', 'error'].includes(install.phase);
   const percent = install?.total > 0 ? ` · ${Math.min(100, Math.round(install.downloaded / install.total * 100))}%` : '';
   const disabled = !ui.status?.desktop || !ui.status?.ready || !activeChoice() || running || ui.applying;
-  return `<section class="panel agent-install-panel" aria-label="安装 Agent"><h2>${install?.phase === 'complete' ? '应用已准备' : '还没有可用的 Agent？'}</h2><p>推荐 WorkBuddy：使用国内官方下载线路，自动校验并安装，随后通过 ACU 内核配置模型、识图、生图与搜索工具。已有账号和登录状态保留；首次使用如要求登录，请按应用提示完成。</p>${install ? `<p role="status" class="agent-install-status">${escapeHTML(install.message || '正在检查')}${percent}</p>` : ''}${install?.phase === 'waiting' ? '<button class="text-button" data-action="cancel-agent-install">停止等待，返回选择应用</button>' : ''}${!activeChoice() ? '<p>请先登录 ACU 或填写已有 Key。</p>' : ''}<div class="agent-install-actions"><button class="button primary" data-action="install-agent" data-agent-id="workbuddy" ${disabled ? 'disabled' : ''}>${running ? '正在准备应用…' : install?.phase === 'error' ? '重试安装并配置 WorkBuddy' : '安装并配置 WorkBuddy'}</button><details><summary>使用 ChatGPT 桌面端</summary><p>打开官方安装入口，安装完成后自动接入 ACU。下载受限时推荐使用 WorkBuddy；不要求退出已有账号，未登录模式的功能以客户端支持为准。</p><button class="button secondary" data-action="install-agent" data-agent-id="codex" ${disabled ? 'disabled' : ''}>安装并配置 ChatGPT</button></details></div></section>`;
+  return `<section class="panel agent-install-panel" aria-label="安装 Agent"><h2>${install?.phase === 'complete' ? '应用已准备' : '还没有可用的 Agent？'}</h2><p>推荐 WorkBuddy：使用国内官方下载线路，自动校验并安装，随后通过 ACU 内核配置模型、识图、生图与搜索工具。已有账号和登录状态保留；首次使用如要求登录，请按应用提示完成。</p>${install ? `<p role="status" class="agent-install-status">${escapeHTML(install.message || '正在检查')}${percent}</p>` : ''}${['waiting', 'downloading', 'checking'].includes(install?.phase) ? '<button class="text-button" data-action="cancel-agent-install">停止准备，返回选择应用</button>' : ''}${!activeChoice() ? '<p>请先登录 ACU 或填写已有 Key。</p>' : ''}<div class="agent-install-actions"><button class="button primary" data-action="install-agent" data-agent-id="workbuddy" ${disabled ? 'disabled' : ''}>${running ? '正在准备应用…' : install?.phase === 'error' ? '重试安装并配置 WorkBuddy' : '安装并配置 WorkBuddy'}</button><details><summary>使用 ChatGPT 桌面端</summary><p>自动检查最新版，优先使用国内可访问镜像，备用 OpenAI 官方线路；完整包验证官方签名，无需 Microsoft Store。没有 ChatGPT 账号时自动通过 ACU 内核使用 API 模式；已有登录保留。首次下载约 1 GB，之后可复用本地包；Windows 可能需要管理员确认。</p><button class="button secondary" data-action="install-agent" data-agent-id="codex" ${disabled ? 'disabled' : ''}>安装并配置 ChatGPT</button></details></div></section>`;
 }
 
-async function installAgent(id) {
+async function installAgent(id, update = false) {
   const choice = activeChoice();
   if (!choice || !ui.status?.ready || ui.applying) return;
   try {
-    ui.agentInstall = await request('/runtime/agents/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: choice.id, model: recommendedModels(choice)[0] || choice.models?.[0] }) });
+    ui.agentInstall = await request('/runtime/agents/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: choice.id, model: recommendedModels(choice)[0] || choice.models?.[0], ...(update ? { update: true } : {}) }) });
     render();
     refresh();
   } catch (error) { toast(error.message); }
@@ -537,7 +550,70 @@ function agentCard(agent) {
   const headerState = agent.id === 'workbuddy' && agent.connected ? `<div class="agent-header-actions"><span class="agent-state ${ready && !agent.needsRepair ? 'route-on' : ''}">已连接</span>${restartNotice}</div>` : `<span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span>`;
   return `<article class="agent-card compact-card routing-card ${agent.connected ? 'is-configured' : ''}" data-agent="${agent.id}"><div class="agent-card-top"><div class="agent-identity"><span class="agent-monogram ${agent.id}" aria-hidden="true">${({ codex: 'C', claude: '✳', workbuddy: 'W', hermes: 'H' })[agent.id] || 'A'}</span><h3>${escapeHTML(agent.name)}</h3></div>${headerState}</div>${routeButton}
     ${!ready || !agent.detected || agent.needsRepair ? `<p class="agent-route">${route}</p>` : ''}
-    ${agentModelSummary(agent, agent.connected ? `<button class="button secondary advanced-link" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置</button>` : '')}<div class="agent-routing-actions">${ready && agent.restartRequired && agent.id !== 'workbuddy' ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
+    ${agentModelSummary(agent, agent.connected ? `<button class="button secondary advanced-link" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置</button>` : '')}<div class="agent-routing-actions">${agentUpdateControl(agent.id)}${ready && agent.restartRequired && agent.id !== 'workbuddy' ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
+}
+
+function availableAgentUpdates() {
+  return Object.entries(ui.agentVersions).filter(([id, info]) => names[id] && info.update && ui.status?.agents?.some(agent => agent.id === id && agent.detected));
+}
+
+function agentUpdateControl(id) {
+  const info = ui.agentVersions[id];
+  const result = ui.agentUpdates[id];
+  return `${info?.update ? `<button class="text-button" data-action="update-agent" data-agent-id="${id}" ${ui.updatingAgents || ui.applying ? 'disabled' : ''}>更新 ${escapeHTML(names[id])}${id === 'codex' ? ' CLI' : ''} · ${escapeHTML(info.latest)}</button>` : ''}${result ? `<span class="agent-update-result" role="status">${escapeHTML(result)}</span>` : ''}`;
+}
+
+function homeUpdates() {
+  if (!ui.status?.desktop) return '';
+  const update = ui.status.update || {};
+  const available = availableAgentUpdates();
+  const running = ui.updatingAgents || ['checking', 'downloading', 'restarting'].includes(update.phase) || (ui.agentInstall && !['complete', 'error'].includes(ui.agentInstall.phase));
+  const runtimeLabel = update.phase === 'available' ? `ACU Runtime ${update.release?.version} 可更新（含配套内核）` : update.phase === 'downloading' ? `正在下载 Runtime 更新${update.total ? ` · ${Math.round(update.downloaded / update.total * 100)}%` : ''}` : update.phase === 'restarting' ? '正在更新 Runtime 与内核…' : update.phase === 'error' ? update.message || '更新检查失败，可重试' : update.phase === 'checking' ? '正在检查 Runtime 更新…' : '应用更新';
+  return `<div class="home-update-bar" aria-label="应用更新"><span role="status">${escapeHTML(runtimeLabel)}${available.length ? ` · ${available.length} 个 Agent 可更新` : ''}</span><div>${update.phase === 'available' ? `<button class="text-button" data-action="install-update" ${running ? 'disabled' : ''}>更新 Runtime 与内核</button>` : ''}${available.length || update.phase === 'available' ? `<button class="text-button" data-action="update-all" ${running ? 'disabled' : ''}>全部更新</button>` : ''}<button class="text-button" data-action="check-all-updates" ${running ? 'disabled' : ''}>${running ? '正在处理…' : '检查更新'}</button>${ui.status.platform === 'windows' && ui.status.agents?.some(agent => agent.id === 'codex' && agent.detected) ? `<button class="text-button" data-action="update-chatgpt" ${running || !activeChoice() ? 'disabled' : ''}>更新 ChatGPT 桌面端</button>` : ''}</div>${ui.agentVersionError ? `<small>${escapeHTML(ui.agentVersionError)}</small>` : ''}${ui.updatingAgents ? '<small role="status">正在逐个更新 Agent，请稍候…</small>' : ''}${ui.agentInstall?.update ? `<small role="status">${escapeHTML(ui.agentInstall.message || '')}${ui.agentInstall.total > 0 ? ` · ${Math.min(100, Math.round(ui.agentInstall.downloaded / ui.agentInstall.total * 100))}%` : ''}</small>` : ''}</div>`;
+}
+
+async function checkAgentVersions() {
+  if (!ui.status?.ready || ui.agentVersionChecking || ui.updatingAgents) return;
+  ui.agentVersionChecking = true;
+  try {
+    const result = await requestKernel('/kernel/api/agents/cli');
+    ui.agentVersions = result.agents || {};
+    ui.agentVersionsPending = !!result.pending;
+    ui.agentVersionError = '';
+  } catch (error) { ui.agentVersionError = 'Agent 更新检查暂不可用，可稍后重试'; }
+  finally { ui.agentVersionChecking = false; ui.agentVersionChecked = Date.now(); render(); }
+}
+
+function maybeNotifyUpdate() {
+  const update = ui.status?.update;
+  if (update?.phase !== 'available' || !update.release || ui.notifiedUpdate === update.release.version || ui.frame || ui.setup || ui.inventory || ui.disconnect || ui.page === 'capabilities' || overlay.innerHTML || ui.applying || ui.updatingAgents || (ui.agentInstall && !['complete', 'error'].includes(ui.agentInstall.phase))) return;
+  ui.notifiedUpdate = update.release.version;
+  installRuntimeUpdate();
+}
+
+function updateAgents(ids, includeRuntime = false) {
+  const targets = availableAgentUpdates().filter(([id]) => ids.includes(id));
+  if (ui.updatingAgents || ui.applying) return;
+  if (!targets.length) { if (includeRuntime) installRuntimeUpdate(); return; }
+  const runtime = includeRuntime && ui.status?.update?.phase === 'available';
+  showModal(targets.length > 1 || runtime ? '更新所选应用' : `更新 ${escapeHTML(names[targets[0][0]])}${targets[0][0] === 'codex' ? ' CLI' : ''}`, `<p>请先保存工作。将按应用原有安装方式更新，可能需要系统确认或重新打开应用。</p><ul>${targets.map(([id, info]) => `<li>${escapeHTML(names[id])}${id === 'codex' ? ' CLI' : ''}：${escapeHTML(info.version || '当前版本')} → ${escapeHTML(info.latest)}</li>`).join('')}${runtime ? '<li>ACU Runtime 与配套内核，完成 Agent 更新后重启</li>' : ''}</ul>`, '确认更新', async () => {
+    ui.updatingAgents = true;
+    let failed = false;
+    try {
+      for (const [id] of targets) {
+        ui.agentUpdates[id] = '正在更新…'; render();
+        try {
+          await requestKernel(`/kernel/api/agents/cli/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          ui.agentUpdates[id] = '更新完成，请按应用提示重新打开';
+        } catch (error) { failed = true; ui.agentUpdates[id] = `更新失败：${error.message}`; }
+      }
+    } finally { ui.updatingAgents = false; await checkAgentVersions(); await refresh(); }
+    // Keep failures visible instead of exiting before the user can read them.
+    if (runtime && !failed) {
+      try { await request('/runtime/update/install', { method: 'POST' }); await refresh(); }
+      catch (error) { toast(error.message); }
+    }
+  });
 }
 
 async function setAgentModel(id, value, field = 'model') {
@@ -569,7 +645,7 @@ async function checkForUpdate() {
 
 function installRuntimeUpdate() {
   const release = ui.status?.update?.release;
-  if (!release || ui.applying) return;
+  if (!release || ui.applying || ui.updatingAgents || (ui.agentInstall && !['complete', 'error'].includes(ui.agentInstall.phase))) return;
   const notes = escapeHTML(release.notes || '修复问题并更新兼容的内置内核。').replace(/\n/g, '<br>');
   showModal(`更新到 ACU Runtime ${escapeHTML(release.version)}`, `<p>将一并更新 Runtime 和随包提供的兼容内核。已保存的 Key、Agent 与本地配置会保留。</p><p>${notes}</p><p>更新完成后 Runtime 将自动重启，可能短暂中断正在处理的请求。</p>`, '立即更新', async () => {
     ui.applying = true;
@@ -615,6 +691,7 @@ function settingsPage() {
     <section class="panel settings-panel"><h2>外观</h2><div class="setting-row"><div><strong>跟随系统</strong><p>自动适配浅色与深色模式。</p></div><span class="theme-readout"><span class="theme-swatch" aria-hidden="true"></span><span data-system-theme>跟随系统</span></span></div></section>
     <section class="panel settings-panel"><h2>窗口与托盘</h2><div class="setting-row"><div><strong>关闭窗口后继续运行</strong><p>点击托盘图标打开快捷面板，随时查看或调整 Agent。</p></div>${ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">打开快捷面板</button>' : ''}</div></section>
     ${ui.status?.desktop ? `<section class="panel settings-panel"><h2>应用更新</h2><div class="setting-row"><div><strong>ACU Runtime ${escapeHTML(update.current || ui.status?.version || '')}</strong><p role="status">${escapeHTML(update.supported ? updateLabel : '此平台暂未提供应用内更新安装包')}${update.kernel ? ` · 内置内核 ${escapeHTML(update.kernel)}` : ''}</p>${update.phase === 'available' ? '<p>Runtime 与兼容内核将一起更新；本机 Key 和 Agent 配置会保留。</p>' : ''}</div><div class="update-actions">${update.phase === 'available' ? '<button class="button primary" data-action="install-update">更新并重启</button>' : ''}<button class="button secondary" data-action="check-update" ${(!update.supported || ['checking', 'downloading', 'restarting'].includes(update.phase)) ? 'disabled' : ''}>${update.phase === 'checking' ? '检查中…' : '检查更新'}</button></div></div>${update.phase === 'error' ? '<p class="inventory-warning">更新失败；当前安装未变更。</p>' : ''}</section>` : ''}
+    ${ui.status?.desktop ? `<section class="panel settings-panel"><h2>Agent 安装与更新</h2><p>WorkBuddy 和 ChatGPT 保留客户端内更新。Windows 也可从这里获取 ChatGPT 官方完整安装包，已有新版不会降级。</p>${ui.status?.platform === 'windows' ? `<button class="button secondary" data-action="update-chatgpt" ${!activeChoice() || !ui.status?.ready || (ui.agentInstall && !['complete', 'error'].includes(ui.agentInstall.phase)) ? 'disabled' : ''}>下载并更新 ChatGPT</button>` : ''}${ui.agentInstall ? `<p role="status">${escapeHTML(ui.agentInstall.message || '')}${ui.agentInstall.total > 0 ? ` · ${Math.min(100, Math.round(ui.agentInstall.downloaded / ui.agentInstall.total * 100))}%` : ''}</p>` : ''}</section>` : ''}
     ${ui.status?.desktop ? '<div class="desktop-exit"><span>退出应用可能中断正在经 ACU 处理的请求。</span><button class="button secondary" data-action="quit">退出 ACU Runtime</button></div>' : ''}`;
 }
 
@@ -630,6 +707,8 @@ function render() {
     const focusedID = document.activeElement?.id;
     if (connection) connection.innerHTML = compactConnection();
     document.getElementById('home-preparation').innerHTML = kernelBanner();
+    const updates = document.getElementById('home-updates');
+    if (updates) updates.innerHTML = homeUpdates();
     const workbench = document.getElementById('home-workbench');
     {
       const guideOpen = workbench.querySelector('.welcome-help')?.open;
@@ -993,6 +1072,7 @@ async function configureConnection(input) {
 }
 
 function openNative(view, agent = '', developer = false, tab = '', focus = '', action = '', extra = new URLSearchParams()) {
+
   if (!ui.status?.ready) { connectKernel(); return; }
     ui.frame = { view, agent, developer };
     const query = new URLSearchParams({ view, 'acu-view': view, 'acu-agent': agent, 'acu-developer': developer ? '1' : '0' });
@@ -1024,10 +1104,14 @@ app.addEventListener('click', event => {
     'show-panel': () => request('/runtime/desktop/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'panel' }) }).catch(error => toast(error.message)),
     refresh: () => refresh(true), connect: connectKernel,
     'check-update': checkForUpdate, 'install-update': installRuntimeUpdate, 'agent-restart': () => reopenAgent(control.dataset.agentId),
+    'check-all-updates': async () => { await Promise.all([checkForUpdate(), checkAgentVersions()]); },
+    'update-agent': () => updateAgents([control.dataset.agentId]),
+    'update-all': () => updateAgents(availableAgentUpdates().map(([id]) => id), true),
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
     capabilities: openCapabilities,
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'install-agent': () => installAgent(control.dataset.agentId),
+    'update-chatgpt': () => showModal('更新 ChatGPT', '<p>请先保存工作并关闭 ChatGPT。将下载官方最新完整安装包并验证签名；Windows 可能要求管理员确认，已有账号与数据保留。</p>', '下载并更新', () => installAgent('codex', true)),
     'cancel-agent-install': async () => { try { await request('/runtime/agents/install/cancel', { method: 'POST' }); await refresh(); } catch (error) { toast(error.message); } },
     'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
