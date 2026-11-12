@@ -66,18 +66,19 @@ type agentModelOption struct {
 }
 
 type kernelState struct {
-	mu         sync.Mutex
-	exe        string
-	endpoint   *url.URL
-	key        string
-	client     *http.Client
-	stream     *http.Client
-	process    *exec.Cmd
-	starting   bool
-	lastErr    string
-	phase      string
-	downloaded int64
-	total      int64
+	mu             sync.Mutex
+	exe            string
+	endpoint       *url.URL
+	key            string
+	client         *http.Client
+	stream         *http.Client
+	process        *exec.Cmd
+	enforceVersion bool
+	starting       bool
+	lastErr        string
+	phase          string
+	downloaded     int64
+	total          int64
 }
 
 type server struct {
@@ -86,7 +87,8 @@ type server struct {
 	host             string
 	web              http.Handler
 	desktop          bool
-	desktopProbe     func() (bool, error)
+	background       bool
+	kernelProbe      func() (string, error)
 	quitRequests     chan struct{}
 	desktopActions   chan desktopAction
 	lifecycle        context.Context
@@ -102,6 +104,7 @@ type server struct {
 	prepareSearch    func(context.Context, string) error
 	imageSkillSource func() (string, error)
 	agentInstall     agentInstallState
+	agentVersions    agentVersionCache
 }
 
 func secret() string {
@@ -116,6 +119,23 @@ func findKernel() string {
 	if configured := os.Getenv("ACU_KERNEL_PATH"); configured != "" {
 		if info, err := os.Stat(configured); err == nil && !info.IsDir() {
 			return configured
+		}
+	}
+	// The packaged CLI is the tested engine; a separately installed GUI can
+	// be older even after Runtime's package was updated.
+	if release, err := releaseFor(runtime.GOOS, runtime.GOARCH); err == nil {
+		if executable, err := os.Executable(); err == nil {
+			name := "acu-kernel"
+			if runtime.GOOS == "windows" {
+				name += ".exe"
+			}
+			bundled := filepath.Join(filepath.Dir(executable), "kernel", name)
+			if verifyKernel(bundled, release.sha256) {
+				return bundled
+			}
+		}
+		if verifyKernel(managedKernelPath(), release.sha256) {
+			return managedKernelPath()
 		}
 	}
 	home, _ := os.UserHomeDir()
@@ -288,6 +308,9 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		kernel.mu.Lock()
 		kernel.exe = executable
 		kernel.mu.Unlock()
+	}
+	if err := kernel.ensureCompatibleGateway(ctx); err != nil {
+		return err
 	}
 	policy, cancelPolicy := context.WithTimeout(ctx, 20*time.Second)
 	err := pauseKernelUpdates(policy, executable)
@@ -614,6 +637,10 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
+		case host.desktop && (request.Method == http.MethodGet || request.Method == http.MethodPost) && request.URL.Path == "/runtime/startup":
+			host.startupSettings(response, request)
+		case request.Method == http.MethodGet && request.URL.Path == "/runtime/agents/versions":
+			host.agentVersionStatus(response, request)
 		case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
 			host.accountPreferences(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/prices":
@@ -689,6 +716,7 @@ func main() {
 	endpoint := flag.String("kernel-url", "", "existing loopback kernel management origin")
 	webMode := flag.Bool("web", !desktopEnabled, "developer browser mode instead of the native desktop window")
 	inspectPort := flag.Int("inspect-port", 0, "developer WebView inspection port; disabled by default")
+	background := flag.Bool("background", false, "start in the tray at sign-in")
 	installTo := flag.String("install-to", "", "installer-only destination directory")
 	agentPackagesFrom := flag.String("agent-packages-from", "", "optional offline vendor packages beside the installer")
 	agentPackagesJSON := flag.Bool("agent-packages-json", false, "print official desktop package metadata")
@@ -753,6 +781,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	kernel.enforceVersion = desktopEnabled && *endpoint == "" && os.Getenv("ACU_KERNEL_PATH") == ""
 	defer kernel.close()
 	if *endpoint != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -763,7 +792,7 @@ func main() {
 		}
 	}
 	web, _ := fs.Sub(assets, "web")
-	host := &server{kernel: kernel, token: secret(), host: *address, desktop: !*webMode, quitRequests: make(chan struct{}, 1), desktopActions: make(chan desktopAction, 16), loginRequests: make(chan loginTicket, 1), web: http.StripPrefix("/ui/", http.FileServer(http.FS(web)))}
+	host := &server{kernel: kernel, token: secret(), host: *address, desktop: !*webMode, background: *background, quitRequests: make(chan struct{}, 1), desktopActions: make(chan desktopAction, 16), loginRequests: make(chan loginTicket, 1), web: http.StripPrefix("/ui/", http.FileServer(http.FS(web)))}
 	listener, err := net.Listen("tcp", *address)
 	if err != nil {
 		log.Fatal(err)
@@ -787,6 +816,10 @@ func main() {
 	serviceErrors := make(chan error, 1)
 	go func() { serviceErrors <- service.Serve(listener) }()
 	if !*webMode {
+		if err := initializeStartup(); err != nil {
+			log.Printf("开机自启动设置未完成：%v", err)
+		}
+		kernel.begin(ctx)
 		if err := repairConnectedWorkBuddyPDF(); err != nil {
 			log.Printf("WorkBuddy PDF 组件路径同步未完成：%v", err)
 		}

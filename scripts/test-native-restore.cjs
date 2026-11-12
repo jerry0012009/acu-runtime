@@ -39,6 +39,7 @@ async function main() {
     await until(async()=>{const value=await status();return value.account?.loggedIn&&value.account.selected===9;});
     assert(refreshes.includes('fixture-server-session'));
     await page.evaluate(()=>fetch('/runtime/desktop/quit',{method:'POST',headers:{'X-ACU-Token':document.querySelector('meta[name="acu-token"]').content}}));
+    await browser.close(); browser=null;
     assert.equal(await exited,0,output);
     console.log('PASS: exited and restarted native Runtime restored the pinned account and selected Key, with zero provider writes.');
   } finally {

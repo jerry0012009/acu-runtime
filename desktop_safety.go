@@ -2,26 +2,26 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 )
 
-// The pinned kernel can end Codex's app-server when its route changes,
-// then relaunch the entire app after its hosted identity fails. Require
-// the user to close the app before making those changes from Runtime.
+// A GUI kernel left running on an old version can restart Codex repeatedly
+// as its catalog changes. Verify the serving engine before changing routes.
 func (host *server) allowCodexDesktopChange(w http.ResponseWriter) bool {
 	if !host.desktop {
 		return true
 	}
-	probe := host.desktopProbe
+	probe := host.kernelProbe
 	if probe == nil {
-		probe = codexDesktopOpen
+		probe = func() (string, error) { info, err := readServingKernel(context.Background()); return info.Version, err }
 	}
-	open, err := probe()
-	if err != nil || open {
-		host.json(w, http.StatusConflict, map[string]string{"error": "请先保存工作并完全退出 ChatGPT / Codex 桌面端，再修改接入或模型配置；当前内核在应用运行时改配置可能导致反复重启。"})
+	version, err := probe()
+	if err != nil || version == "" || desktopVersionNewer(kernelVersion, version) {
+		host.json(w, http.StatusConflict, map[string]string{"error": "正在准备兼容内核，完成后即可开启 ChatGPT 接入，请稍后重试。"})
 		return false
 	}
 	return true

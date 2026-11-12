@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -96,7 +97,24 @@ func TestNativeLoginSmoke(t *testing.T) {
 	host.cloudTransport = accountTransport(func(request *http.Request) (*http.Response, error) {
 		switch request.URL.Path {
 		case "/api/user/self/acu-preference-profile":
-			return cloudFixture(`{"success":true,"data":{"status":"ready","generatedAt":"2026-11-12T12:00:00Z","profile":{"summary":"偏好可核验的交付。","rays":[{"id":"native-ray","label":"交付验收","category":"交付","summary":"交付应可安装并完成启动验证。","scope":"软件交付","sourceIds":["native-source"]}]}}}`), nil
+			rays := []map[string]any{}
+			count := 3
+			if os.Getenv("ACU_NATIVE_STARFISH_MODE") == "bipolar" {
+				count = 192
+			}
+			for i := 0; i < count; i++ {
+				ray := map[string]any{"id": fmt.Sprintf("native-ray-%d", i), "label": fmt.Sprintf("交付验收 %d", i), "category": []string{"交付", "协作", "表达"}[i%3], "score": 70 + i%21, "confidence": 78, "summary": "交付应可安装并完成启动验证。", "scope": "软件交付", "sourceIds": []string{"native-source"}}
+				if count == 192 {
+					ray["bipolar"] = map[string]any{"axis_id": fmt.Sprintf("axis-%d", i), "schema_version": "acu-preference-v5-bipolar", "name": "交付条件", "end_a": "简洁", "end_b": "详尽", "position": []int{60, 0, 120, 18, 102}[i%5], "acceptable_interval": []int{18, 102}, "importance": 96, "confidence": 84, "applicability": i%17 != 3, "origin": []string{"authorized_initialization", "learned", "user_explicit"}[i%3], "scope": map[string]string{"project": "Runtime", "task": "验收", "subtype": "原生界面"}}
+				}
+				rays = append(rays, ray)
+			}
+			profile := map[string]any{"summary": "偏好可核验的交付。", "sourceCount": 1, "rays": rays}
+			if count == 192 {
+				profile["schemaVersion"] = "acu-preference-v5-bipolar"
+			}
+			b, _ := json.Marshal(map[string]any{"success": true, "data": map[string]any{"status": "ready", "generatedAt": "2026-11-12T12:00:00Z", "profile": profile}})
+			return cloudFixture(string(b)), nil
 		case "/api/user/self/acu-preference-library":
 			return cloudFixture(`{"success":true,"data":{"version":1,"records":[{"id":"native-source","summary":"交付应可安装并完成启动验证。"}]}}`), nil
 		case "/api/user/self/acu-preference-activity":

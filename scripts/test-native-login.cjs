@@ -72,7 +72,7 @@ async function run() {
     });
     assert.equal(login.isClosed(), false, 'login WebView must remain available for silent renewal');
     assert.equal((await call('/runtime/status')).account.selected, 9, 'renewal must preserve the user-selected Key');
-    await page.locator('[data-page="preferences"]').click();
+    await page.locator('[data-page="preferences"]').click().catch(async error => {console.error('Native modal:', await page.locator('#overlay').innerText());throw error;});
     await page.getByText('摘要更新', { exact: true }).waitFor().catch(async error => { console.error('Native preference view:', (await page.locator('body').innerText()).slice(-4000)); throw error; });
     await page.locator('.preference-change summary').focus();
     await page.keyboard.press('Enter');
@@ -81,8 +81,17 @@ async function run() {
     const screenshotDirectory = path.join(root, 'output/runtime-preferences');
     fs.mkdirSync(screenshotDirectory, { recursive: true });
     await page.screenshot({ path: path.join(screenshotDirectory, 'preferences-native-windows.png'), fullPage: true });
+    await page.locator('.starfish-svg').waitFor();
+    assert.equal(await page.locator('.starfish-ray-list button').count(),process.env.ACU_NATIVE_STARFISH_MODE==='bipolar'?192:3);
+    const graphOutput=path.join(root,'output/runtime-starfish');fs.mkdirSync(graphOutput,{recursive:true});
+    for(const colorScheme of ['light','dark'])for(const width of [920,1240]){
+      await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:850});
+      await page.waitForFunction(theme=>document.documentElement.dataset.acuTheme===theme,colorScheme);
+      await page.screenshot({path:path.join(graphOutput,`native-${process.env.ACU_NATIVE_STARFISH_MODE||'ordinary'}-${colorScheme}-${width}.png`),fullPage:false});
+    }
     assert.equal((await call('/runtime/status')).account.selected, 9, 'viewing preferences must preserve the selected Key');
     await call('/runtime/desktop/quit', {});
+    await browser.close(); browser = null;
     const exitCode = await exited;
     process.stdout.write(output);
     assert.equal(exitCode, 0, 'native Go assertions failed');
