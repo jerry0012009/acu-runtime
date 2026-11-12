@@ -99,6 +99,8 @@ func TestNativeLoginSmoke(t *testing.T) {
 			return cloudFixture(`{"success":true,"data":{"status":"ready","generatedAt":"2026-11-12T12:00:00Z","profile":{"summary":"偏好可核验的交付。","rays":[{"id":"native-ray","label":"交付验收","category":"交付","summary":"交付应可安装并完成启动验证。","scope":"软件交付","sourceIds":["native-source"]}]}}}`), nil
 		case "/api/user/self/acu-preference-library":
 			return cloudFixture(`{"success":true,"data":{"version":1,"records":[{"id":"native-source","summary":"交付应可安装并完成启动验证。"}]}}`), nil
+		case "/api/user/self/acu-preference-controls":
+			return cloudFixture(`{"success":true,"data":{"records":[]}}`), nil
 		case "/api/user/self/acu-preference-activity":
 			return cloudFixture(`{"success":true,"data":{"version":1,"events":[{"trigger":"explicit_user_preference","recordedAt":"2026-11-12T12:00:00Z","changes":[{"kind":"updated","before":"交付应可安装。","after":"交付应可安装并完成启动验证。"}]}],"partial":false,"moreAvailable":false}}`), nil
 		case "/api/user/self/acu-advisor/settings":
