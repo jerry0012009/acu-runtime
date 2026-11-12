@@ -51,7 +51,7 @@ const server = http.createServer(async (req,res) => {
    await page.screenshot({path:path.join(output,`preferences-${theme}-${width}.png`),fullPage:true});
    await page.locator('#preference-search').fill('不存在的内容');assert(await page.getByText('没有匹配的偏好记录。',{exact:true}).isVisible());
    await page.locator('#preference-search').fill('');
-   const count=reads;await page.locator('[data-page="overview"]').click();await page.locator('[data-page="preferences"]').click();assert.equal(reads,count,'60 second cache');
+   const count=reads;await page.getByRole('button', {name:'工作台',exact:true}).click();await page.locator('[data-page="preferences"]').click();assert.equal(reads,count,'60 second cache');
    assert.deepEqual(errors,[]);await page.close();
   }
   for(const nextMode of ['empty','unsupported','error','revoked']) {
