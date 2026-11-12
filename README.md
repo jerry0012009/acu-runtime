@@ -8,6 +8,8 @@ Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻�
 
 Windows 安全配置：接入、断开及修改 Codex 模型时，Runtime 暂停自己管理的空闲内核，完成配置、登录身份与模型验证后再恢复；失败或取消自动还原。不自动关闭或启动 ChatGPT，保存工作后手动重开使配置生效。旧版、未知或自定义独立内核尚未迁移时阻止配置。
 
+macOS 配置前请先保存并完全退出 ChatGPT / Codex；检测到应用仍运行时阻止写入，完成后手动重开。
+
 从 [GitHub Releases](https://github.com/jerry0012009/acu-runtime/releases/latest) 下载对应平台安装包。完整安装说明见 [RELEASE-NOTES.md](RELEASE-NOTES.md)。
 
 | 平台 | 安装包 | 安装 |

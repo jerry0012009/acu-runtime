@@ -6,4 +6,6 @@ Local checks: 114 JavaScript tests; preference browser layouts and draft-edit re
 
 Release gates include Go and native desktop suites/vet, installer payload pins and actual verify-only execution, official ChatGPT/WorkBuddy first installation, native WebView session/restore checks, quiet Codex routing, upgrade from the published 0.1.56 installer, matching serving kernel and unchanged existing Codex config/auth, kernel API compatibility, and Apple Silicon/Intel native packaging. All platform builds must pass before a complete release becomes latest.
 
+macOS blocks route writes while its desktop app is open and requires a manual close/reopen; it does not claim Windows quiet-transaction acceptance.
+
 Windows x64 supports in-app Runtime updates; macOS receives the same compatible pinned kernel in DMG/app.zip and currently requires replacing the app. Custom external gateways are not stopped automatically. Unknown kernel state blocks Codex writes. Full GUI tasks and real accounts on arbitrary devices cannot be proven by these checks.

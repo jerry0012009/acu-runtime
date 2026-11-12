@@ -23,6 +23,11 @@ if ($PreviousInstaller) {
     $previous = Start-Process -FilePath (Resolve-Path -LiteralPath $PreviousInstaller).Path -ArgumentList @('--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
     if (!$previous.WaitForExit(60000) -or $previous.ExitCode -ne 0) { throw 'Previous release installation failed' }
     $old = Wait-InstalledRuntime '0.1.56'
+    $codexConfig = Join-Path $env:USERPROFILE '.codex/config.toml'
+    if (!(Test-Path -LiteralPath $codexConfig)) {
+        New-Item -ItemType Directory -Force (Split-Path $codexConfig -Parent) | Out-Null
+        '[mcp_servers.upgrade_preservation_fixture]`ncommand = "preserved-by-runtime-upgrade"' -replace '`n', "`n" | Set-Content -LiteralPath $codexConfig -Encoding utf8NoBOM
+    }
     foreach ($file in @((Join-Path $env:USERPROFILE '.codex/config.toml'), (Join-Path $env:USERPROFILE '.codex/auth.json'))) {
         if (Test-Path -LiteralPath $file) { $configHashes[$file] = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash }
     }
@@ -32,7 +37,7 @@ if ($PreviousInstaller) {
     $setup = Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList @('--wait-pid', $old.process.Id, '--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
     Invoke-RestMethod -Uri ($old.origin + '/runtime/desktop/quit') -Method Post -Headers @{'X-ACU-Token'=$token;Origin=$old.origin} -ContentType 'application/json' -Body '{}' -TimeoutSec 5 | Out-Null
 } else {
-$setup = Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList @('--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
+    $setup = Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList @('--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
 }
 if (!$setup.WaitForExit(60000) -or $setup.ExitCode -ne 0) { throw 'Runtime first installation failed' }
 $expected = [regex]::Match((Get-Content update.go -Raw), 'const appVersion = "([^"]+)"').Groups[1].Value

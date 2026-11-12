@@ -17,6 +17,12 @@ func (host *server) allowCodexDesktopChange(w http.ResponseWriter) bool {
 	if !host.desktop {
 		return true
 	}
+	if runtime.GOOS == "darwin" {
+		if open, err := codexDesktopOpen(); err != nil || open {
+			host.json(w, http.StatusConflict, map[string]string{"error": "请保存工作并完全退出 ChatGPT / Codex 后再修改接入，配置完成后手动重开。"})
+			return false
+		}
+	}
 	probe := host.kernelProbe
 	if probe == nil {
 		probe = func() (string, error) { info, err := readServingKernel(context.Background()); return info.Version, err }
