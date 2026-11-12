@@ -12,7 +12,7 @@ let mode = 'normal', delay = false, reads = 0, writes = [];
 const summary = '面向终端用户交付软件或浏览器扩展时，以可直接安装、可分发和真实启动验证作为主要验收标准；已明确授权的插件试用应默认具备指定核心能力与可用接入配置。';
 const fixtures = {
  controls: {records:[{id:'11111111-1111-4111-8111-111111111111',summary:'先结论再说明',rule:'先结论；法律文书保留完整论证。',scope:'工作报告',exceptions:'法律文书',revision:'a'.repeat(64),disabled:false}]},
- profile: { status: 'error', generatedAt: '2026-11-12T12:51:00Z', profile: { summary: '注重可核验的交付、清晰的依据与直接可用的结果。', rays: [{ id: 'hidden-ray', label: '直接安装使用', category: '交付与核验', summary, scope: '面向用户的交付', sourceIds: ['hidden-source', 'missing-source'] }, {id:'initialized',label:'简洁与详尽',summary:'按任务保留合适的细节。',category:'表达',scope:'报告',sourceIds:[],bipolar:{origin:'authorized_initialization'}}] } },
+ profile: { status: 'error', error:'profile_refresh_failed', generatedAt: '2026-11-12T12:51:00Z', profile: { summary: '注重可核验的交付、清晰的依据与直接可用的结果。', rays: [{ id: 'hidden-ray',score:80,confidence:70, label: '直接安装使用', category: '交付与核验', summary, scope: '面向用户的交付', sourceIds: ['hidden-source', 'missing-source'] }, {id:'initialized',score:70,confidence:60,label:'简洁与详尽',summary:'按任务保留合适的细节。',category:'表达',scope:'报告',sourceIds:[],bipolar:{origin:'authorized_initialization'}}] } },
  library: { version: 1, records: [{ id: 'hidden-source', summary }, {id:'english',summary:'LongEnglishText'.repeat(50)+' <script>unsafe()</script>'}] },
  activity: { version: 1, partial: true, moreAvailable: true, events: [{ runId: 'hidden-run', trigger: 'explicit_user_preference', recordedAt: '2026-11-12T12:00:00Z', changes: [{ kind:'updated', before: '交付应可安装。', after: summary }, {kind:'updated',before:'unchanged',after:'unchanged'}] }] },
  settings: {globalEnabled:true,learningEnabled:false,injectionEnabled:false},
@@ -51,25 +51,26 @@ const server = http.createServer(async (req,res) => {
    await page.goto(origin);await page.locator('[data-page="preferences"]').click();await page.getByText('摘要更新',{exact:true}).waitFor();
    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,`overflow ${width} ${theme}`);
    assert.equal(await page.getByText('unchanged',{exact:true}).count(),0);
-   assert.equal(await page.locator('[data-pref-ray]').count(),2);
-   await page.locator('[data-pref-ray]').last().focus();await page.keyboard.press('Enter');
-   assert.equal(await page.locator('[data-pref-ray]').last().getAttribute('aria-pressed'),'true');
+   assert.equal(await page.locator('.starfish-ray-list button').count(),2);
+   await page.locator('.starfish-list > summary').click();
+   await page.locator('.starfish-ray-list [data-star-ray]').last().focus();await page.keyboard.press('Enter');
+   assert.equal(await page.locator('.starfish-ray-list [data-star-ray]').last().getAttribute('aria-pressed'),'true');
    const catalog=page.locator('.preference-catalog').first();
    if (!(await catalog.evaluate(element=>element.open))) await catalog.locator(':scope > summary').click();
    await page.locator('.preference-change summary').focus();await page.keyboard.press('Enter');
    await page.locator('.preference-change details[open]').waitFor();
-   await page.locator('.preference-sources summary').first().click();
+   await page.locator('.preference-rays .preference-sources summary').first().click();
    assert(await page.getByText('此条偏好记录暂不可用。',{exact:true}).isVisible());
    await page.screenshot({path:path.join(output,`preferences-${theme}-${width}.png`),fullPage:true});
    await page.locator('#preference-search').fill('不存在的内容');assert(await page.getByText('没有匹配的偏好记录。',{exact:true}).isVisible());
    await page.locator('#preference-search').fill('');
-   const count=reads;await page.locator('button[data-page="overview"]').click();await page.locator('[data-page="preferences"]').click();assert.equal(reads,count,'60 second cache');
+   const count=reads;await page.locator('button[data-page="overview"]').click();await page.locator('[data-page="preferences"]').click();assert.equal(reads,count,'6 hour cache');
    assert.deepEqual(errors,[]);await page.close();
   }
   const editingPage=await browser.newPage();await editingPage.goto(origin);await editingPage.locator('[data-page="preferences"]').click();
   const editing=editingPage.locator('[data-pref-record]').first();await editing.locator('summary').click();
   await editing.locator('[name="rule"]').fill('先给决策，再说明原因。');
-  await editingPage.locator('[data-pref-ray]').last().focus();await editingPage.keyboard.press('Enter');
+  await editingPage.locator('svg [data-star-ray]').last().focus();await editingPage.keyboard.press('Enter');
   assert.equal(await editing.locator('[name="rule"]').inputValue(),'先给决策，再说明原因。');
   await editingPage.locator('#preference-search').fill('找不到');
   await editingPage.locator('#preference-search').fill('');
@@ -77,9 +78,9 @@ const server = http.createServer(async (req,res) => {
   assert.equal(await editing.locator('[name="exceptions"]').inputValue(),'法律文书');
   await editing.getByRole('button',{name:'保存修正',exact:true}).click();
   await editing.getByRole('button',{name:'保存修正',exact:true}).waitFor();
-  const svg=editingPage.getByRole('group',{name:'偏好向量海星图'});const originalView=await svg.getAttribute('viewBox');
-  await editingPage.getByRole('button',{name:'放大图谱',exact:true}).click();assert.notEqual(await svg.getAttribute('viewBox'),originalView);
-  await editingPage.getByRole('button',{name:'缩小图谱',exact:true}).click();assert.equal(await svg.getAttribute('viewBox'),originalView);
+  const svg=editingPage.getByRole('group',{name:'动态偏好向量海星图'});const originalView=await svg.getAttribute('viewBox');
+  await editingPage.getByRole('button',{name:'缩小图谱',exact:true}).click();assert.notEqual(await svg.getAttribute('viewBox'),originalView);
+  await editingPage.getByRole('button',{name:'放大图谱',exact:true}).click();assert.equal(await svg.getAttribute('viewBox'),originalView);
   await editingPage.close();
   for(const nextMode of ['empty','unsupported','error','revoked']) {
    mode=nextMode; const page=await browser.newPage();await page.goto(origin);await page.locator('[data-page="preferences"]').click();

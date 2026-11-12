@@ -5,7 +5,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { createRequire } = require('node:module');
 const root = process.env.ACU_TEST_WORKSPACE || path.resolve(__dirname, '../..');
-const { chromium } = createRequire(path.join(root,'.build/package.json'))('playwright');
+const { chromium } = process.env.PLAYWRIGHT_MODULE ? require(process.env.PLAYWRIGHT_MODULE) : createRequire(path.join(root,'.build/package.json'))('playwright');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(),'acu-billing-restore-'));
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve,milliseconds));
 async function until(check) { const deadline = Date.now()+60000; while(Date.now()<deadline) { const value = await check(); if(value) return value; await pause(200); } throw new Error('native restore timed out'); }
@@ -23,6 +23,7 @@ async function main() {
     await until(async()=>{try{return (await fetch('http://127.0.0.1:9238/json/version')).ok;}catch{return false;}});
     browser = await chromium.connectOverCDP('http://127.0.0.1:9238');
     const context = browser.contexts()[0];
+    await context.route('http://127.0.0.1:*/runtime/update/check', route => route.fulfill({contentType:'application/json',body:JSON.stringify({phase:'current',current:'0.1.55'})}));
     assert((await context.cookies('https://acu.best')).some(cookie => cookie.name === 'acu-isolated-persistence-check' && cookie.value === 'fixture-only'), 'system WebView did not retain the persistent official-site cookie across restart');
     const refreshes=[];
     await context.route('https://acu.best/**',async route=> {
@@ -39,6 +40,7 @@ async function main() {
     await until(async()=>{const value=await status();return value.account?.loggedIn&&value.account.selected===9;});
     assert(refreshes.includes('fixture-server-session'));
     await page.evaluate(()=>fetch('/runtime/desktop/quit',{method:'POST',headers:{'X-ACU-Token':document.querySelector('meta[name="acu-token"]').content}}));
+    await browser.close(); browser=null;
     assert.equal(await exited,0,output);
     console.log('PASS: exited and restarted native Runtime restored the pinned account and selected Key, with zero provider writes.');
   } finally {

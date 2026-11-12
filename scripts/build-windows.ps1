@@ -29,8 +29,17 @@ try {
     $payload = Join-Path $root 'cmd/setup/payload.zip'
     Compress-Archive -LiteralPath $application, $kernelDirectory, (Join-Path $root 'web/THIRD-PARTY-NOTICES.txt') -DestinationPath $payload -Force
     $installer = Join-Path $output 'ACU Runtime Setup.exe'
-    & $GoExecutable build -tags setup -ldflags '-H windowsgui' -o $installer ./cmd/setup
+    $setupLinker = "-H windowsgui -X main.setupKernelVersion=$($release.version) -X main.setupKernelName=$($release.name) -X main.setupKernelSHA256=$($release.sha256)"
+    & $GoExecutable build -tags setup -ldflags $setupLinker -o $installer ./cmd/setup
     if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+    $verifyOutput = Join-Path $output 'installer-verify.stdout.log'
+    $verifyError = Join-Path $output 'installer-verify.stderr.log'
+    $verification = Start-Process -FilePath $installer -ArgumentList '--verify-only' -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $verifyOutput -RedirectStandardError $verifyError
+    if (Test-Path -LiteralPath $verifyOutput) { Get-Content -LiteralPath $verifyOutput -Encoding utf8 }
+    if ($verification.ExitCode -ne 0) {
+        $detail = Get-Content -LiteralPath $verifyError -Encoding utf8 -Raw
+        throw "Embedded installer payload validation failed: $detail"
+    }
     Write-Output "Installer: $installer"
 } finally {
     Pop-Location

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os/exec"
 
@@ -26,6 +27,12 @@ func noRegisteredWSLDistros() bool {
 
 func prepareKernelDetection(ctx context.Context, executable string) error {
 	if !noRegisteredWSLDistros() {
+		return nil
+	}
+	if kernelSettingsMatch(executable, func(settings map[string]json.RawMessage) bool {
+		var disabled bool
+		return json.Unmarshal(settings["noWSLAgents"], &disabled) == nil && disabled
+	}) {
 		return nil
 	}
 	command := exec.CommandContext(ctx, executable, "settings", "set", "noWSLAgents", "on")

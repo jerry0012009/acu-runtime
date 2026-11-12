@@ -1,3 +1,9 @@
+## Windows Runtime 0.1.55 candidate / Magpie 0.1.3935
+
+The known desktop failure involves both a prefixed model absent from the effective catalog and the upstream gateway ending ChatGPT's hosted app-server on route changes. Windows configuration now sets native Magpie API routing, validates retained ChatGPT identity and actual model visibility, and changes routes with the owned idle gateway stopped. The existing desktop is left running until the user reopens it. Snapshot rollback includes native ownership metadata and catalogs; cancellation does not leave the gateway stopped. Advanced model/disconnect routes use the same transaction. Headless validators/configuration commands use owned Windows jobs, never a broad process-name kill.
+
+The official 0.1.3935 assets are pinned for all four kernel targets. Windows isolated native acceptance includes an actual signed-in profile copy. This candidate still requires the requested real desktop user test before formal publication; see ACCEPTANCE-0155.md. macOS retains its existing integration behavior and needs separate native acceptance.
+
 # Runtime 0.1.51 / Magpie 0.1.3909
 
 本次配套内核为 v0.1.3909（2026-11-12 确认的上游最新正式版），固定 Windows/macOS amd64、arm64 官方摘要。保留独立安装和手动升级后的内核，不承诺所有未来版本未经测试即可兼容。
@@ -126,3 +132,10 @@ Windows 后台进程设置 HideWindow 与 CREATE_NO_WINDOW，保留其余进程�
 
 
 Windows Runtime rejects Codex route/model/restart writes while the OpenAI.Codex Store app is open (409), before forwarding to Magpie. Unknown process state also blocks these writes. Read-only requests and other agents remain available. This prevents Runtime-triggered app-server termination and hosted identity/relaunch failures; it does not change independent Magpie automation.
+
+
+## 0.1.57 release integration
+
+The user confirmed the repaired Windows build fixed the desktop crash loop. Windows route writes now stop only the verified owned idle watcher, verify Codex identity/config/model, and restart the watcher on the complete route; failures restore the original files. Advanced restart/catalog-write endpoints cannot bypass this path. Packaged Magpie is pinned to 0.1.3940 for all four kernel architectures. Runtime installer manifests derive from the actual payload and are executed in verify-only mode during packaging. CI installs published 0.1.56, hands off by PID to the new setup, checks ready/version and the actual serving kernel, and verifies existing Codex config/auth digests are unchanged.
+
+Local 0.1.3940 isolated native routing passed initial configuration, invalid-model rollback, cancellation and disconnect. Initial parse/model configuration measured 6.8 seconds before final release runs; this excludes downloads, account sign-in and remote latency. Three-platform package acceptance is recorded in the release workflow, not inferred from local Windows tests.

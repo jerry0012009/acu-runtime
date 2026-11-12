@@ -1,0 +1,33 @@
+# 0.1.55 Windows candidate — ready for user desktop validation
+
+Historical candidate record. On 2026-11-13 (Asia/Shanghai), the user confirmed the repaired build successfully fixed the desktop crash loop, and requested general release delivery. This feedback supersedes the pending desktop acceptance below. Release integration and current evidence are tracked in ACCEPTANCE-0157.md.
+
+## Reproduced failure
+
+The earlier candidate caused a signed-in Windows desktop failure after activation at 00:29 Asia/Shanghai on 2026-11-13. Desktop logs record a clean expected app-server exit at 16:29:24Z followed immediately by Hosted AppServerManager identity is not ready and fatal_error_broadcasted. The main ChatGPT PID stayed alive, so PID stability is not acceptance. Upstream issue #4550 documents the hot-restart failure; the native autoRestart switch does not cover Connect/Disconnect route changes.
+
+A second configuration issue was reproduced with the installed Codex executable: beside-the-sign-in mode could parse its prefixed ACU selection but did not include it in model/list. Initialization success alone was insufficient.
+
+## Repair
+
+Windows Codex changes use the native Magpie API login setting for prefixed ACU models, including requires_openai_auth when the account is retained. They are applied while only Runtime's own verified idle gateway is stopped. The restarted watcher begins on the complete new route. No ChatGPT process is terminated or launched by configuration.
+
+The actual installed Codex app-server validates initialization, account/read, config/read and presence of the selected model before committing. A ChatGPT-authenticated profile must keep an account. Failure/cancellation restores config, native catalogs, stash and applied records, and recovers the gateway. Headless config/probe descendants are contained in a Windows job and cleaned without touching existing desktop processes. The same transaction handles advanced model changes and disconnect; configuration supports auxiliary fields.
+
+## Evidence
+
+Official pinned Magpie **0.1.3935**, including fixed official asset digests. TestQuietCodexNativeIsolation passed using both API-only and an isolated copy of the user's ChatGPT authentication. It verified retained identity and actual ACU model visibility, workbench transaction behavior through the advanced HTTP proxy, gateway replacement, invalid-model rollback, cancellation before and after file writes, disconnect, original MCP preservation and descendant cleanup. No desktop window or inference request was started. Authentication contents are never in test output or release artifacts.
+
+Also passed: normal and desktop-tag Go suites, vet, 114 JS tests, billing/preferences browser acceptance, six-hour refresh regression, and starfish themes/interactions/192 axes. Existing Windows WebView2 screenshots cover ordinary and bipolar fixtures; a separate actual-account screenshot is available locally. macOS native visual acceptance remains separate from browser checks.
+
+Remaining: the user performs their requested real desktop enable/reopen/use test. No assertion of zero future crashes or completed real-desktop acceptance is made from isolated tests.
+
+Opt-in isolated regression (Windows): ACU_QUIET_CODEX_SMOKE=1, ACU_QUIET_KERNEL=absolute official CLI path; optionally ACU_QUIET_CHATGPT_AUTH=absolute auth.json path for the signed-in case. Run go test -run ^TestQuietCodexNativeIsolation$ -v -timeout 4m . . The auth source is only copied into a disposable profile; the user's live profile stays disconnected.
+
+## Installer repair and local installation
+
+The previous installer rejected a valid 0.1.3935 payload because setup still pinned 0.1.3909. Setup now receives version/name/digest pins from the same built Runtime, and the Windows build runs the actual GUI-subsystem installer in --verify-only mode with an explicitly awaited exit code. A deliberately mismatched installer is rejected before target installation. Setup-specific regression tests cover missing and conflicting pins.
+
+The repaired setup installed successfully on the user's Windows machine (exit 0). Installed Runtime and built app hashes matched; account restoration and ready=true were confirmed, with the serving 0.1.3935 CLI owned by Runtime and no standalone Magpie process. Codex remained disconnected. No fresh desktop fatal or identity errors were found during this installation check. The user's real Codex enable/reopen test is still pending.
+
+Compatible default GUI gateways are also retired after path/PID verification and idle checks without replacing their newer binary. Tests verify newer GUI binaries remain unchanged and custom processes are rejected for takeover. This avoids attaching to an external gateway that cannot participate in safe Codex transactions.

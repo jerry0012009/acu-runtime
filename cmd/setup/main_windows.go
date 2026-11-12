@@ -23,7 +23,33 @@ import (
 //go:embed payload.zip
 var payload []byte
 
-const setupKernelVersion = "v0.1.3909"
+// These pins come from the exact staged Runtime during packaging. Empty
+// values fail closed, so a manually built installer cannot silently drift.
+var setupKernelVersion string
+var setupKernelName string
+var setupKernelSHA256 string
+
+type kernelManifest struct {
+	Version string `json:"version"`
+	Name    string `json:"name"`
+	SHA256  string `json:"sha256"`
+}
+
+func validateKernelManifest(actual, expected kernelManifest) error {
+	if expected.Version == "" || expected.Name == "" || len(expected.SHA256) != 64 {
+		return fmt.Errorf("安装包缺少构建校验清单，请重新构建安装包")
+	}
+	if expected.Name != "magpie-cli-windows-amd64.exe" && expected.Name != "magpie-cli-windows-arm64.exe" {
+		return fmt.Errorf("安装包内核架构清单无效")
+	}
+	if actual != expected {
+		return fmt.Errorf("安装包清单不一致（打包内核 %s，应用内核 %s），请重新构建安装包", expected.Version, actual.Version)
+	}
+	if _, err := hex.DecodeString(expected.SHA256); err != nil {
+		return fmt.Errorf("安装包内核摘要清单无效")
+	}
+	return nil
+}
 
 func verifyBundledKernel(path, digest string) bool {
 	if len(digest) != 64 {
@@ -37,7 +63,7 @@ func verifyBundledKernel(path, digest string) bool {
 	return hex.EncodeToString(hash[:]) == digest
 }
 
-func install(waitPID int, requestedTarget string) error {
+func install(waitPID int, requestedTarget string, verifyOnly bool) error {
 	if waitPID > 0 {
 		handle, err := syscall.OpenProcess(0x00100000, false, uint32(waitPID))
 		if err != nil && err != syscall.Errno(87) {
@@ -108,16 +134,20 @@ func install(waitPID int, requestedTarget string) error {
 	if err != nil {
 		return fmt.Errorf("安装包校验清单无效")
 	}
-	var manifest struct {
-		Version string `json:"version"`
-		Name    string `json:"name"`
-		SHA256  string `json:"sha256"`
+	var manifest kernelManifest
+	if json.Unmarshal(manifestBytes, &manifest) != nil {
+		return fmt.Errorf("安装包校验清单格式无效")
 	}
-	if json.Unmarshal(manifestBytes, &manifest) != nil || manifest.Version != setupKernelVersion || !strings.EqualFold(manifest.Name, "magpie-cli-windows-amd64.exe") && !strings.EqualFold(manifest.Name, "magpie-cli-windows-arm64.exe") {
-		return fmt.Errorf("安装包版本不兼容")
+	expected := kernelManifest{setupKernelVersion, setupKernelName, setupKernelSHA256}
+	if err := validateKernelManifest(manifest, expected); err != nil {
+		return err
 	}
-	if !verifyBundledKernel(filepath.Join(staging, "kernel", "acu-kernel.exe"), manifest.SHA256) {
+	if !verifyBundledKernel(filepath.Join(staging, "kernel", "acu-kernel.exe"), expected.SHA256) {
 		return fmt.Errorf("安装包内核校验失败")
+	}
+	if verifyOnly {
+		fmt.Printf("PASS: installer payload verified: %s %s\n", expected.Version, expected.Name)
+		return nil
 	}
 	target := requestedTarget
 	if target == "" {
@@ -152,8 +182,13 @@ func install(waitPID int, requestedTarget string) error {
 func main() {
 	waitPID := flag.Int("wait-pid", 0, "wait for this Runtime process to exit")
 	target := flag.String("target", "", "existing installation directory")
+	verifyOnly := flag.Bool("verify-only", false, "verify the embedded payload without installing or opening Runtime")
 	flag.Parse()
-	if err := install(*waitPID, *target); err != nil {
+	if err := install(*waitPID, *target, *verifyOnly); err != nil {
+		if *verifyOnly {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		message, _ := syscall.UTF16PtrFromString(err.Error())
 		title, _ := syscall.UTF16PtrFromString("ACU Runtime 安装未完成")
 		syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(message)), uintptr(unsafe.Pointer(title)), 0x10)

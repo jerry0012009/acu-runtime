@@ -29,6 +29,35 @@ func TestPauseUpdatesUsesNativeCommandsOnly(t *testing.T) {
 	}
 }
 
+func TestPreparedKernelSkipsCommandsOnlyWhileSafetySettingsStillMatch(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", root)
+	directory := filepath.Join(root, "magpie")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(root, "not-installed", "kernel")
+	for _, tc := range []struct {
+		settings string
+		safe     bool
+	}{
+		{`{"noAutoUpdate":true,"noAutoDownload":true}`, true},
+		{`{"noAutoUpdate":true,"noAutoDownload":true,"autoRestart":false}`, true},
+		{`{"noAutoUpdate":true,"noAutoDownload":true,"autoRestart":true}`, false},
+		{`{"noAutoUpdate":false,"noAutoDownload":true}`, false},
+		{`{"noAutoUpdate":true}`, false},
+		{`broken`, false},
+	} {
+		if err := os.WriteFile(filepath.Join(directory, "settings.json"), []byte(tc.settings), 0600); err != nil {
+			t.Fatal(err)
+		}
+		err := pauseKernelUpdates(context.Background(), executable)
+		if (err == nil) != tc.safe {
+			t.Fatalf("settings %s: skipped native validation=%v, want %v", tc.settings, err == nil, tc.safe)
+		}
+	}
+}
+
 func TestExistingManagementIsAuthenticatedAndNeverOwned(t *testing.T) {
 	var authenticated bool
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

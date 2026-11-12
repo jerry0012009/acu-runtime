@@ -837,7 +837,7 @@ test('release notification waits for Agent installation and is shown after compl
 });
 
 test('homepage offers only native confirmed Agent updates and labels Codex CLI explicitly',async()=>{
- const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async route=>route==='/kernel/api/agents/cli'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'2',latest:'2',update:false}}}}:undefined);
+ const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async route=>route==='/runtime/agents/versions'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'2',latest:'2',update:false}}}}:undefined);
  await instance.run('checkAgentVersions()');
  assert(instance.elements.app.innerHTML.includes('更新 Codex CLI'));
  assert(!instance.elements.app.innerHTML.includes('更新 Claude Code'));
@@ -852,7 +852,7 @@ test('homepage offers only native confirmed Agent updates and labels Codex CLI e
 });
 
 test('all Agent updates retain individual failures and postpone Runtime restart',async()=>{
- const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}],update:{supported:true,phase:'available',release:{version:'0.1.99'}}},async(route,options)=>route==='/kernel/api/agents/cli'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'1',latest:'2',update:true}}}}:route==='/kernel/api/agents/cli/codex'&&options.method==='POST'?{ok:false,body:{error:'fixture failed'}}:undefined);
+ const instance=await setup({desktop:true,ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}],update:{supported:true,phase:'available',release:{version:'0.1.99'}}},async(route,options)=>route==='/runtime/agents/versions'?{body:{agents:{codex:{version:'1',latest:'2',update:true},claude:{version:'1',latest:'2',update:true}}}}:route==='/kernel/api/agents/cli/codex'&&options.method==='POST'?{ok:false,body:{error:'fixture failed'}}:undefined);
  instance.run('closeOverlay()');await instance.run('checkAgentVersions()');
  await instance.run('updateAgents(["codex","claude"],true)');
  await instance.elements['confirm-action'].onclick();
@@ -862,10 +862,21 @@ test('all Agent updates retain individual failures and postpone Runtime restart'
  assert(instance.elements.app.innerHTML.includes('更新完成'));
 });
 
-test('ChatGPT full package update is explicit and sends no account credentials',async()=>{
- const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async(route,options)=>route==='/runtime/agents/install'&&options.method==='POST'?{body:{agent:'codex',phase:'downloading',update:true,message:'official'}}:undefined);
- assert(instance.elements.app.innerHTML.includes('更新 ChatGPT 桌面端'));
+test('ChatGPT update appears on its Agent only when a newer installed desktop version is confirmed',async()=>{
+ const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async(route,options)=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:{version:'26.1106.6628.0',latest:'26.1112.100.0',update:true,installed:true,desktop:true}}}}:route==='/runtime/agents/install'?{body:{agent:'codex',phase:'complete',update:true,message:'official'}}:undefined);
+ await instance.run('checkAgentVersions()');
+ const html=instance.elements.app.innerHTML;
+ assert(html.includes('更新 ChatGPT 桌面端 · 26.1106.6628.0 → 26.1112.100.0'));
+ assert(instance.run('homeUpdates()').includes('更新 ChatGPT 桌面端')===false);
  await instance.run('installAgent("codex",true)');
  const input=JSON.parse(posts(instance).find(c=>c.route==='/runtime/agents/install').body);
- assert.deepEqual(input,{agent:'codex',provider:'acu-runtime',model:'acu-auto',update:true});
+ assert.deepEqual(input,{agent:'codex',update:true});
+ assert(!posts(instance).some(c=>c.route.includes('/api/set')||c.route.includes('/agents/configure')));
+});
+test('current or unconfirmed desktop versions never show an update button',async()=>{
+ for(const info of [{version:'26.1106.6628.0',latest:'26.1106.6628.0',update:false,installed:true},{version:'26.1106.6628.0',error:'unavailable',update:false,installed:true}]){
+  const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async route=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:info}}}:undefined);
+  await instance.run('checkAgentVersions()');
+  assert(!instance.elements.app.innerHTML.includes('更新 ChatGPT 桌面端 ·'));
+ }
 });

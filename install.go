@@ -60,7 +60,7 @@ func copyInstalledFile(source, target string, mode os.FileMode) error {
 	if err := output.Close(); err != nil {
 		return err
 	}
-	return os.Rename(output.Name(), target)
+	return replaceInstalledPath(output.Name(), target)
 }
 
 func prepareInstallation(source, target string, release kernelRelease) error {

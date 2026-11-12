@@ -126,6 +126,11 @@ func openAgentURL(ctx context.Context, address string) error {
 
 func openInstalledAgent(ctx context.Context, id string) error {
 	if id == "codex" {
+		if running, err := codexDesktopOpen(); err != nil {
+			return err
+		} else if running {
+			return nil
+		}
 		command := exec.Command("explorer.exe", `shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App`)
 		if err := command.Start(); err != nil {
 			return err

@@ -145,7 +145,8 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 		OnShutdown:     shutdown,
 	})
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "acu-main", Title: "ACU Runtime", URL: origin + "?page=overview",
+		Hidden: host.background,
+		Name:   "acu-main", Title: "ACU Runtime", URL: origin + "?page=overview",
 		Width: 1240, Height: 850, MinWidth: 920, MinHeight: 650,
 		BackgroundColour: application.NewRGB(24, 25, 26),
 		Windows:          application.WindowsWindow{Theme: application.SystemDefault},
