@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,7 +17,22 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/runtime/preferences/")
-	paths := map[string]string{"profile": "acu-preference-profile", "library": "acu-preference-library", "activity": "acu-preference-activity", "settings": "acu-advisor/settings"}
+	paths := map[string]string{"profile": "acu-preference-profile", "library": "acu-preference-library", "activity": "acu-preference-activity", "settings": "acu-advisor/settings", "controls": "acu-preference-controls"}
+	var input []byte
+	if r.Method == http.MethodPut {
+		parts := strings.Split(name, "/")
+		if len(parts) != 2 || parts[0] != "controls" || len(parts[1]) != 36 || strings.ContainsAny(parts[1], "?#%\\") {
+			host.json(w, 400, map[string]string{"error": "偏好记录无效"})
+			return
+		}
+		var err error
+		input, err = io.ReadAll(io.LimitReader(r.Body, 8193))
+		if err != nil || len(input) > 8192 || !json.Valid(input) {
+			host.json(w, 400, map[string]string{"error": "偏好修改无效"})
+			return
+		}
+		paths[name] = "acu-preference-controls/" + parts[1]
+	}
 	path, ok := paths[name]
 	if !ok {
 		host.json(w, 404, map[string]string{"error": "unknown preference view"})
@@ -38,13 +54,17 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 502, map[string]string{"error": "无法识别官方登录站点。"})
 		return
 	}
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, site+"/api/user/self/"+path, nil)
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, site+"/api/user/self/"+path, bytes.NewReader(input))
 	if err != nil {
 		host.json(w, 502, map[string]string{"error": "无法读取偏好。"})
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+bearer)
 	req.Header.Set("Accept", "application/json")
+	if r.Method == http.MethodPut {
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", site)
+	}
 	client := &http.Client{Timeout: 20 * time.Second, Transport: host.cloudTransport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, err := client.Do(req)
 	if err != nil {

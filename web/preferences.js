@@ -1,13 +1,13 @@
 globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: esc }) => {
-  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', controller: null, revoked: false, refreshTimer: null, retryDelay: 1500 };
+  const state = { identity: '', generation: 0, data: {}, errors: {}, loaded: 0, busy: false, query: '', category: '', selected: '', controller: null, revoked: false, refreshTimer: null, retryDelay: 1500 };
   const graph = globalThis.createACUStarfish?.({ escapeHTML: esc, sourceList });
   const preferenceCacheMs = 6 * 60 * 60 * 1000;
-  const titles = { profile: '偏好概览', library: '偏好记录', activity: '近期摘要变化', settings: '学习与参考状态' };
+  const titles = { profile: '偏好概览', library: '偏好记录', activity: '近期摘要变化', settings: '学习与参考状态', controls: '管理偏好' };
   const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN') : '时间未提供';
   const note = text => `<p class="preference-note" role="status">${esc(text)}</p>`;
   function clear() {
     graph?.reset();
-    state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.revoked = false; state.retryDelay = 1500;
+    state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.selected = ''; state.revoked = false; state.retryDelay = 1500;
   }
   function syncAccount() {
     const identity = ui.status?.account?.loggedIn ? ui.status.account.identity : '';
@@ -38,7 +38,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     if (generation === state.generation) {
       state.busy = false; state.loaded = retry ? 0 : Date.now(); update();
       clearTimeout(state.refreshTimer);
-      state.refreshTimer = setTimeout(retry ? () => load(true) : update, retry ? state.retryDelay : preferenceCacheMs + 10);
+      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retry ? state.retryDelay : preferenceCacheMs + 10);
       state.retryDelay = retry ? Math.min(state.retryDelay * 2, 30000) : 1500;
 
     }
@@ -68,20 +68,50 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       <div class="preference-rays">${filtered.map(ray => `<article class="panel preference-ray"><div class="preference-ray-heading"><h3>${esc(ray.label || '偏好')}</h3><span>${esc(ray.category || '其他领域')}</span></div><p>${esc(ray.summary || '暂无可读摘要。')}</p>${ray.scope ? `<p class="preference-muted">适用范围：${esc(ray.scope)}</p>` : ''}${ray.bipolar?.origin === 'authorized_initialization' ? note('授权初始化；不代表已学习的偏好。') : ''}${sourceList(ray)}</article>`).join('')}</div>${rays.length && !filtered.length ? note('没有匹配的偏好，可调整搜索或领域筛选。') : ''}
       </section>
       <section aria-labelledby="pref-records"><h2 id="pref-records">偏好记录</h2><p class="preference-muted">保存的理解，不是用户原话。部分记录可能没有可展示的摘要。</p>${library ? records.length ? records.map(record => `<article class="panel preference-record"><p>${esc(record.summary)}</p></article>`).join('') : note(query ? '没有匹配的偏好记录。' : '暂无可读的偏好记录。') : ''}</section>
-      <section aria-labelledby="pref-activity"><h2 id="pref-activity">近期摘要变化</h2><p class="preference-muted">显示近期窗口中的摘要文字变化，不是完整历史；时间为学习完成时间。</p>${activity?.partial ? note('部分变化读取失败，当前结果不完整。') : ''}${activity?.moreAvailable ? note('已达到近期窗口的读取上限，可能还有其他变化。') : ''}${activity ? activity.events.flatMap(event => (event.changes || []).filter(change => ['created','updated','deleted'].includes(change.kind) && (change.kind !== 'updated' || (change.before?.trim() && change.after?.trim() && change.before.trim() !== change.after.trim())) && (change.after || change.before) && match([change.after,change.before].join(' '))).map(change => `<article class="panel preference-change"><div class="preference-ray-heading"><strong>${({created:'新增摘要',updated:'摘要更新',deleted:'移除记录'})[change.kind]}</strong><span>${event.trigger === 'explicit_user_preference' ? '明确偏好' : event.trigger === 'user_dissatisfaction' ? '反馈学习' : '偏好学习'} · ${esc(date(event.recordedAt))}</span></div><p>${esc(change.kind === 'deleted' ? change.before : change.after)}</p>${change.kind === 'updated' ? `<details><summary>更新前</summary><p>${esc(change.before)}</p></details>` : ''}</article>`)).join('') || note(query ? '没有匹配的近期变化。' : '近期窗口内没有可展示的摘要变化；这不代表没有发生学习。') : ''}</section>`;
+      <section aria-labelledby="pref-activity"><h2 id="pref-activity">近期摘要变化</h2><p class="preference-muted">显示近期窗口中的摘要文字变化，不是完整历史；时间为学习完成时间。</p>${activity?.partial ? note('部分变化读取失败，当前结果不完整。') : ''}${activity?.moreAvailable ? note('已达到近期窗口的读取上限，可能还有其他变化。') : ''}${activity ? activity.events.flatMap(event => (event.changes || []).filter(change => ['created','updated','deleted','rule_updated'].includes(change.kind) && (change.kind !== 'updated' || (change.before?.trim() && change.after?.trim() && change.before.trim() !== change.after.trim())) && (change.after || change.before) && match([change.after,change.before].join(' '))).map(change => `<article class="panel preference-change"><div class="preference-ray-heading"><strong>${({created:'新增摘要',updated:'摘要更新',deleted:'移除记录',rule_updated:'规则修订'})[change.kind]}</strong><span>${event.trigger === 'explicit_user_preference' ? '明确偏好' : event.trigger === 'user_dissatisfaction' ? '反馈学习' : '偏好学习'} · ${esc(date(event.recordedAt))}</span></div><p>${esc(change.kind === 'deleted' ? change.before : change.after)}</p>${change.kind === 'updated' ? `<details><summary>更新前</summary><p>${esc(change.before)}</p></details>` : ''}</article>`)).join('') || note(query ? '没有匹配的近期变化。' : '近期窗口内没有可展示的摘要变化；这不代表没有发生学习。') : ''}</section>`;
   }
   function update() { if (ui.page === 'preferences') render(false); }
+  async function changePreference(record, action, summary = record.summary, scope = record.scope) {
+    const generation = state.generation;
+    try {
+      await request(`/runtime/preferences/controls/${encodeURIComponent(record.id)}`, { method:'PUT', body:JSON.stringify({action,summary,scope,expected_hash:record.revision}) });
+      if (generation !== state.generation) return;
+      state.loaded = 0; await load();
+    } catch(error) { if (generation === state.generation) { state.errors.controls = error.message; update(); } }
+  }
   function render(shouldLoad = true) {
     const active = document.activeElement?.id === 'preference-search';
     const caret = active ? document.activeElement.selectionStart : null;
-    const opened = [...(app.querySelectorAll?.('details') || [])].map((detail, index) => detail.open ? index : -1);
+    const opened = new Set([...(app.querySelectorAll?.('details') || [])].filter(detail=>detail.open).map(detail=>detail.querySelector('summary')?.textContent));
     app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1><p>查看已保存的理解，核对近期摘要变化。</p></header>${content()}</main></div>`;
-    for (const [index, detail] of [...(app.querySelectorAll?.('details') || [])].entries()) if (opened.includes(index)) detail.open = true;
+    const chart = app.querySelector('.starfish-panel');
+    // Keep the graph primary; long catalogs remain available without repeating every record on first view.
+    for (const id of ['pref-overview', 'pref-records']) {
+      const section = app.querySelector(`#${id}`)?.closest('section');
+      if (!section) continue;
+      const disclosure = document.createElement('details');
+      disclosure.className = 'preference-catalog';
+      const heading = document.createElement('summary');
+      heading.textContent = id === 'pref-overview' ? '全部偏好与来源' : '保存的偏好记录';
+      section.before(disclosure); disclosure.append(heading, section);
+      disclosure.open = opened.has(heading.textContent) || Boolean(state.query) || !(state.data.profile?.profile?.rays?.length);
+    }
+    const management = document.createElement('section');
+    management.innerHTML = `<h2>管理偏好</h2>${(state.data.controls?.records || []).filter(record=>!state.query || record.summary.includes(state.query)).map(record=>`<details class="preference-controls"><summary>${esc(record.summary)}${record.disabled?' · 已停用':''}</summary><form data-pref-edit="${esc(record.id)}"><label>偏好规则<input name="summary" required maxlength="400" value="${esc(record.summary)}"></label><label>适用范围<input name="scope" required maxlength="400" value="${esc(record.scope || '')}" placeholder="例如：当前项目的周报"></label><button class="button secondary" type="submit">保存修正</button><button class="button secondary" type="button" data-pref-toggle="${esc(record.id)}">${record.disabled?'恢复':'停用'}</button></form></details>`).join('')}`;
+    app.querySelector('.preference-page')?.append(management);
+    const activity = app.querySelector('#pref-activity')?.closest('section');
+    if (activity && chart) chart.after(activity);
+    management.addEventListener('submit', event=>{event.preventDefault(); const record=state.data.controls?.records?.find(record=>record.id===event.target.dataset.prefEdit); if(record) {const data=new FormData(event.target);changePreference(record,'edit',String(data.get('summary')),String(data.get('scope')));}});
+    for (const detail of [...(app.querySelectorAll?.('details') || [])]) if (opened.has(detail.querySelector('summary')?.textContent)) detail.open = true;
     if (active) { const input = app.querySelector('#preference-search'); input?.focus(); if (caret !== null) input?.setSelectionRange?.(caret, caret); }
     graph?.bind(app);
     if (shouldLoad) { syncAccount(); load(); }
   }
   function click(event) {
+    const toggle = event.target.closest('[data-pref-toggle]');
+    if (toggle) { const record=state.data.controls?.records?.find(record=>record.id===toggle.dataset.prefToggle); if(record) changePreference(record,record.disabled?'restore':'disable'); return true; }
+    const ray = event.target.closest('[data-pref-ray]');
+    if (ray) { state.selected = ray.dataset.prefRay; update(); app.querySelector(`[data-pref-ray="${CSS.escape(state.selected)}"]`)?.focus(); return true; }
     if (event.target.closest('[data-pref-refresh]')) { load(true); return true; }
     const filter = event.target.closest('[data-pref-category]');
     if (filter) { state.category = filter.dataset.prefCategory; update(); return true; }

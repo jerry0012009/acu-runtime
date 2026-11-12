@@ -117,6 +117,8 @@ func TestNativeLoginSmoke(t *testing.T) {
 			return cloudFixture(string(b)), nil
 		case "/api/user/self/acu-preference-library":
 			return cloudFixture(`{"success":true,"data":{"version":1,"records":[{"id":"native-source","summary":"交付应可安装并完成启动验证。"}]}}`), nil
+		case "/api/user/self/acu-preference-controls":
+			return cloudFixture(`{"success":true,"data":{"records":[]}}`), nil
 		case "/api/user/self/acu-preference-activity":
 			return cloudFixture(`{"success":true,"data":{"version":1,"events":[{"trigger":"explicit_user_preference","recordedAt":"2026-11-12T12:00:00Z","changes":[{"kind":"updated","before":"交付应可安装。","after":"交付应可安装并完成启动验证。"}]}],"partial":false,"moreAvailable":false}}`), nil
 		case "/api/user/self/acu-advisor/settings":
