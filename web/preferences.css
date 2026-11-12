@@ -1,0 +1,26 @@
+.preference-page { max-width: 1120px; margin: 0 auto; padding: 36px 40px 72px; overflow-wrap: anywhere; }
+.preference-page h1 { font-size: 30px; margin: 8px 0 12px; }
+.preference-page h2 { font-size: 19px; margin: 30px 0 12px; }
+.preference-page h3 { font-size: 16px; margin: 0; }
+.preference-page p { line-height: 1.8; margin: 8px 0; white-space: pre-wrap; }
+.preference-muted,.preference-account p,.preference-ray-heading>span { color: var(--muted); font-size: 13px; }
+.preference-account,.preference-ray-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.preference-account { margin: 28px 0 16px; }
+.preference-actions,.preference-filters,.preference-map { display: flex; flex-wrap: wrap; gap: 8px; }
+.preference-search { display: grid; gap: 12px; margin: 24px 0; }
+.preference-search input { width: 100%; min-width: 0; border: 1px solid var(--acu-line); background: var(--acu-surface); color: var(--acu-text); border-radius: 7px; padding: 11px 13px; }
+.preference-page { width: 100%; }
+@media(max-width:600px) { .sidebar nav { flex-wrap: wrap; } .nav-item { min-width: 88px; flex-basis: 28%; } }
+.preference-filters button[aria-pressed=true] { border-color: var(--acu-accent); }
+.preference-rays { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.preference-ray,.preference-record,.preference-change { padding: 20px; min-width: 0; }
+.preference-record,.preference-change { margin: 12px 0; }
+.preference-page summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.preference-page summary:focus-visible { outline: 2px solid var(--acu-accent); outline-offset: 3px; }
+.preference-sources { border-top: 1px solid var(--acu-line); margin-top: 16px; }
+.preference-sources p { padding: 4px 0; }
+.preference-note { padding: 12px 14px; background: var(--acu-surface); border-left: 3px solid var(--acu-accent); border-radius: 4px; }
+.preference-empty { margin-top: 28px; padding: 24px; }
+.preference-graph,.preference-controls { margin: 14px 0; border-bottom: 1px solid var(--acu-line); padding-bottom: 12px; }
+@media(max-width: 800px) { .preference-page { padding: 24px 20px 60px; } .preference-rays { grid-template-columns: minmax(0,1fr); } }
+@media(max-width: 480px) { .preference-page { padding: 20px 12px 60px; } .preference-page h1 { font-size: 26px; } .preference-ray,.preference-record,.preference-change { padding: 14px; } .preference-actions { width: 100%; } }

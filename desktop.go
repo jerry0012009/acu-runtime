@@ -70,6 +70,10 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 		go func() { <-ready; application.InvokeAsync(func() { window.Restore(); window.Show(); window.Focus() }) }()
 	}
 	windows := application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: filepath.Join(dataDirectory, "WebView2")}
+	instanceID := "com.acu.runtime.desktop"
+	if os.Getenv("ACU_NATIVE_LOGIN_SMOKE") == "1" {
+		instanceID += ".isolated-preference-test"
+	}
 	if inspectPort != 0 {
 		windows.AdditionalBrowserArgs = []string{fmt.Sprintf("--remote-debugging-port=%d", inspectPort), "--remote-debugging-address=127.0.0.1"}
 	}
@@ -127,7 +131,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 				source.ExecJS(`window.dispatchEvent(new CustomEvent('acu-runtime-account-result',{detail:` + string(encoded) + `}))`)
 			}()
 		},
-		SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.acu.runtime.desktop", OnSecondInstanceLaunch: func(application.SecondInstanceData) { show() }},
+		SingleInstance: &application.SingleInstanceOptions{UniqueID: instanceID, OnSecondInstanceLaunch: func(application.SecondInstanceData) { show() }},
 		OnShutdown:     shutdown,
 	})
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{

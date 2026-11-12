@@ -3,10 +3,10 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 const { spawn } = require('node:child_process');
 
-const root = path.resolve(__dirname, '../..');
-const { chromium } = createRequire(path.join(root, '.build/package.json'))('playwright');
+const root = process.env.ACU_TEST_WORKSPACE || path.resolve(__dirname, '../..');
+const { chromium } = process.env.PLAYWRIGHT_MODULE ? require(process.env.PLAYWRIGHT_MODULE) : createRequire(path.join(root, '.build/package.json'))('playwright');
 const port = Number(process.env.ACU_NATIVE_INSPECT_PORT || 9231);
-const native = spawn(path.join(root, '.build/acu-runtime-native-login-smoke.exe'), ['-test.run', '^TestNativeLoginSmoke$', '-test.v'], {
+const native = spawn(process.env.ACU_NATIVE_TEST_EXE || path.join(root, '.build/acu-runtime-native-login-smoke.exe'), ['-test.run', '^TestNativeLoginSmoke$', '-test.v'], {
   env: { ...process.env, ACU_NATIVE_LOGIN_SMOKE: '1', ACU_NATIVE_INSPECT_PORT: String(port) },
   windowsHide: true,
 });
@@ -50,7 +50,7 @@ async function run() {
       }
       await route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><title>隔离登录测试</title><button id="fixture-login" onclick="history.pushState({},\'\',\'/dashboard\');this.remove()">登录隔离测试账号</button>' });
     });
-    page = await until(() => context.pages().find(candidate => candidate.url().startsWith('http://127.0.0.1:')));
+    page = await until(() => context.pages().find(candidate => candidate.url().startsWith('http://127.0.0.1:') && new URL(candidate.url()).searchParams.get('page') === 'overview'));
     await page.waitForSelector('meta[name="acu-token"]', { state: 'attached' });
     const call = (endpoint, input) => page.evaluate(async ({ endpoint, input }) => {
       const token = document.querySelector('meta[name="acu-token"]').content;
@@ -71,11 +71,21 @@ async function run() {
     });
     assert.equal(login.isClosed(), false, 'login WebView must remain available for silent renewal');
     assert.equal((await call('/runtime/status')).account.selected, 9, 'renewal must preserve the user-selected Key');
+    await page.locator('[data-page="preferences"]').click();
+    await page.getByText('摘要更新', { exact: true }).waitFor();
+    await page.locator('.preference-change summary').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('.preference-change details').getAttribute('open'), '');
+    const fs = require('node:fs');
+    const screenshotDirectory = path.join(root, 'output/runtime-preferences');
+    fs.mkdirSync(screenshotDirectory, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotDirectory, 'preferences-native-windows.png'), fullPage: true });
+    assert.equal((await call('/runtime/status')).account.selected, 9, 'viewing preferences must preserve the selected Key');
     await call('/runtime/desktop/quit', {});
     const exitCode = await exited;
     process.stdout.write(output);
     assert.equal(exitCode, 0, 'native Go assertions failed');
-    process.stdout.write('PASS: native login, Key switching, transient refresh failure, access expiry and silent recovery.\n');
+    process.stdout.write('PASS: native login, Key switching, transient refresh failure, access expiry, silent recovery and preference comparison.\n');
   } finally {
     if (native.exitCode === null) {
       try {

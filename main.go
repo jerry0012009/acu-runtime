@@ -604,6 +604,16 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			return
 		}
 		switch {
+		case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
+			host.accountPreferences(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/account/logout":
+			host.account.mu.Lock()
+			host.account.view = accountView{}
+			host.account.bearer = ""
+			host.account.session, host.account.ticket = loginTicket{}, loginTicket{}
+			host.account.userID, host.account.expires = 0, 0
+			host.account.mu.Unlock()
+			host.json(response, 200, map[string]bool{"ok": true})
 		case (request.URL.Path == "/runtime/agents/install" && (request.Method == http.MethodGet || request.Method == http.MethodPost)) || (request.URL.Path == "/runtime/agents/install/cancel" && request.Method == http.MethodPost):
 			host.agentInstaller(response, request)
 		case request.URL.Path == "/runtime/capabilities" && (request.Method == http.MethodGet || request.Method == http.MethodPost):
