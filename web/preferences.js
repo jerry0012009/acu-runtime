@@ -3,7 +3,12 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
   const titles = { profile: '偏好概览', library: '偏好记录', activity: '近期摘要变化', settings: '学习与参考状态', controls: '管理偏好' };
   const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN') : '时间未提供';
   const note = text => `<p class="preference-note" role="status">${esc(text)}</p>`;
+  const drafts = new Map();
+  const saving = new Set();
+  let zoom=1;
   function clear() {
+    drafts.clear(); saving.clear();
+    zoom=1;
     state.controller?.abort(); clearTimeout(state.refreshTimer); state.generation++; state.data = {}; state.errors = {}; state.loaded = 0; state.busy = false; state.query = ''; state.category = ''; state.selected = ''; state.revoked = false; state.retryDelay = 1500;
   }
   function syncAccount() {
@@ -67,21 +72,29 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       <section aria-labelledby="pref-activity"><h2 id="pref-activity">近期摘要变化</h2><p class="preference-muted">显示近期窗口中的摘要文字变化，不是完整历史；时间为学习完成时间。</p>${activity?.partial ? note('部分变化读取失败，当前结果不完整。') : ''}${activity?.moreAvailable ? note('已达到近期窗口的读取上限，可能还有其他变化。') : ''}${activity ? activity.events.flatMap(event => (event.changes || []).filter(change => ['created','updated','deleted','rule_updated'].includes(change.kind) && (change.kind !== 'updated' || (change.before?.trim() && change.after?.trim() && change.before.trim() !== change.after.trim())) && (change.after || change.before) && match([change.after,change.before].join(' '))).map(change => `<article class="panel preference-change"><div class="preference-ray-heading"><strong>${({created:'新增摘要',updated:'摘要更新',deleted:'移除记录',rule_updated:'规则修订'})[change.kind]}</strong><span>${event.trigger === 'explicit_user_preference' ? '明确偏好' : event.trigger === 'user_dissatisfaction' ? '反馈学习' : '偏好学习'} · ${esc(date(event.recordedAt))}</span></div><p>${esc(change.kind === 'deleted' ? change.before : change.after)}</p>${change.kind === 'updated' ? `<details><summary>更新前</summary><p>${esc(change.before)}</p></details>` : ''}</article>`)).join('') || note(query ? '没有匹配的近期变化。' : '近期窗口内没有可展示的摘要变化；这不代表没有发生学习。') : ''}</section>`;
   }
   function update() { if (ui.page === 'preferences') render(false); }
-  async function changePreference(record, action, summary = record.summary, scope = record.scope) {
+  async function changePreference(record, action, patch = {}) {
+    if (saving.has(record.id)) return;
     const generation = state.generation;
+    saving.add(record.id); update();
     try {
-      await request(`/runtime/preferences/controls/${encodeURIComponent(record.id)}`, { method:'PUT', body:JSON.stringify({action,summary,scope,expected_hash:record.revision}) });
+      await request(`/runtime/preferences/controls/${encodeURIComponent(record.id)}`, { method:'PUT', body:JSON.stringify({action,...patch,expected_hash:record.revision}) });
       if (generation !== state.generation) return;
+      drafts.delete(record.id);
       state.loaded = 0; await load();
     } catch(error) { if (generation === state.generation) { state.errors.controls = error.message; update(); } }
+    finally { if (generation === state.generation) {saving.delete(record.id); update();} }
   }
   function render(shouldLoad = true) {
+    const focused=document.activeElement;
+    const focusedRecord=focused?.closest?.('[data-pref-edit]')?.dataset.prefEdit;
+    const focusedName=focusedRecord ? focused.name : null;
+    const selection=focusedRecord ? [focused.selectionStart,focused.selectionEnd] : null;
     const active = document.activeElement?.id === 'preference-search';
     const caret = active ? document.activeElement.selectionStart : null;
     const opened = new Set([...(app.querySelectorAll?.('details') || [])].filter(detail=>detail.open).map(detail=>detail.querySelector('summary')?.textContent));
     app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1><p>查看已保存的理解，核对近期摘要变化。</p></header>${content()}</main></div>`;
     const chart = document.createElement('section');
-    chart.innerHTML = globalThis.acuPreferenceChart?.(state.data.profile?.profile, state.selected, esc) || '';
+    chart.innerHTML = globalThis.acuPreferenceChart?.(state.data.profile?.profile, state.selected, esc, {zoom}) || '';
     app.querySelector('.preference-page > header')?.after(chart);
     // Keep the graph primary; long catalogs remain available without repeating every record on first view.
     for (const id of ['pref-overview', 'pref-records']) {
@@ -95,18 +108,39 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       disclosure.open = opened.has(heading.textContent) || Boolean(state.query) || !(state.data.profile?.profile?.rays?.length);
     }
     const management = document.createElement('section');
-    management.innerHTML = `<h2>管理偏好</h2>${(state.data.controls?.records || []).filter(record=>!state.query || record.summary.includes(state.query)).map(record=>`<details class="preference-controls"><summary>${esc(record.summary)}${record.disabled?' · 已停用':''}</summary><form data-pref-edit="${esc(record.id)}"><label>偏好规则<input name="summary" required maxlength="400" value="${esc(record.summary)}"></label><label>适用范围<input name="scope" required maxlength="400" value="${esc(record.scope || '')}" placeholder="例如：当前项目的周报"></label><button class="button secondary" type="submit">保存修正</button><button class="button secondary" type="button" data-pref-toggle="${esc(record.id)}">${record.disabled?'恢复':'停用'}</button></form></details>`).join('')}`;
+    const selectedRay = state.data.profile?.profile?.rays?.find(ray=>ray.id===state.selected);
+    const controls = (state.data.controls?.records || []).filter(record=>!state.query || [record.summary,record.scope,record.rule].join(' ').toLowerCase().includes(state.query.toLowerCase()));
+    controls.sort((a,b)=>Number(selectedRay?.sourceIds?.includes(b.id))-Number(selectedRay?.sourceIds?.includes(a.id)));
+    management.innerHTML = `<h2>管理偏好</h2>${controls.map(record=>{
+      const draft=drafts.get(record.id) || record;
+      return `<details class="preference-controls" data-pref-record="${esc(record.id)}" ${drafts.has(record.id)?'open':''}><summary>${esc(record.summary)}${record.disabled?' · 已停用':''}</summary><form data-pref-edit="${esc(record.id)}"><label>偏好摘要<textarea name="summary" required maxlength="400">${esc(draft.summary)}</textarea></label><label>适用范围<textarea name="scope" maxlength="30000">${esc(draft.scope || '')}</textarea></label><label>选择标准<textarea name="rule" maxlength="30000">${esc(draft.rule || '')}</textarea></label><label>例外情况<textarea name="exceptions" maxlength="30000">${esc(draft.exceptions || '')}</textarea></label><button class="button secondary" type="submit" ${saving.has(record.id)?'disabled':''}>${saving.has(record.id)?'保存中…':'保存修正'}</button><button class="text-button" type="button" data-pref-cancel="${esc(record.id)}">取消修改</button><button class="button secondary" type="button" data-pref-toggle="${esc(record.id)}" ${saving.has(record.id)?'disabled':''}>${record.disabled?'恢复':'停用'}</button></form></details>`;
+    }).join('')}`;
     app.querySelector('.preference-page')?.append(management);
     const activity = app.querySelector('#pref-activity')?.closest('section');
     if (activity) chart.after(activity);
-    management.addEventListener('submit', event=>{event.preventDefault(); const record=state.data.controls?.records?.find(record=>record.id===event.target.dataset.prefEdit); if(record) {const data=new FormData(event.target);changePreference(record,'edit',String(data.get('summary')),String(data.get('scope')));}});
+    management.addEventListener('submit', event=>{event.preventDefault(); const record=state.data.controls?.records?.find(record=>record.id===event.target.dataset.prefEdit); if(record) {const draft=drafts.get(record.id) || record;const patch={};for(const key of ['summary','scope','rule','exceptions'])if((draft[key]||'')!==(draft.original?.[key]??record[key]??''))patch[key]=draft[key]||'';changePreference({...record,revision:draft.revision},'edit',patch);}});
     chart.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-pref-ray]')) { event.preventDefault(); click(event); } });
+    const preview=id=>{const rays=state.data.profile?.profile?.rays||[];const ray=rays.find(ray=>ray.id===id)||rays.find(ray=>ray.id===state.selected)||rays[0];if(!ray)return;for(const key of ['label','summary','scope']){const element=chart.querySelector(`[data-pref-preview-${key}]`);if(element)element.textContent=ray[key]||'';}};
+    chart.addEventListener('pointerover',event=>{const ray=event.target.closest('[data-pref-ray]');if(ray)preview(ray.dataset.prefRay);});
+    chart.addEventListener('pointerleave',()=>preview(state.selected));
+    const rays=state.data.profile?.profile?.rays||[];
+    for(const element of chart.querySelectorAll('[data-pref-ray]')){
+      const ray=rays.find(ray=>ray.id===element.dataset.prefRay);
+      const matches=(!state.category||ray?.category===state.category)&&(!state.query||[ray?.label,ray?.summary,ray?.scope].join(' ').toLowerCase().includes(state.query.toLowerCase()));
+      element.style.opacity=matches?'1':'.12';
+    }
     chart.querySelector('[data-pref-ray-select]')?.addEventListener('change', event => { state.selected = event.target.value; update(); });
     for (const detail of [...(app.querySelectorAll?.('details') || [])]) if (opened.has(detail.querySelector('summary')?.textContent)) detail.open = true;
     if (active) { const input = app.querySelector('#preference-search'); input?.focus(); if (caret !== null) input?.setSelectionRange?.(caret, caret); }
+    if(focusedRecord&&focusedName){const input=app.querySelector(`[data-pref-edit="${CSS.escape(focusedRecord)}"] [name="${CSS.escape(focusedName)}"]`);input?.focus();if(selection)input?.setSelectionRange?.(...selection);}
     if (shouldLoad) { syncAccount(); load(); }
   }
   function click(event) {
+    const zoomButton=event.target.closest('[data-pref-zoom]');
+    if(zoomButton){zoom=Math.max(1,Math.min(2.5,zoom+Number(zoomButton.dataset.prefZoom)*.5));update();return true;}
+    if(event.target.closest('[data-pref-show-record]')){const rays=state.data.profile?.profile?.rays||[];const ray=rays.find(ray=>ray.id===state.selected)||rays[0];const id=ray?.sourceIds?.[0];const target=id&&app.querySelector(`[data-pref-record="${CSS.escape(id)}"]`);if(target){target.open=true;target.scrollIntoView({block:'center'});target.querySelector('textarea')?.focus();}return true;}
+    const cancel = event.target.closest('[data-pref-cancel]');
+    if(cancel) {drafts.delete(cancel.dataset.prefCancel);update();return true;}
     const toggle = event.target.closest('[data-pref-toggle]');
     if (toggle) { const record=state.data.controls?.records?.find(record=>record.id===toggle.dataset.prefToggle); if(record) changePreference(record,record.disabled?'restore':'disable'); return true; }
     const ray = event.target.closest('[data-pref-ray]');
@@ -121,7 +155,11 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     }
     return false;
   }
-  function input(event) { if (event.target.id === 'preference-search') { state.query = event.target.value; update(); } }
+  function input(event) {
+    const form=event.target.closest('[data-pref-edit]');
+    if(form) {const record=state.data.controls?.records?.find(record=>record.id===form.dataset.prefEdit);if(record){const draft=drafts.get(record.id)||{...record,original:{...record}};draft[event.target.name]=event.target.value;drafts.set(record.id,draft);}return;}
+    if (event.target.id === 'preference-search') { state.query = event.target.value; update(); }
+  }
   function beginLogin() { clear(); state.revoked = true; update(); }
   return { render, syncAccount, click, input, beginLogin };
 };

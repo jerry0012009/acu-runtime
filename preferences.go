@@ -26,8 +26,8 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var err error
-		input, err = io.ReadAll(io.LimitReader(r.Body, 8193))
-		if err != nil || len(input) > 8192 || !json.Valid(input) {
+		input, err = io.ReadAll(io.LimitReader(r.Body, 300001))
+		if err != nil || len(input) > 300000 || !json.Valid(input) {
 			host.json(w, 400, map[string]string{"error": "偏好修改无效"})
 			return
 		}

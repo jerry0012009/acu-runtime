@@ -1,5 +1,5 @@
 // Interpretable projection; geometry matches the Console ordinary radial scale.
-globalThis.acuPreferenceChart = (profile, selectedId, esc) => {
+globalThis.acuPreferenceChart = (profile, selectedId, esc, options = {}) => {
   const rays = profile?.rays || [];
   if (!rays.length) return '';
   if (profile.schemaVersion && profile.schemaVersion !== 'acu-preference-v5-bipolar') return '<p role="status">暂不支持此图谱版本，偏好仍可在列表查看。</p>';
@@ -24,10 +24,12 @@ globalThis.acuPreferenceChart = (profile, selectedId, esc) => {
     return {ray,angle,radius,x:320+Math.cos(angle)*radius,y:320+Math.sin(angle)*radius};
   });
   const selected = rays.find(ray => ray.id === selectedId) || rays[0];
-  return `<div class="preference-chart-layout"><div class="preference-chart-viewport"><svg viewBox="-100 -100 840 840" role="group" aria-label="偏好向量海星图">
+  const zoom=options.zoom || 1;
+  const extent=840/zoom;
+  return `<div class="preference-chart-layout"><div><div class="preference-chart-tools"><button class="text-button" data-pref-zoom="-1" aria-label="缩小图谱" title="缩小图谱" ${zoom<=1?'disabled':''}>−</button><button class="text-button" data-pref-zoom="1" aria-label="放大图谱" title="放大图谱" ${zoom>=2.5?'disabled':''}>+</button></div><div class="preference-chart-viewport"><svg viewBox="${320-extent/2} ${320-extent/2} ${extent} ${extent}" role="group" aria-label="偏好向量海星图">
     ${[48,99,150,201,250].map(radius=>`<circle cx="320" cy="320" r="${radius}" fill="none" stroke="currentColor" opacity=".12"/>`).join('')}
     <circle class="preference-center-pulse" cx="320" cy="320" r="18" fill="currentColor" opacity=".4"/>
     ${points.map(({ray,angle,radius,x,y}) => {const back=radius-Math.min(8,radius*.45), half=Math.min(3.5,radius*.2);return `<g role="button" tabindex="0" aria-label="${esc(ray.label)}" aria-pressed="${ray.id===selected.id}" data-pref-ray="${esc(ray.id)}"><title>${esc(ray.summary)}</title><line x1="320" y1="320" x2="${x}" y2="${y}" stroke="currentColor" stroke-width="${ray.id===selected.id?2.5:1.5}" opacity="${ray.id===selected.id?1:.55}"/><line x1="320" y1="320" x2="${320+Math.cos(angle)*272}" y2="${320+Math.sin(angle)*272}" stroke="transparent" stroke-width="14"/>${radius>0?`<path d="M ${320+Math.cos(angle)*back-Math.sin(angle)*half} ${320+Math.sin(angle)*back+Math.cos(angle)*half} L ${x} ${y} L ${320+Math.cos(angle)*back+Math.sin(angle)*half} ${320+Math.sin(angle)*back-Math.cos(angle)*half}" fill="none" stroke="currentColor" stroke-width="2"/>`:''}</g>`;}).join('')}
     ${categories.map(category=>{const indices=ordered.map((ray,index)=>ray.category===category?index:-1).filter(index=>index>=0);const angle=((indices[0]+indices.at(-1))/2)*Math.PI*2/ordered.length-Math.PI/2;const lines=[...category].reduce((out,char,index)=>{const i=Math.floor(index/12);out[i]=(out[i]||'')+char;return out;},[]);return `<text x="${320+Math.cos(angle)*310}" y="${320+Math.sin(angle)*310}" text-anchor="middle" fill="currentColor" font-size="14">${lines.map((line,index)=>`<tspan x="${320+Math.cos(angle)*310}" dy="${index?18:0}">${esc(line)}</tspan>`).join('')}</text>`;}).join('')}
-    </svg></div><aside class="preference-selected"><h2>${esc(selected.label)}</h2><p>${esc(selected.summary)}</p><p class="preference-muted">${esc(selected.scope)}</p><select aria-label="选择偏好" data-pref-ray-select>${rays.map(ray=>`<option value="${esc(ray.id)}" ${ray.id===selected.id?'selected':''}>${esc(ray.label)}</option>`).join('')}</select></aside></div>`;
+    </svg></div></div><aside class="preference-selected"><h2 data-pref-preview-label>${esc(selected.label)}</h2><p data-pref-preview-summary>${esc(selected.summary)}</p><p class="preference-muted" data-pref-preview-scope>${esc(selected.scope)}</p><select aria-label="选择偏好" data-pref-ray-select>${rays.map(ray=>`<option value="${esc(ray.id)}" ${ray.id===selected.id?'selected':''}>${esc(ray.label)}</option>`).join('')}</select><button class="text-button" data-pref-show-record>修正这条理解</button></aside></div>`;
 };

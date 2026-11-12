@@ -1,5 +1,11 @@
 .preference-page { max-width: 1120px; margin: 0 auto; padding: 36px 40px 72px; overflow-wrap: anywhere; }
+.preference-controls form { display:grid; gap:12px; }
+.preference-controls label { display:grid; gap:6px; }
+.preference-controls textarea { width:100%; min-height:84px; resize:vertical; color:var(--acu-text); background:var(--acu-surface); border:1px solid var(--acu-line); border-radius:6px; padding:10px; font:inherit; }
 .preference-chart-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(220px,300px); gap:24px; align-items:center; }
+.preference-chart-tools { display:flex; justify-content:flex-end; gap:8px; }
+.preference-chart-tools button { width:36px; height:36px; font-size:22px; }
+.preference-chart-viewport { overflow:hidden; }
 .preference-chart-viewport { aspect-ratio:1; width:100%; min-width:0; color:var(--acu-text); }
 .preference-chart-viewport svg { width:100%; height:100%; }
 .preference-chart-viewport [role=button] { cursor:pointer; }

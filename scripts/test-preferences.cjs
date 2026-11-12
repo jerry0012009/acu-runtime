@@ -11,7 +11,7 @@ let account = { loggedIn: true, identity: 'fixture-one', username: '偏好预览
 let mode = 'normal', delay = false, reads = 0, writes = [];
 const summary = '面向终端用户交付软件或浏览器扩展时，以可直接安装、可分发和真实启动验证作为主要验收标准；已明确授权的插件试用应默认具备指定核心能力与可用接入配置。';
 const fixtures = {
- controls: {records:[]},
+ controls: {records:[{id:'11111111-1111-4111-8111-111111111111',summary:'先结论再说明',rule:'先结论；法律文书保留完整论证。',scope:'工作报告',exceptions:'法律文书',revision:'a'.repeat(64),disabled:false}]},
  profile: { status: 'error', generatedAt: '2026-11-12T12:51:00Z', profile: { summary: '注重可核验的交付、清晰的依据与直接可用的结果。', rays: [{ id: 'hidden-ray', label: '直接安装使用', category: '交付与核验', summary, scope: '面向用户的交付', sourceIds: ['hidden-source', 'missing-source'] }, {id:'initialized',label:'简洁与详尽',summary:'按任务保留合适的细节。',category:'表达',scope:'报告',sourceIds:[],bipolar:{origin:'authorized_initialization'}}] } },
  library: { version: 1, records: [{ id: 'hidden-source', summary }, {id:'english',summary:'LongEnglishText'.repeat(50)+' <script>unsafe()</script>'}] },
  activity: { version: 1, partial: true, moreAvailable: true, events: [{ runId: 'hidden-run', trigger: 'explicit_user_preference', recordedAt: '2026-11-12T12:00:00Z', changes: [{ kind:'updated', before: '交付应可安装。', after: summary }, {kind:'updated',before:'unchanged',after:'unchanged'}] }] },
@@ -20,7 +20,10 @@ const fixtures = {
 const server = http.createServer(async (req,res) => {
  const url = new URL(req.url, 'http://localhost');
  const json = data => {res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));};
- if(req.method !== 'GET') { writes.push(url.pathname); if(url.pathname === '/runtime/account/logout') account = {}; return json({ok:true}); }
+ if(req.method !== 'GET') {
+  if(url.pathname.startsWith('/runtime/preferences/controls/')) {let body='';for await(const chunk of req)body+=chunk;const change=JSON.parse(body);assert.equal(change.expected_hash,'a'.repeat(64));assert.equal(change.rule,'先给决策，再说明原因。');assert.equal(change.exceptions,undefined);assert.equal(change.scope,undefined);fixtures.controls.records[0].rule=change.rule;return json({updated:true});}
+  writes.push(url.pathname); if(url.pathname === '/runtime/account/logout') account = {}; return json({ok:true});
+ }
  if(url.pathname === '/runtime/status') return json({ready:true,desktop:false,agents:[],connection:{choices:[]},account});
  if(url.pathname.startsWith('/runtime/preferences/')) {
   reads++; const name = url.pathname.split('/').pop(); const data = structuredClone(fixtures[name]);
@@ -63,6 +66,21 @@ const server = http.createServer(async (req,res) => {
    const count=reads;await page.locator('button[data-page="overview"]').click();await page.locator('[data-page="preferences"]').click();assert.equal(reads,count,'60 second cache');
    assert.deepEqual(errors,[]);await page.close();
   }
+  const editingPage=await browser.newPage();await editingPage.goto(origin);await editingPage.locator('[data-page="preferences"]').click();
+  const editing=editingPage.locator('[data-pref-record]').first();await editing.locator('summary').click();
+  await editing.locator('[name="rule"]').fill('先给决策，再说明原因。');
+  await editingPage.locator('[data-pref-ray]').last().focus();await editingPage.keyboard.press('Enter');
+  assert.equal(await editing.locator('[name="rule"]').inputValue(),'先给决策，再说明原因。');
+  await editingPage.locator('#preference-search').fill('找不到');
+  await editingPage.locator('#preference-search').fill('');
+  assert.equal(await editing.locator('[name="rule"]').inputValue(),'先给决策，再说明原因。');
+  assert.equal(await editing.locator('[name="exceptions"]').inputValue(),'法律文书');
+  await editing.getByRole('button',{name:'保存修正',exact:true}).click();
+  await editing.getByRole('button',{name:'保存修正',exact:true}).waitFor();
+  const svg=editingPage.getByRole('group',{name:'偏好向量海星图'});const originalView=await svg.getAttribute('viewBox');
+  await editingPage.getByRole('button',{name:'放大图谱',exact:true}).click();assert.notEqual(await svg.getAttribute('viewBox'),originalView);
+  await editingPage.getByRole('button',{name:'缩小图谱',exact:true}).click();assert.equal(await svg.getAttribute('viewBox'),originalView);
+  await editingPage.close();
   for(const nextMode of ['empty','unsupported','error','revoked']) {
    mode=nextMode; const page=await browser.newPage();await page.goto(origin);await page.locator('[data-page="preferences"]').click();
    const text={empty:'暂无可读的偏好记录。',unsupported:'当前服务暂不支持此视图。',error:'读取失败',revoked:'登录后查看我的偏好'}[mode];
@@ -72,7 +90,7 @@ const server = http.createServer(async (req,res) => {
   mode='normal';delay=true;const page=await browser.newPage();await page.goto(origin);await page.locator('[data-page="preferences"]').click();
   await page.waitForTimeout(100);account={...account,identity:'fixture-two',username:'另一账户'};
   // Status polling observes the switch; the old response cannot refill the new session.
-  fixtures.library={version:1,records:[]};fixtures.profile={status:'empty',profile:null};fixtures.activity={version:1,events:[]};
+  fixtures.library={version:1,records:[]};fixtures.profile={status:'empty',profile:null};fixtures.activity={version:1,events:[]};fixtures.controls={records:[]};
   await page.waitForTimeout(6500);assert.equal(await page.getByText(summary,{exact:true}).count(),0);
   await page.locator('[data-pref-logout]').click();await page.getByText('登录后查看我的偏好',{exact:true}).waitFor();assert.deepEqual(writes,['/runtime/account/logout']);
   await page.close();console.log('PASS: 8 theme/viewport layouts, keyboard comparison, sources, search, cache, empty/404/error/revoked, switch and logout.');
