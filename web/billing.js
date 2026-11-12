@@ -52,12 +52,20 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
   async function loadPrices(force = false) {
     if (state.pricesBusy) return;
     state.pricesBusy = true;
+    state.pricesError = '';
     update();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
-      state.prices = await request('/runtime/billing/prices' + (force ? '?refresh=1' : ''));
-      state.pricesError = state.prices.warning || '';
-    } catch (error) { state.pricesError = error.message; }
-    finally { state.pricesBusy = false; update(); }
+      if (!state.prices) {
+        const cached = await request('/runtime/billing/prices?cached=1', { signal: controller.signal });
+        if (Array.isArray(cached.models) && cached.models.length) { state.prices = cached; update('prices'); }
+      }
+      const result = await request('/runtime/billing/prices' + (force ? '?refresh=1' : ''), { signal: controller.signal });
+      if (Array.isArray(result.models) && result.models.length) state.prices = result;
+      state.pricesError = result.warning || (!result.models?.length ? '暂时没有可用的价格数据，请稍后重试。' : '');
+    } catch (error) { state.pricesError = error.name === 'AbortError' ? '获取价格超时，请稍后重试。' : error.message; }
+    finally { clearTimeout(timeout); state.pricesBusy = false; update('prices'); }
   }
 
   function summary() {
@@ -100,20 +108,24 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
   }
 
   function pricesPage() {
+    const rows = priceRows();
     return `<section class="panel billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 标准上下文档 · Judge 评估不另收费</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="input_cny_per_million" ${state.sort === 'input_cny_per_million' ? 'selected' : ''}>输入价格从低到高</option><option value="output_cny_per_million" ${state.sort === 'output_cny_per_million' ? 'selected' : ''}>输出价格从低到高</option></select></label></div>
-      ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? '。当前显示上次价格。' : '')) : ''}${state.pricesBusy && !state.prices ? note('正在获取模型价格…') : ''}
-      <div class="billing-table-scroll"><table><thead><tr><th>模型</th><th>输入</th><th>输出</th><th>缓存读取</th><th>倍率</th><th>计费方式</th></tr></thead><tbody id="billing-price-rows">${priceRows()}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${priceRows() ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">平台参考价用于说明倍率；当前价格不能替代历史账单。最近更新：${esc(date(state.prices?.updatedAt))}</p></section>`;
+      ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}
+      <div class="billing-table-scroll"><table><thead><tr><th>模型</th><th>输入</th><th>输出</th><th>缓存读取</th><th>倍率</th><th>计费方式</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">平台参考价用于说明倍率；当前价格不能替代历史账单。最近更新：${esc(date(state.prices?.updatedAt))}</p></section>`;
   }
 
   function update(source = '') {
     if (ui.page !== 'usage') return;
     if (source === 'account' && state.tab === 'prices') return;
+    if (source === 'prices' && state.tab !== 'prices') return;
     if (state.tab === 'local') {
       const strip = document.getElementById('billing-summary');
       if (strip) strip.innerHTML = summary();
       return;
     }
+    const searchFocused = document.activeElement?.id === 'billing-price-search';
     render();
+    if (searchFocused) document.getElementById('billing-price-search')?.focus();
   }
 
   function render() {
@@ -132,7 +144,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
     syncAccount();
     render();
     if (!state.account) loadAccount();
-    if (state.tab === 'prices' && !state.prices) loadPrices();
+    if (state.tab === 'prices') loadPrices();
   }
 
   function click(event) {
@@ -160,7 +172,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
     state.query = event.target.value;
     const rows = priceRows();
     document.getElementById('billing-price-rows').innerHTML = rows;
-    document.getElementById('billing-price-empty').hidden = !!rows;
+    document.getElementById('billing-price-empty').hidden = !!rows || !state.prices;
   }
   return { open, render, syncAccount, click, change, input };
 };

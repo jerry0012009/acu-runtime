@@ -161,11 +161,11 @@ func TestPriceRefreshFailureRetainsLastSuccessfulCatalog(t *testing.T) {
 		if !strings.Contains(response.Body.String(), "fixture") {
 			t.Fatal("lost cached price")
 		}
-		if strings.Contains(path, "refresh") && !strings.Contains(response.Body.String(), "503") {
+		if strings.Contains(path, "refresh") && !strings.Contains(response.Body.String(), "warning") {
 			t.Fatal("failure not reported")
 		}
 	}
-	if calls != 2 {
+	if calls != 3 {
 		t.Fatal("catalog cache not reused")
 	}
 }

@@ -59,6 +59,9 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 	if err := os.MkdirAll(dataDirectory, 0700); err != nil {
 		return err
 	}
+	host.prices.Lock()
+	host.prices.File = filepath.Join(filepath.Dir(host.accountFile), "model-prices.json")
+	host.prices.Unlock()
 	output, err := os.OpenFile(filepath.Join(dataDirectory, "runtime.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return err

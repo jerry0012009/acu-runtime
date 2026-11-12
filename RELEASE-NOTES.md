@@ -1,3 +1,9 @@
+# ACU Runtime 0.1.58
+
+- 修复模型价格首次加载、重新加载和网络波动时的体验：使用所选官方站点，必要时自动尝试备用官方站点；Windows 复用系统代理设置。
+- 保存最近成功获取的公开价格，重启后先显示缓存再更新；失败保留已有数据，明确更新时间，不把断网误显示为搜索无结果。
+- 刷新请求合并、总网络等待限制为 8 秒；刷新不清空搜索内容，失败后切回价格页可重新获取。
+
 # ACU Runtime 0.1.57
 
 - 修复 Windows ChatGPT / Codex 接入时反复闪退重启：暂停 Runtime 自己的空闲内核后写入配置，实际核验登录身份、配置与模型，再恢复服务。失败或取消恢复原配置，接入/断开/高级模型设置使用同一流程。
@@ -42,9 +48,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.57-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.57-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.57-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.58-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.58-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.58-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

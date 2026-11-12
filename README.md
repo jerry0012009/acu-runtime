@@ -1,6 +1,6 @@
-Current release: **0.1.57** combines animated preference vectors, six-hour preference refresh, Agent-scoped version-aware updates, visible price multipliers, pinned Windows engine migration and default background startup. Startup can be disabled in Settings and stays disabled across relaunches.
+Current release: **0.1.58** fixes model price loading with bounded official-site fallback, Windows system proxy support and persistent last-successful prices. It retains the 0.1.57 routing, preference and update improvements.
 
-# ACU Runtime 0.1.57
+# ACU Runtime 0.1.58
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。
 
@@ -14,9 +14,9 @@ macOS 配置前请先保存并完全退出 ChatGPT / Codex；检测到应用仍�
 
 | 平台 | 安装包 | 安装 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `ACU-Runtime-0.1.57-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
-| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.57-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
-| macOS 12+ Intel | `ACU-Runtime-0.1.57-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
+| Windows 10/11 x64 | `ACU-Runtime-0.1.58-windows-amd64-Setup.exe` | 双击安装到当前用户目录，开始菜单打开；无需管理员权限 |
+| macOS 12+ Apple Silicon | `ACU-Runtime-0.1.58-macos-arm64.dmg` | 将 ACU Runtime 拖入 Applications |
+| macOS 12+ Intel | `ACU-Runtime-0.1.58-macos-amd64.dmg` | 将 ACU Runtime 拖入 Applications |
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 

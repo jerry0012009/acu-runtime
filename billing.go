@@ -6,35 +6,10 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 	"time"
 )
 
 const billingSite = "https://console.acucompute.com"
-
-type priceCache struct {
-	sync.Mutex
-	Models  json.RawMessage
-	Updated int64
-}
-
-func (host *server) modelPrices(response http.ResponseWriter, request *http.Request) {
-	host.prices.Lock()
-	defer host.prices.Unlock()
-	var failure string
-	if host.prices.Models == nil || time.Now().Unix()-host.prices.Updated >= 300 || request.URL.Query().Get("refresh") == "1" {
-		var models json.RawMessage
-		if err := host.cloudJSON(request.Context(), http.MethodGet, billingSite+"/api/pricing", "", &models); err != nil {
-			failure = err.Error()
-		} else if len(models) == 0 || models[0] != '[' {
-			failure = "模型价格数据格式无效，请稍后刷新。"
-		} else {
-			host.prices.Models, host.prices.Updated = models, time.Now().Unix()
-		}
-	}
-	response.Header().Set("Cache-Control", "no-store")
-	host.json(response, 200, map[string]any{"models": host.prices.Models, "updatedAt": host.prices.Updated, "warning": failure})
-}
 
 type billingLog struct {
 	ID           int             `json:"id"`
