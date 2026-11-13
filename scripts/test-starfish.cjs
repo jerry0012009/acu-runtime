@@ -45,7 +45,7 @@ const server=http.createServer((req,res)=>{
   mode='ordinary';count=3;const cached=await browser.newPage();await cached.clock.install();await cached.goto(origin);await cached.locator('[data-page="preferences"]').click();await cached.locator('.starfish-svg').waitFor();const cachedReads=reads;
   await cached.clock.fastForward(5*60*60*1000);assert.equal(reads,cachedReads,'five hours must not refresh preference data');
   await cached.clock.fastForward(60*60*1000+100);await cached.waitForFunction(()=>!document.querySelector('[data-pref-refresh]').disabled);assert(reads>cachedReads,'six hours must refresh the visible preference page');await cached.close();
-  mode='ordinary';status='error';count=3;const savedError=await open();assert.equal(await savedError.locator('.starfish-arrow').count(),3);await savedError.getByText('图谱生成失败；如有已保存内容，仍在下方展示。',{exact:true}).waitFor();await savedError.close();status='ready';
+  mode='ordinary';status='error';count=3;const savedError=await open();assert.equal(await savedError.locator('.starfish-arrow').count(),3);await savedError.locator('.preference-catalog > summary').first().click();await savedError.getByText('图谱生成失败；如有已保存内容，仍在下方展示。',{exact:true}).waitFor();await savedError.close();status='ready';
   mode='unknown';count=3;const unknown=await open();await unknown.getByText('当前图谱版本或向量数据暂不兼容，已保留下方可读偏好记录。',{exact:true}).waitFor();assert.equal(await unknown.locator('.starfish-svg').count(),0);await unknown.close();
   console.log('PASS: ordinary 0/1/3/100, complete 192 bipolar axes, arrow alignment, hover/pin/keyboard/domain/source linkage, zoom, actual themes, narrow layout, animation and reduced motion; 8 screenshots.');
  }finally{await browser.close();server.close();}

@@ -17,6 +17,9 @@ const fixtures = {
  activity: { version: 1, partial: true, moreAvailable: true, events: [{ runId: 'hidden-run', trigger: 'explicit_user_preference', recordedAt: '2026-11-12T12:00:00Z', changes: [{ kind:'updated', before: '交付应可安装。', after: summary }, {kind:'updated',before:'unchanged',after:'unchanged'}] }] },
  settings: {globalEnabled:true,learningEnabled:false,injectionEnabled:false},
 };
+fixtures.profile.profile.highlights = [{title:'接入省事，保留选择',summary:'尽可能一键接入，同时保留必要授权和内部选模。',sourceIds:['hidden-source'],evidence:[{sourceId:'hidden-source',quote:'面向终端用户'}]}];
+if (process.env.ACU_REAL_PROFILE) fixtures.profile.profile.highlights = JSON.parse(fs.readFileSync(process.env.ACU_REAL_PROFILE,'utf8')).highlights;
+const firstHighlight = fixtures.profile.profile.highlights[0].title;
 const server = http.createServer(async (req,res) => {
  const url = new URL(req.url, 'http://localhost');
  const json = data => {res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));};
@@ -48,7 +51,13 @@ const server = http.createServer(async (req,res) => {
   for(const theme of ['light','dark']) for(const width of [320,390,768,1440]) {
    const page=await browser.newPage({viewport:{width,height:1000},colorScheme:theme});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
-   await page.goto(origin);await page.locator('[data-page="preferences"]').click();await page.getByText('摘要更新',{exact:true}).waitFor();
+   await page.goto(origin);await page.locator('[data-page="preferences"]').click();await page.getByText(firstHighlight,{exact:true}).waitFor();
+   assert.equal(await page.locator('.preference-understanding').innerText().then(text=>text.length<420),true);
+   assert.equal(await page.locator('.preference-catalog[open]').count(),0);
+   assert.equal(await page.getByText('摘要更新',{exact:true}).isVisible(),false);
+   await page.screenshot({path:path.join(output,`preferences-first-${theme}-${width}.png`),fullPage:true});
+   await page.locator('.preference-secondary > summary').filter({hasText:'探索偏好图谱'}).click();
+   await page.locator('.preference-secondary > summary').filter({hasText:'近期变化'}).click();
    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,`overflow ${width} ${theme}`);
    assert.equal(await page.getByText('unchanged',{exact:true}).count(),0);
    assert.equal(await page.locator('.starfish-ray-list button').count(),2);
@@ -68,6 +77,9 @@ const server = http.createServer(async (req,res) => {
    assert.deepEqual(errors,[]);await page.close();
   }
   const editingPage=await browser.newPage();await editingPage.goto(origin);await editingPage.locator('[data-page="preferences"]').click();
+  await editingPage.getByText(firstHighlight,{exact:true}).waitFor();
+  await editingPage.locator('.preference-secondary > summary').filter({hasText:'管理偏好'}).click();
+  await editingPage.locator('.preference-secondary > summary').filter({hasText:'探索偏好图谱'}).click();
   const editing=editingPage.locator('[data-pref-record]').first();await editing.locator('summary').click();
   await editing.locator('[name="rule"]').fill('先给决策，再说明原因。');
   await editingPage.locator('svg [data-star-ray]').last().focus();await editingPage.keyboard.press('Enter');
@@ -87,7 +99,7 @@ const server = http.createServer(async (req,res) => {
    const text={empty:'暂无可读的偏好记录。',unsupported:'当前服务暂不支持此视图。',error:'读取失败',revoked:'登录后查看我的偏好'}[mode];
    await page.getByText(text,{exact:false}).first().waitFor();assert.equal(await page.getByText(summary,{exact:true}).count(),0);await page.close();
   }
-  mode='renewing';const retryPage=await browser.newPage();await retryPage.goto(origin);await retryPage.locator('[data-page="preferences"]').click();await retryPage.getByText('正在续期官网登录，请稍后重试。',{exact:false}).first().waitFor();mode='normal';await retryPage.getByText('摘要更新',{exact:true}).waitFor({timeout:10000});await retryPage.close();
+  mode='renewing';const retryPage=await browser.newPage();await retryPage.goto(origin);await retryPage.locator('[data-page="preferences"]').click();await retryPage.getByText('正在续期官网登录，请稍后重试。',{exact:false}).first().waitFor();mode='normal';await retryPage.getByText(firstHighlight,{exact:true}).waitFor({timeout:10000});await retryPage.close();
   mode='normal';delay=true;const page=await browser.newPage();await page.goto(origin);await page.locator('[data-page="preferences"]').click();
   await page.waitForTimeout(100);account={...account,identity:'fixture-two',username:'另一账户'};
   // Status polling observes the switch; the old response cannot refill the new session.

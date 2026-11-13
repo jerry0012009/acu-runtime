@@ -54,6 +54,11 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const sources = (ray.sourceIds || []).map(id => records.find(record => record.id === id));
     return `<details class="preference-sources"><summary>偏好记录</summary><p class="preference-muted">保存的理解，不是用户原话。</p>${state.errors.library ? note(state.errors.library) : sources.length ? sources.map(record => record?.summary ? `<p>${esc(record.summary)}</p>` : note('此条偏好记录暂不可用。')).join('') : note('暂无可读的偏好记录。')}</details>`;
   }
+  function understanding(profile) {
+    const items = (profile?.profile?.highlights || []).slice(0, 5);
+    if (!items.length) return `<section class="preference-understanding"><h2>已记住的偏好</h2><p>${esc(profile?.profile?.summary || '暂无已整理的偏好。')}</p></section>`;
+    return `<section class="preference-understanding" aria-label="已记住的偏好"><h2>已记住的偏好</h2><div class="preference-highlights">${items.map(item => `<article><h3>${esc(item.title)}</h3><p>${esc(item.summary)}</p><details><summary>相关记录</summary>${(item.sourceIds || []).map(id => { const record = state.data.library?.records?.find(record => record.id === id); return `<p>${esc(record?.summary || '相关记录暂不可用。')}</p>`; }).join('')}</details></article>`).join('')}</div></section>`;
+  }
   function content() {
     const account = ui.status?.account;
     if (!account?.loggedIn || state.revoked) return `<section class="panel preference-empty"><h2>登录后查看我的偏好</h2>${note(state.errors.session || account?.error || '使用 ACU 官网账号查看个人记录。API Key 连接仍可在工作台使用。')}<button class="button primary" data-action="account-login" ${account?.pending || !ui.status?.desktop ? 'disabled' : ''}>${account?.pending ? '登录中…' : '登录 ACU'}</button><p class="preference-muted">登录和查看页面不会开启学习或自动参考。</p></section>`;
@@ -96,10 +101,16 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const selection=focusedRecord ? [focused.selectionStart,focused.selectionEnd] : null;
     const active = document.activeElement?.id === 'preference-search';
     const caret = active ? document.activeElement.selectionStart : null;
-    const opened = new Set([...(app.querySelectorAll?.('details') || [])].filter(detail=>detail.open).map(detail=>detail.querySelector('summary')?.textContent));
-    app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1><p>查看已保存的理解，核对近期摘要变化。</p></header>${content()}</main></div>`;
+    const opened = new Set([...(app.querySelectorAll?.('details') || [])].filter(detail=>detail.open && !detail.dataset.autoEmpty).map(detail=>detail.querySelector('summary')?.textContent));
+    app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1></header>${content()}</main></div>`;
     const chart = app.querySelector('.starfish-panel');
-    // Keep the graph primary; long catalogs remain available without repeating every record on first view.
+    const page = app.querySelector('.preference-page');
+    if (ui.status?.account?.loggedIn && !state.revoked && state.data.profile?.profile?.highlights?.length) {
+      const overview = document.createElement('div');
+      overview.innerHTML = understanding(state.data.profile);
+      page.querySelector('header').after(overview);
+    }
+    // The complete catalog stays available; the first screen is a bounded, grounded selection.
     for (const id of ['pref-overview', 'pref-records']) {
       const section = app.querySelector(`#${id}`)?.closest('section');
       if (!section) continue;
@@ -108,7 +119,9 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       const heading = document.createElement('summary');
       heading.textContent = id === 'pref-overview' ? '全部偏好与来源' : '保存的偏好记录';
       section.before(disclosure); disclosure.append(heading, section);
-      disclosure.open = opened.has(heading.textContent) || Boolean(state.query) || !(state.data.profile?.profile?.rays?.length);
+      const empty = !state.busy && state.data.profile && !state.data.profile.profile?.rays?.length;
+      disclosure.open = opened.has(heading.textContent) || Boolean(state.query) || empty;
+      if (empty) disclosure.dataset.autoEmpty = 'true';
     }
     const management = document.createElement('section');
     const selectedRay = state.data.profile?.profile?.rays?.find(ray=>ray.id===state.selected);
@@ -120,7 +133,23 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     }).join('')}`;
     app.querySelector('.preference-page')?.append(management);
     const activity = app.querySelector('#pref-activity')?.closest('section');
-    if (activity && chart) chart.after(activity);
+    for (const [section, label] of [[state.data.profile?.profile?.highlights?.length ? chart : null, '探索偏好图谱'], [activity, '近期变化'], [management, '管理偏好']]) {
+      if (!section) continue;
+      const disclosure = document.createElement('details');
+      disclosure.className = 'preference-secondary';
+      const heading = document.createElement('summary');
+      heading.textContent = label;
+      section.before(disclosure); disclosure.append(heading, section);
+      disclosure.open = opened.has(label) || Boolean(state.query);
+    }
+    if (activity) {
+      // Identical visible changes are one reading item, not multiple learning achievements.
+      const seen = new Set();
+      for (const item of activity.querySelectorAll('.preference-change')) {
+        const key = item.textContent.replace(/明确偏好|反馈学习|偏好学习/g, '').trim();
+        if (seen.has(key)) item.remove(); else seen.add(key);
+      }
+    }
     management.addEventListener('submit', event=>{event.preventDefault(); const record=state.data.controls?.records?.find(record=>record.id===event.target.dataset.prefEdit); if(record) {const draft=drafts.get(record.id) || record;const patch={};for(const key of ['summary','scope','rule','exceptions'])if((draft[key]||'')!==(draft.original?.[key]??record[key]??''))patch[key]=draft[key]||'';changePreference({...record,revision:draft.revision},'edit',patch);}});
     for (const detail of [...(app.querySelectorAll?.('details') || [])]) if (opened.has(detail.querySelector('summary')?.textContent)) detail.open = true;
     if (active) { const input = app.querySelector('#preference-search'); input?.focus(); if (caret !== null) input?.setSelectionRange?.(caret, caret); }

@@ -1,4 +1,4 @@
-Current release: **0.1.58** fixes model price loading with bounded official-site fallback, Windows system proxy support and persistent last-successful prices. It retains the 0.1.57 routing, preference and update improvements.
+Current release: **0.1.59** adds a concise, source-grounded preference overview when supplied by ACU. Full records, recent changes and management remain available on demand. It retains the 0.1.58 price-loading fixes.
 
 # ACU Runtime 0.1.58
 

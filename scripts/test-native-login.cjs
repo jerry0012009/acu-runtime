@@ -78,6 +78,7 @@ async function run() {
     assert.equal(login.isClosed(), false, 'login WebView must remain available for silent renewal');
     assert.equal((await call('/runtime/status')).account.selected, 9, 'renewal must preserve the user-selected Key');
     await page.locator('[data-page="preferences"]').click().catch(async error => {console.error('Native modal:', await page.locator('#overlay').innerText());throw error;});
+    await page.locator('.preference-secondary > summary').filter({hasText:'近期变化'}).click();
     await page.getByText('摘要更新', { exact: true }).waitFor().catch(async error => { console.error('Native preference view:', (await page.locator('body').innerText()).slice(-4000)); throw error; });
     await page.locator('.preference-change summary').focus();
     await page.keyboard.press('Enter');

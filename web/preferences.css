@@ -1,4 +1,14 @@
 .preference-page { max-width: 1120px; margin: 0 auto; padding: 36px 40px 72px; overflow-wrap: anywhere; }
+.preference-understanding { margin: 20px 0 28px; }
+.preference-highlights { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 28px; }
+.preference-highlights article { min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--acu-line); }
+.preference-highlights article p { line-height: 1.65; }
+.preference-highlights details { font-size: 13px; color: var(--muted); }
+.preference-highlights details summary { padding: 5px 0; font-weight: 400; }
+.preference-secondary { border-bottom: 1px solid var(--acu-line); margin: 12px 0; }
+.preference-secondary > summary { font-size: 15px; }
+.preference-secondary .preference-controls > summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media(max-width:700px) { .preference-highlights { grid-template-columns: minmax(0,1fr); } }
 .preference-controls form { display:grid; gap:12px; }
 .preference-controls label { display:grid; gap:6px; }
 .preference-controls textarea { width:100%; min-height:84px; resize:vertical; color:var(--acu-text); background:var(--acu-surface); border:1px solid var(--acu-line); border-radius:6px; padding:10px; font:inherit; }
