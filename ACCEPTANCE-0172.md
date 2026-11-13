@@ -1,4 +1,4 @@
-# Runtime 0.1.71 Kernel Update
+# Runtime 0.1.72 Kernel Update
 
 ## Package
 
@@ -39,3 +39,8 @@ production restart. Windows ARM64 digest is maintained but no Windows ARM64
 Runtime installer is offered or claimed tested.
 
 Evidence: /tmp/acu-kernel-4096; native UI screenshots under browser/output.
+
+Unpublished 0.1.71 workflow 43522864538 passed both Mac platforms and Windows
+native/installer upgrade checks, but its new version-check fixture read UTF-8
+source using Windows cp1252. 0.1.72 explicitly decodes that source as UTF-8;
+the failed tag remains traceable and was never publicly released.

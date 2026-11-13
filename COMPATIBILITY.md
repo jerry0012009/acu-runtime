@@ -1,10 +1,10 @@
-## Runtime 0.1.71 / Magpie 0.1.4096
+## Runtime 0.1.72 / Magpie 0.1.4096
 
 Current paired kernel is official v0.1.4096. Runtime preserves the native login
 policy rather than forcing API-only mode; historical auth.json does not require
 account/read to return an account. ACU display branding changes only provider
 name, not ID. Native MCP definitions remain native stdio servers. See
-ACCEPTANCE-0171.md and the release workflow for current platform evidence.
+ACCEPTANCE-0172.md and the release workflow for current platform evidence.
 Windows upgrade acceptance starts with Runtime 0.1.70 / Magpie 0.1.3940 and
 checks both the new serving version and configuration/auth preservation.
 

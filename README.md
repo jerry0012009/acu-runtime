@@ -1,4 +1,4 @@
-Current release: **0.1.71** bundles the official Magpie v0.1.4096 CLI kernel with pinned SHA-256 digests. Includes native Codex compatibility, ACU display branding, shared image/search tools and configuration-preserving upgrades from 0.1.70.
+Current release: **0.1.72** bundles the official Magpie v0.1.4096 CLI kernel with pinned SHA-256 digests. Includes native Codex compatibility, ACU display branding, shared image/search tools and configuration-preserving upgrades from 0.1.70.
 
 # ACU Runtime 0.1.58
 

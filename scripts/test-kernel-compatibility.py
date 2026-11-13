@@ -122,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             processes.append(subprocess.Popen([kernel, "web", "--addr", origin.split("//")[1], "--no-open"],
                 env=env, stdout=log, stderr=log, **flags))
             wait(origin + "/?k=" + env["MAGPIE_WEB_KEY"])
-            expected_kernel = re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text())[1]
+            expected_kernel = re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text(encoding="utf-8"))[1]
             actual_kernel = json.loads(wait("http://" + env["MAGPIE_ADDR"] + "/"))["version"]
             assert actual_kernel == expected_kernel, (actual_kernel, expected_kernel)
             models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08"]
