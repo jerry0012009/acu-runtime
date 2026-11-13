@@ -33,6 +33,7 @@ async function until(check, timeout = 60000) {
 async function run() {
   let browser;
   let page;
+  const pageErrors = [];
   let refreshes = 0;
   try {
     await until(async () => {
@@ -56,7 +57,11 @@ async function run() {
       }
       await route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><title>隔离登录测试</title><button id="fixture-login" onclick="history.pushState({},\'\',\'/dashboard\');this.remove()">登录隔离测试账号</button>' });
     });
-    page = await until(() => context.pages().find(candidate => candidate.url().startsWith('http://127.0.0.1:') && !candidate.url().includes('/panel')));
+    page = await until(() => context.pages().find(candidate => {
+      const url = new URL(candidate.url());
+      return url.hostname === '127.0.0.1' && url.pathname === '/' && url.searchParams.get('page') === 'overview';
+    }));
+    page.on('pageerror', error => pageErrors.push(error.message));
     await page.waitForSelector('meta[name="acu-token"]', { state: 'attached' });
     const call = (endpoint, input) => page.evaluate(async ({ endpoint, input }) => {
       const token = document.querySelector('meta[name="acu-token"]').content;
@@ -103,6 +108,15 @@ async function run() {
     process.stdout.write(output);
     assert.equal(exitCode, 0, 'native Go assertions failed');
     process.stdout.write('PASS: native login, Key switching, transient refresh failure, access expiry, silent recovery and preference comparison.\n');
+  } catch (error) {
+    console.error('Native main page:', page?.url(), 'script errors:', pageErrors);
+    if (page && !page.isClosed()) {
+      console.error('Native main body:', (await page.locator('body').innerText().catch(() => '')).slice(0, 6000));
+      const output = path.join(root, 'output/runtime-preferences');
+      fs.mkdirSync(output, { recursive: true });
+      await page.screenshot({ path: path.join(output, 'native-login-failure.png'), fullPage: true }).catch(() => {});
+    }
+    throw error;
   } finally {
     if (native.exitCode === null) {
       try {
