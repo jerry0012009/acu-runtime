@@ -631,7 +631,7 @@ test('WorkBuddy one-click setup exposes Fable 5.1 and preserves active legacy an
   await instance.run('confirmSetup()');
   const visibility = posts(instance).find(call=>call.route==='/kernel/api/agent-models/workbuddy');
   assert(visibility);
-  assert.deepEqual(JSON.parse(visibility.body), {hidden:['acu-runtime/claude-fable-5']});
+  assert.deepEqual(JSON.parse(visibility.body), {hidden:[]});
   catalog.models[2].inUse=true;
   await instance.run('applyRecommendedVisibility("workbuddy","acu-runtime","acu-auto")');
   assert.deepEqual(JSON.parse(posts(instance).at(-1).body), {hidden:[]});

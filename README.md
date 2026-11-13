@@ -1,4 +1,4 @@
-Current release: **0.1.66** recommends Fable 5.1 (`claude-fable-5-1`) instead of Fable 5. One-click configuration exposes the new recommendation while retaining active legacy models and explicit selections. `acu-auto` remains the general default; ChatGPT desktop updates stay in the application.
+Current release: **0.1.67** uses native Magpie model capabilities, MCP tools, keyless search and provider checks. ACU tool names remain visible, setup no longer hides nonrecommended models, and existing choices are preserved. Includes the Fable 5.1 recommendation and native ChatGPT/Codex update policy.
 
 # ACU Runtime 0.1.58
 

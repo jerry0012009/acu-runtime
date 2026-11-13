@@ -151,14 +151,30 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             token = re.search(r'name="acu-token" content="([^"]+)"', html)[1]
             status = request(rt + "/runtime/status")
             assert status["ready"] and len([a for a in status["agents"] if a["connected"]]) == 4
+            for name, kind in (("acu-vision", "vision"), ("acu-image", "image")):
+                request(origin + "/api/library/servers/save", {"old":"", "server":{
+                    "name":name, "transport":"http", "url":"http://127.0.0.1:3425/mcp/magpie/"+kind,
+                    "note":"ACU Runtime recommended tools v1", "agents":["codex"], "local":True,
+                    "startupTimeout":73, "disabledTools":["generate_video"] if kind == "image" else []}})
+            request(origin + "/api/library/servers/save", {"old":"", "server":{
+                "name":"acu-free-search", "transport":"stdio", "command":"old-fixture-uvx",
+                "args":["--from", "duckduckgo-mcp-server[browser]==0.7.0", "duckduckgo-mcp-server"],
+                "note":"ACU Runtime recommended tools v1", "agents":["hermes"], "local":True}})
             body = {"provider": "acu-runtime", "agents": ids}
             applied = request(rt + "/runtime/capabilities", body, token)
             repeated = request(rt + "/runtime/capabilities", body, token)
             owned = [s for s in request(origin + "/api/library")["servers"]
                      if s.get("note") == "ACU Runtime recommended tools v1"]
+            legacy = next(s for s in owned if s["name"] == "acu-free-search")
+            assert not legacy.get("agents"), legacy
+            owned = [s for s in owned if s["name"] != "acu-free-search"]
             assert {s["name"] for s in owned} == {"acu-image", "acu-vision", "acu-search"}, owned
             for tool in owned:
                 assert set(tool["agents"]) == set(ids), tool
+                if tool["name"] in ("acu-vision", "acu-image"):
+                    assert tool["startupTimeout"] == 73 and tool["local"], tool
+                if tool["name"] == "acu-image":
+                    assert tool["disabledTools"] == ["generate_video"], tool
             assert repeated["vision"] == "acu-runtime/gpt-6.1-sol" or repeated["visionAuto"], repeated
             assert repeated["imageGen"] == "" and repeated["imageGenAuto"], repeated
             assert repeated["searchReady"]
@@ -191,7 +207,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                                  "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"]}[tool["name"]]:
                     assert expected in data, (tool["name"], data[:500])
             print(json.dumps({"runtime": status["version"], "fourAgentsConfigured": True,
-                "kernelPolicyCLI": True, "repeatNoDuplicates": True, "existingMCPPreserved": True,
+                "kernelPolicyCLI": True, "repeatNoDuplicates": True, "existingMCPPreserved": True, "legacyMigration": True,
                 "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True,
                 "freshCodexUsesAPIWithoutChatGPTAccount": True}))
         except Exception:

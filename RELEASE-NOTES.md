@@ -1,4 +1,12 @@
-# ACU Runtime 0.1.66
+# ACU Runtime 0.1.67
+
+识图、生图与搜索直接使用内核原生工具，应用内名称为 `acu-vision`、`acu-image`、`acu-search`。无需额外下载 Python、uv 或搜索插件。
+
+模型能力与候选使用内核目录，不为单个型号写视觉特判，不因 Runtime 本地 profile 缺失限制识图。识图与生图支持内核自动选择，也可随时切换模型。
+
+Key 检查与模型刷新沿用内核原生流程，移除额外的后台连通性轮询。一键配置只补充显示推荐模型，不再自动隐藏其他 ACU 模型。旧工具迁移保留用户配置、自定义工具与已有分配；接入弹窗进一步精简。
+
+## 保留 0.1.66 的 Fable 推荐更新
 
 推荐模型中的 Fable 升级为 Fable 5.1（`claude-fable-5-1`）。一键配置、各 Agent 推荐选项和 WorkBuddy 推荐模型列表使用同一份清单，不再把 Fable 5.1 隐藏、只推荐旧 Fable 5。
 
@@ -82,9 +90,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.66-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.66-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.66-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.67-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.67-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.67-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
