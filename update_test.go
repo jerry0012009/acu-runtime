@@ -5,13 +5,67 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
+
+type updateDownloadTransport struct {
+	t          *testing.T
+	content    string
+	calls      []string
+	failMirror bool
+}
+
+func (transport *updateDownloadTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	transport.calls = append(transport.calls, request.URL.Host)
+	deadline, ok := request.Context().Deadline()
+	if !ok {
+		transport.t.Fatal("download must be bounded")
+	}
+	remaining := time.Until(deadline)
+	if request.URL.Host == "github.com" {
+		if remaining > time.Minute {
+			transport.t.Fatal("blocked direct downloads must fall back promptly")
+		}
+	} else if remaining < 4*time.Minute {
+		transport.t.Fatal("healthy mirror download must not be limited to 45 seconds")
+	}
+	body := transport.content
+	if transport.failMirror && request.URL.Host == "gh-proxy.com" {
+		body = "corrupted mirror installer"
+	}
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)),
+		Header: make(http.Header), ContentLength: int64(len(body)), Request: request}, nil
+}
+
+func TestUpdatePrefersAcceleratedDownloadAndFallsBackOnDigestMismatch(t *testing.T) {
+	for _, failMirror := range []bool{false, true} {
+		t.Run(fmt.Sprint("corrupt=", failMirror), func(t *testing.T) {
+			content := "official installer bytes"
+			digest := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
+			transport := &updateDownloadTransport{t: t, content: content, failMirror: failMirror}
+			client := &http.Client{Transport: transport}
+			url := updateRepository + "/releases/download/v0.1.99/ACU-Runtime-0.1.99-windows-amd64-Setup.exe"
+			target := filepath.Join(t.TempDir(), "setup.exe")
+			if err := downloadUpdatePackage(context.Background(), client, updateDownloadSources(url), target, digest, nil); err != nil {
+				t.Fatal(err)
+			}
+			want := "gh-proxy.com"
+			if failMirror {
+				want += ",github.com"
+			}
+			if strings.Join(transport.calls, ",") != want || !verifyKernel(target, digest) {
+				t.Fatalf("download source order or verified output incorrect: %v", transport.calls)
+			}
+		})
+	}
+}
 
 func TestUpdateFallbackChecksAndVerifiesDownloads(t *testing.T) {
 	content := []byte("verified installer payload")

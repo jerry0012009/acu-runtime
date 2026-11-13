@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.62
+# ACU Runtime 0.1.63
+
+Windows 应用内更新优先通过 gh-proxy.com 下载官方发布安装包，失败后自动尝试 GitHub 原址及 ghfast.top。镜像下载保留五分钟完整下载时间，不再因首条线路 45 秒限制而中断正常下载。版本信息仍优先读取 GitHub 官方发布记录；安装前继续校验发布记录中的 SHA-256，不传输 ACU Key 或账户会话。
+
+官网 Windows、Apple Silicon 和 Intel Mac 下载同步优先使用加速线路，并保留 GitHub 原址入口。macOS 仍需下载新版替换应用。旧客户端需要先升级到本版，后续更新才能优先使用加速线路。
+
+## 保留 0.1.62 的学习设置和价格展示
 
 偏好向量图下方直接展示学习设置，可独立开关偏好学习、任务观察、建议和偏好参考，也可一键总开关、调整观察间隔或恢复默认。与网页端使用同一套账户配置，修改即时保存。
 
@@ -60,9 +66,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.58-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.58-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.58-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.63-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.63-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.63-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

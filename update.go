@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.62"
+const appVersion = "0.1.63"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
@@ -109,13 +109,13 @@ func checkUpdateWithFallback(ctx context.Context, client *http.Client, endpoints
 
 func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []string, target, digest string, progress func(int64, int64)) error {
 	var err error
-	for index, source := range sources {
+	for _, source := range sources {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Switch away from a blocked or very slow direct connection promptly.
+		// A healthy mirror needs enough time for a full installer on slower links.
 		timeout := 5 * time.Minute
-		if index == 0 {
+		if strings.HasPrefix(source, updateRepository+"/") {
 			timeout = 45 * time.Second
 		}
 		attempt, cancel := context.WithTimeout(ctx, timeout)
@@ -129,6 +129,10 @@ func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []s
 		}
 	}
 	return err
+}
+
+func updateDownloadSources(officialURL string) []string {
+	return []string{"https://gh-proxy.com/" + officialURL, officialURL, "https://ghfast.top/" + officialURL}
 }
 
 func updateProxy(request *http.Request) (*url.URL, error) {
@@ -320,7 +324,7 @@ func (host *server) downloadUpdate(ctx context.Context, release *updateRelease) 
 		}
 	}()
 	installer := filepath.Join(directory, "ACU Runtime Setup.exe")
-	err = downloadUpdatePackage(ctx, updateClient(6*time.Minute), []string{release.URL, "https://gh-proxy.com/" + release.URL, "https://ghfast.top/" + release.URL}, installer, release.SHA256, func(done, total int64) {
+	err = downloadUpdatePackage(ctx, updateClient(6*time.Minute), updateDownloadSources(release.URL), installer, release.SHA256, func(done, total int64) {
 		host.update.mu.Lock()
 		host.update.view.Downloaded = done
 		host.update.view.Total = total
