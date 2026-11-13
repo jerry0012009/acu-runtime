@@ -1,4 +1,4 @@
-Current release: **0.1.67** uses native Magpie model capabilities, MCP tools, keyless search and provider checks. ACU tool names remain visible, setup no longer hides nonrecommended models, and existing choices are preserved. Includes the Fable 5.1 recommendation and native ChatGPT/Codex update policy.
+Current release: **0.1.68** uses native Magpie model capabilities, MCP tools, keyless search and provider checks. ACU tool names remain visible, setup no longer hides nonrecommended models, and existing choices are preserved. Includes the Fable 5.1 recommendation and native ChatGPT/Codex update policy.
 
 # ACU Runtime 0.1.58
 

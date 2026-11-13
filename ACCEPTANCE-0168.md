@@ -1,4 +1,4 @@
-# Runtime 0.1.67 Native Capabilities
+# Runtime 0.1.68 Native Capabilities
 
 ## Behavior
 
@@ -39,6 +39,10 @@
   screenshots: /tmp/acu-native-reuse-browser/output.
 
 ## Release Boundary
+
+Unpublished 0.1.67 pipeline was canceled after finding a missing provider-refresh
+fixture in the Windows native login smoke test. 0.1.68 includes that fixture;
+the canceled tag is retained for traceability and was not a public release.
 
 Only Runtime desktop packages are published. No Router, Console or Private ACU
 application restart, schema or environment change. Three-platform release CI
