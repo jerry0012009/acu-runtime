@@ -54,6 +54,11 @@ const server = http.createServer(async (req,res) => {
    await page.goto(origin);await page.locator('[data-page="preferences"]').click();await page.getByText(firstHighlight,{exact:true}).waitFor();
    assert.equal(await page.locator('.preference-understanding').innerText().then(text=>text.length<420),true);
    assert.equal(await page.locator('.preference-catalog[open]').count(),0);
+   const renderedText = await page.locator('.preference-page').textContent();
+   for (const phrase of ['不是用户原话', '启发式', '并非准确率', '角度仅用于排布', '不代表参考已被实际采纳', '不代表已学习', '不代表没有发生学习', '读取上限', '6 小时内复用', '份来源文档']) assert(!renderedText.includes(phrase), phrase);
+   assert.equal(await page.locator('.starfish-caption').count(),0);
+   assert.equal(await page.locator('.starfish-detail dl').count(),0);
+   assert(await page.getByText('部分更新加载失败，请刷新。',{exact:true}).count());
    assert.equal(await page.getByText('摘要更新',{exact:true}).isVisible(),false);
    await page.screenshot({path:path.join(output,`preferences-first-${theme}-${width}.png`),fullPage:true});
    assert.equal(await page.locator('.starfish-panel').evaluate(node => node.closest('details') === null && node.previousElementSibling.tagName === 'HEADER' && node.getBoundingClientRect().top < innerHeight / 2),true,'graph must be first and never collapsed');

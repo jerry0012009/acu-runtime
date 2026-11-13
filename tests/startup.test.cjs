@@ -274,7 +274,8 @@ test('capability preview reads shared settings without modifying tools or claimi
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route === '/api/settings' ? { body: settings } : undefined);
   await instance.run('configureAgent("codex")');
   const html = instance.elements.overlay.innerHTML;
-  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '已有配置 ≠ 已验证可用', '同时添加 ACU 内核生图 MCP', '暂不提供']) assert(html.includes(phrase), phrase);
+  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '配置状态', '同时添加 ACU 内核生图 MCP', '暂不提供']) assert(html.includes(phrase), phrase);
+  assert(!html.includes('已有配置 ≠ 已验证可用'));
   assert(!html.includes('关闭的搜索'));
   assert(!html.includes('missing/image'));
   assert.equal(posts(instance).length, 0);

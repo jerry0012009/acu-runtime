@@ -1,4 +1,4 @@
-Current release: **0.1.60** keeps the interactive preference vector graph at the top of My Preferences, always expanded. Concise grounded highlights follow the graph; long records, recent changes and management remain available on demand.
+Current release: **0.1.61** removes repetitive explanatory copy from preferences, setup and billing. The interactive preference vector graph stays first and always expanded, followed by concise personal highlights. Necessary status, permission and cost information remains available.
 
 # ACU Runtime 0.1.58
 

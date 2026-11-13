@@ -91,7 +91,7 @@ async function main() {
     await page.screenshot({ path: path.join(workspace,'.build/billing-prices-narrow.png'), fullPage: true });
     await page.getByRole('button', { name: 'ACU 账户', exact: true }).click();
     await page.getByRole('button', { name: '退出账号' }).click();
-    await page.getByRole('heading', { name: '连接 ACU 账户' }).waitFor();
+      await page.getByRole('heading', { name: '登录后查看余额与消费' }).waitFor();
     assert.equal(await page.getByText('¥134.8', { exact: true }).count(), 0);
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
