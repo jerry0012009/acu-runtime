@@ -218,6 +218,10 @@ func (host *server) prepareChatGPT(ctx context.Context, update bool) error {
 		return err
 	}
 	target := filepath.Join(dir, pkg.Name)
+	expected := ""
+	if update && runtime.GOOS == "windows" {
+		expected = host.desktopAgentVersions(ctx)["chatgpt"].Latest
+	}
 	progress := func(done, total int64) {
 		s := &host.agentInstall
 		s.mu.Lock()
@@ -239,8 +243,13 @@ func (host *server) prepareChatGPT(ctx context.Context, update bool) error {
 		}
 	}
 	host.agentInstall.phase("checking", "正在检查 ChatGPT 最新版本和下载线路")
-	if err := prepareLatestChatGPT(ctx, runtime.GOOS, runtime.GOARCH, target, progress, func(message string) { host.agentInstall.phase("downloading", message) }); err != nil {
+	if err := prepareLatestChatGPT(ctx, runtime.GOOS, runtime.GOARCH, target, progress, func(message string) { host.agentInstall.phase("downloading", message) }, expected); err != nil {
 		return err
+	}
+	if expected != "" {
+		if err := requireChatGPTTarget(target, expected); err != nil {
+			return err
+		}
 	}
 	host.agentInstall.phase("checking", "正在验证 ChatGPT 官方签名和应用身份")
 	if err := verifyChatGPTPackage(ctx, target); err != nil {

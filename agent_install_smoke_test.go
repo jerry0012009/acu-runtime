@@ -63,5 +63,17 @@ func TestOfficialChatGPTInstallSmoke(t *testing.T) {
 	if !chatGPTInstalled() {
 		t.Fatal("app registration missing after installation")
 	}
+	if runtime.GOOS == "windows" {
+		target, err := chatGPTPackageVersion(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		host := &server{}
+		installed, err := host.verifyDesktopUpdate(ctx, "chatgpt", target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("registered ChatGPT package verified:", installed.Version)
+	}
 	t.Log("official signed ChatGPT package installed on a clean profile")
 }

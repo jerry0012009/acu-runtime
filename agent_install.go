@@ -25,6 +25,7 @@ type agentInstallView struct {
 	Downloaded int64  `json:"downloaded"`
 	Total      int64  `json:"total"`
 	Update     bool   `json:"update,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 type agentInstallState struct {
@@ -221,6 +222,11 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 	defer func() { s.mu.Lock(); s.running = false; s.mu.Unlock() }()
 	fail := func(err error) { s.phase("error", err.Error()) }
 	if update {
+		defer func() {
+			host.agentVersions.Lock()
+			host.agentVersions.at = time.Time{}
+			host.agentVersions.Unlock()
+		}()
 		key, label := "chatgpt", "ChatGPT"
 		if id == "workbuddy" {
 			key, label = "workbuddy-desktop", "WorkBuddy"
@@ -280,10 +286,19 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 				return
 			}
 		}
-		s.phase("complete", label+" 桌面端已更新，账号与 ACU 接入配置保留。")
-		host.agentVersions.Lock()
-		host.agentVersions.at = time.Time{}
-		host.agentVersions.Unlock()
+		if id == "codex" {
+			verified, err := host.verifyDesktopUpdate(ctx, key, info.Latest)
+			if err != nil {
+				fail(err)
+				return
+			}
+			s.mu.Lock()
+			s.view.Version = verified.Version
+			s.mu.Unlock()
+			s.phase("complete", label+" 已更新至 "+verified.Version)
+		} else {
+			s.phase("complete", label+" 桌面端已更新，账号与 ACU 接入配置保留。")
+		}
 		return
 	}
 

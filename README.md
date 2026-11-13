@@ -1,4 +1,4 @@
-Current release: **0.1.62** adds editable learning controls directly below the preference vector graph, sharing the website's account settings. Model prices show output prices only, with ascending and descending sorting. The graph stays first and always expanded.
+Current release: **0.1.64** verifies ChatGPT update package and installed versions, rejects stale full installers, and separates first installation from per-app update progress. It retains accelerated Runtime downloads, editable learning settings and output-price sorting.
 
 # ACU Runtime 0.1.58
 

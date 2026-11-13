@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestDesktopVersionsCompareActualBuilds(t *testing.T) {
@@ -15,6 +16,36 @@ func TestDesktopVersionsCompareActualBuilds(t *testing.T) {
 		if got := desktopVersionNewer(tc.latest, tc.current); got != tc.want {
 			t.Fatalf("%s vs %s: %v", tc.latest, tc.current, got)
 		}
+	}
+}
+
+func TestDesktopUpdateVerifiesRegistrationAndInvalidatesOldCache(t *testing.T) {
+	for _, tc := range []struct {
+		current   string
+		wantError bool
+	}{
+		{"26.1106.6628.0", true}, {"", true}, {"unknown", true}, {"26.1111.2228.0", false}, {"26.1112.1.0", false},
+	} {
+		t.Run(tc.current, func(t *testing.T) {
+			host := &server{}
+			host.agentVersions.at = time.Now()
+			host.agentVersions.desktop = map[string]desktopVersion{"chatgpt": {Version: "26.1106.6628.0", Update: true}}
+			host.agentVersions.probe = func(context.Context) map[string]string { return map[string]string{"chatgpt": tc.current} }
+			host.agentVersions.latest = func(context.Context, string) (string, error) { return "26.1111.2228.0", nil }
+			got, err := host.verifyDesktopUpdate(context.Background(), "chatgpt", "26.1111.2228.0")
+			if (err != nil) != tc.wantError {
+				t.Fatalf("unexpected validation %v %+v", err, got)
+			}
+			if !host.agentVersions.at.IsZero() {
+				t.Fatal("old cache retained")
+			}
+			if !tc.wantError {
+				fresh := host.desktopAgentVersions(context.Background())["chatgpt"]
+				if fresh.Update || fresh.Version != tc.current {
+					t.Fatalf("stale update offer %+v", fresh)
+				}
+			}
+		})
 	}
 }
 func TestUnconfirmedOrCurrentDesktopHasNoUpdateOffer(t *testing.T) {

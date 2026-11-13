@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -74,6 +75,9 @@ func latestDesktopVersion(ctx context.Context, id string) (string, error) {
 			if !candidate.Downloadable || !validAppxVersion(candidate.Version) || hashErr != nil || len(hash) != 32 || age < -time.Hour || age > 7*24*time.Hour {
 				return "", err
 			}
+			if candidate.CurrentForCodexVersion != nil && !*candidate.CurrentForCodexVersion {
+				return "", fmt.Errorf("镜像安装包尚未同步最新版")
+			}
 			return candidate.Version, nil
 		}
 		if release.Identity != "OpenAI.Codex" || !validAppxVersion(release.Version) {
@@ -137,6 +141,26 @@ func (host *server) desktopAgentVersions(ctx context.Context) map[string]desktop
 	}
 	cache.desktop, cache.at = result, time.Now()
 	return result
+}
+
+func (host *server) verifyDesktopUpdate(ctx context.Context, id, target string) (desktopVersion, error) {
+	cache := &host.agentVersions
+	cache.Lock()
+	probe := cache.probe
+	if probe == nil {
+		probe = installedDesktopVersions
+	}
+	current := probe(ctx)[id]
+	// Re-read the registration, not the pre-install snapshot, on the next UI poll.
+	cache.at = time.Time{}
+	cache.Unlock()
+	if !validAppxVersion(current) || desktopVersionNewer(target, current) {
+		if current == "" {
+			return desktopVersion{}, fmt.Errorf("更新后暂未读到已安装版本，请检查系统安装结果后重新检查更新")
+		}
+		return desktopVersion{}, fmt.Errorf("更新尚未生效：当前版本 %s，目标版本 %s；请检查系统安装结果后重试", current, target)
+	}
+	return desktopVersion{Version: current, Latest: target, Installed: true, Desktop: true}, nil
 }
 
 func (host *server) agentVersionStatus(w http.ResponseWriter, r *http.Request) {

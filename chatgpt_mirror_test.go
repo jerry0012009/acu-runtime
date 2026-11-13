@@ -67,6 +67,15 @@ func TestMirrorPackageRequiresMatchingManifestAndDigest(t *testing.T) {
 	if err := verifyChatGPTDownload(path, choice); err != nil {
 		t.Fatal(err)
 	}
+	if err := requireChatGPTTarget(path, "1.2.3.5"); err == nil || !strings.Contains(err.Error(), "下载包仍为 1.2.3.4") {
+		t.Fatalf("stale complete package accepted: %v", err)
+	}
+	if err := requireChatGPTTarget(path, "1.2.3.4"); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireChatGPTTarget(path, "1.2.3.3"); err != nil {
+		t.Fatal("newer package rejected", err)
+	}
 	choice.Version = "1.2.3.5"
 	if verifyChatGPTDownload(path, choice) == nil {
 		t.Fatal("accepted stale signed-package candidate")
@@ -76,6 +85,51 @@ func TestMirrorPackageRequiresMatchingManifestAndDigest(t *testing.T) {
 	if verifyChatGPTDownload(path, choice) == nil {
 		t.Fatal("accepted corrupt bytes")
 	}
+}
+
+func TestOfficialFullPackageLagIsRejectedBeforeDownload(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		status  int
+		reject  bool
+	}{
+		{"26.1106.6628.0", 200, true}, {"26.1111.2228.0", 200, false}, {"26.1112.1.0", 200, false}, {"", 200, false}, {"invalid", 200, false}, {"26.1106.6628.0", 503, false},
+	} {
+		client := &http.Client{Transport: agentPackageTransport(func(r *http.Request) (*http.Response, error) {
+			if r.Method != "HEAD" {
+				t.Fatal("preflight downloaded full package")
+			}
+			return &http.Response{StatusCode: tc.status, Header: http.Header{"X-Ms-Meta-Package_version": []string{tc.version}}, Body: io.NopCloser(strings.NewReader(""))}, nil
+		})}
+		err := checkChatGPTTargetSource(context.Background(), client, "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-x64.msix", "26.1111.2228.0")
+		if (err != nil) != tc.reject {
+			t.Fatalf("%+v: %v", tc, err)
+		}
+	}
+}
+
+func TestLiveChatGPTUpdatePackageConsistency(t *testing.T) {
+	if os.Getenv("ACU_CHATGPT_METADATA_ACCEPTANCE") != "1" {
+		t.Skip("explicit read-only vendor metadata acceptance")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	client := chatGPTDownloadClient()
+	var release struct {
+		BuildVersion string `json:"buildVersion"`
+	}
+	if err := readChatGPTMetadata(ctx, client, "https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json", &release); err != nil {
+		t.Fatal(err)
+	}
+	if !validAppxVersion(release.BuildVersion) {
+		t.Fatal("invalid vendor target")
+	}
+	// A lag is a valid diagnostic result; it must never be treated as an installed update.
+	if err := checkChatGPTTargetSource(ctx, client, "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-x64.msix", release.BuildVersion); err != nil {
+		t.Log("blocked stale vendor package:", err)
+		return
+	}
+	t.Log("no known package lag in metadata; signed-file and registered-version checks still required")
 }
 
 func TestMirrorRedirectAllowlist(t *testing.T) {

@@ -90,7 +90,7 @@ try {
  if ($existing -and [version]$existing.Version -ge [version]$identity.Version) { exit 0 }
  Add-AppxPackage -Path $PackagePath -ErrorAction Stop
  $p=Get-AppxPackage -Name OpenAI.Codex -ErrorAction Stop
- if (!$p -or $p.Publisher -ne 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B') { exit 3 }
+ if (!$p -or $p.Publisher -ne 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B' -or [version]$p.Version -lt [version]$identity.Version) { exit 3 }
 } catch { exit 1 }
 `
 	if err := os.WriteFile(script, []byte(content), 0600); err != nil {

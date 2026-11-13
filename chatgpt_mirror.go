@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -24,10 +25,11 @@ type chatGPTMirrorRelease struct {
 	Sources     struct {
 		Windows struct {
 			Architectures map[string]struct {
-				Version       string `json:"version"`
-				ContentLength int64  `json:"contentLength"`
-				Downloadable  bool   `json:"downloadable"`
-				Catalog       struct {
+				Version                string `json:"version"`
+				ContentLength          int64  `json:"contentLength"`
+				Downloadable           bool   `json:"downloadable"`
+				CurrentForCodexVersion *bool  `json:"currentForCodexVersion"`
+				Catalog                struct {
 					Hash string `json:"hash"`
 				} `json:"catalog"`
 			} `json:"architectures"`
@@ -119,16 +121,27 @@ func verifyChatGPTDownload(path string, choice chatGPTDownloadChoice) error {
 	if err != nil || hex.EncodeToString(h.Sum(nil)) != choice.SHA256 {
 		return errors.New("镜像文件摘要不符")
 	}
-	z, err := zip.OpenReader(path)
+	version, err := chatGPTPackageVersion(path)
 	if err != nil {
 		return err
+	}
+	if version != choice.Version {
+		return errors.New("镜像安装包版本与最新清单不一致")
+	}
+	return nil
+}
+
+func chatGPTPackageVersion(path string) (string, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return "", err
 	}
 	defer z.Close()
 	for _, f := range z.File {
 		if f.Name == "AppxManifest.xml" {
 			r, e := f.Open()
 			if e != nil {
-				return e
+				return "", e
 			}
 			defer r.Close()
 			var manifest struct {
@@ -137,21 +150,61 @@ func verifyChatGPTDownload(path string, choice chatGPTDownloadChoice) error {
 				} `xml:"Identity"`
 			}
 			if e = xml.NewDecoder(io.LimitReader(r, 1<<20)).Decode(&manifest); e != nil {
-				return e
+				return "", e
 			}
-			if manifest.Identity.Version != choice.Version {
-				return errors.New("镜像安装包版本与最新清单不一致")
+			if !validAppxVersion(manifest.Identity.Version) {
+				return "", errors.New("ChatGPT 安装包版本无效")
 			}
-			return nil
+			return manifest.Identity.Version, nil
 		}
 	}
-	return errors.New("缺少应用清单")
+	return "", errors.New("缺少应用清单")
 }
 
-func prepareLatestChatGPT(ctx context.Context, platform, arch, target string, progress func(int64, int64), phase func(string)) error {
+func requireChatGPTTarget(path, target string) error {
+	version, err := chatGPTPackageVersion(path)
+	if err != nil {
+		return err
+	}
+	if desktopVersionNewer(target, version) {
+		return fmt.Errorf("ChatGPT 新版 %s 已发布，但下载包仍为 %s；请在 ChatGPT 内检查更新，或等待安装包同步后重试", target, version)
+	}
+	return nil
+}
+
+// Reject a known stale full package before downloading a gigabyte. The HEAD
+// metadata can reject a candidate, but never replaces the signed-file checks.
+func checkChatGPTTargetSource(ctx context.Context, client *http.Client, source, target string) error {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "HEAD", source, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	response, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer response.Body.Close()
+	version := response.Header.Get("x-ms-meta-package_version")
+	if response.StatusCode == 200 && validAppxVersion(version) && desktopVersionNewer(target, version) {
+		return fmt.Errorf("ChatGPT 新版 %s 已发布，但官方完整安装包仍为 %s；请在 ChatGPT 内检查更新，或等待安装包同步后重试", target, version)
+	}
+	return nil
+}
+
+func prepareLatestChatGPT(ctx context.Context, platform, arch, target string, progress func(int64, int64), phase func(string), requiredVersion ...string) error {
 	client := chatGPTDownloadClient()
+	expected := ""
+	if len(requiredVersion) > 0 {
+		expected = requiredVersion[0]
+	}
 	if platform == "windows" {
 		choice, err := selectChatGPTMirror(ctx, client, arch)
+		if err == nil && expected != "" && desktopVersionNewer(expected, choice.Version) {
+			err = errors.New("镜像尚未同步目标版本")
+		}
 		if err == nil {
 			phase("正在通过国内可访问镜像下载 ChatGPT " + choice.Version + "（约 1 GB），支持续传")
 			// A matching signed-package candidate can be reused only after refreshing
@@ -179,6 +232,11 @@ func prepareLatestChatGPT(ctx context.Context, platform, arch, target string, pr
 	pkg, err := chatGPTPackage(platform, arch)
 	if err != nil {
 		return err
+	}
+	if platform == "windows" && expected != "" {
+		if err := checkChatGPTTargetSource(ctx, client, pkg.URL, expected); err != nil {
+			return err
+		}
 	}
 	phase("正在通过 OpenAI 官方线路下载最新 ChatGPT 完整包（约 1 GB），无需 Microsoft Store")
 	return downloadChatGPTPackage(ctx, client, pkg.URL, target, progress)
