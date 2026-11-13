@@ -38,3 +38,16 @@ the individual recommendation to apply the list.
 No Router/Console/Private service deployment, schema, environment or Key change
 is required. Official website downloads resolve the latest stable Runtime release
 automatically and retain the previously deployed accelerated download route.
+
+## Published
+
+Workflow `43504275198` passed all three platforms and published 0.1.66 from
+`2a2cdf329fd5ce41b7de4ff65af3e06a14262b3f` at 2026-11-13 20:55:33 UTC.
+The website resolver returns 0.1.66. Full accelerated downloads matched official
+GitHub sizes and SHA-256 digests for Windows, Apple Silicon and Intel Mac.
+Evidence: `/tmp/acu-runtime-speed-verification.json`.
+
+Separately, the owner's Fable 5 requests were traced to Wawapii Kiro returning
+`claude-opus-5-5` for a `claude-fable-5` request. A direct Fable 5.1 request to
+that same channel also returned the Opus name. Runtime did not rewrite the model.
+This recommendation release does not change upstream routing or identity policy.
