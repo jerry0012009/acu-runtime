@@ -1,4 +1,4 @@
-Current release: **0.1.69** fixes Codex setup being rejected by a historical ChatGPT login file. Model changes retain Magpie's automatic compatibility policy and explicit login choices instead of forcing API-only mode. Advanced login choices are concise; native tools and all 0.1.68 improvements remain.
+Current release: **0.1.70** labels the native Codex provider as ACU after configuration, retaining the internal provider ID and all authentication/routing behavior. Embedded display copy uses ACU; technical identifiers, links and third-party notices remain unchanged. Includes the Codex compatibility fix from 0.1.69.
 
 # ACU Runtime 0.1.58
 

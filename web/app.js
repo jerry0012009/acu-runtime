@@ -320,7 +320,7 @@ function isRoutingGroup(model) {
 function modelOptionLabel(option, agent) {
   const source = (ui.status?.connection?.choices || []).find(choice => (option.ref || option.value || '').startsWith(choice.id + '/'));
   const suffix = isRoutingGroup(option) ? '当前高级配置' : source ? source.name || 'ACU' : !option.ref ? `${agent.name} 原生` : option.group;
-  return `${option.label || option.value || '默认'}${suffix ? ` · ${suffix}` : ''}`.replace(/\bmagpie\b/gi, 'ACU 内核');
+  return `${option.label || option.value || '默认'}${suffix ? ` · ${suffix}` : ''}`.replace(/\bmagpie\b/gi, 'ACU');
 }
 
 function modelOptionGroup(option, agent) {

@@ -44,7 +44,7 @@
   const timer = setInterval(() => { attempts += 1; if (navigate() || attempts > 30) clearInterval(timer); }, 150);
   const scrub = root => {
     if (root.nodeType === Node.TEXT_NODE) {
-      if (!root.parentElement?.closest('script,style,input,textarea,pre,code')) root.nodeValue = root.nodeValue.replace(/\bmagpie\b/gi, 'ACU 内核');
+      if (!root.parentElement?.closest('script,style,input,textarea,pre,code')) root.nodeValue = root.nodeValue.replace(/\bmagpie\b/gi, 'ACU');
       return;
     }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -53,14 +53,14 @@
       const node = walker.currentNode;
       if (!node.parentElement?.closest('script,style,input,textarea,pre,code') && /\bmagpie\b/i.test(node.nodeValue)) pending.push(node);
     }
-    pending.forEach(node => { node.nodeValue = node.nodeValue.replace(/\bmagpie\b/gi, 'ACU 内核'); });
+    pending.forEach(node => { node.nodeValue = node.nodeValue.replace(/\bmagpie\b/gi, 'ACU'); });
   };
   const scrubAttributes = root => {
     if (root.nodeType !== Node.ELEMENT_NODE) return;
     for (const element of [root, ...root.querySelectorAll('[title],[aria-label]')]) {
       for (const attribute of ['title', 'aria-label']) {
         const value = element.getAttribute(attribute);
-        if (value && /\bmagpie\b/i.test(value)) element.setAttribute(attribute, value.replace(/\bmagpie\b/gi, 'ACU 内核'));
+        if (value && /\bmagpie\b/i.test(value)) element.setAttribute(attribute, value.replace(/\bmagpie\b/gi, 'ACU'));
       }
     }
   };

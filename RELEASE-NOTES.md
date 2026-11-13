@@ -1,4 +1,12 @@
-# ACU Runtime 0.1.69
+# ACU Runtime 0.1.70
+
+通过 Runtime 配置 Codex 后，供应商显示名称改为“ACU”。保留内部供应商标识、已有会话、模型路由与登录方式，不迁移账号、不增加后台改名机制。
+
+Runtime 内嵌设置中的普通品牌文案和提示统一使用“ACU”；代码、配置路径、链接及第三方许可说明保持原样。用户自己设置的供应商名称不覆盖。
+
+升级后执行一次 Codex 接入配置，并重新打开 ChatGPT，使新的显示名称生效。
+
+## 保留 0.1.69 的 Codex 兼容性修复
 
 修复 Codex 接入时误报“无法保留 ChatGPT 登录身份”：不再把历史登录文件和当前 API 模式的账号返回混为一谈。继续核验配置和所选模型，并检查登录凭据未被接入过程改动。
 
@@ -98,9 +106,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.69-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.69-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.69-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.70-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.70-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.70-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

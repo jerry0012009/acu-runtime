@@ -199,6 +199,11 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 	if err != nil {
 		return nil, errors.New("Codex 配置未完成，正在恢复原配置")
 	}
+	if !disconnect {
+		if err = brandCodexProvider(); err != nil {
+			return nil, errors.New("无法保存 Codex 显示名称，请重试")
+		}
+	}
 	model := probeModel
 	for _, c := range changes {
 		if c.Field == "model" {

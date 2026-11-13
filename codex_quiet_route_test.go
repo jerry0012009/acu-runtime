@@ -143,6 +143,9 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	if !strings.Contains(string(b), "preserved-test-marker") {
 		t.Fatal("existing MCP lost")
 	}
+	if !strings.Contains(string(b), `name = "ACU"`) {
+		t.Fatal("native provider display name was not branded after restart")
+	}
 	before := append([]byte(nil), b...)
 	assertLogin := func(state map[string]json.RawMessage, want string) {
 		t.Helper()
