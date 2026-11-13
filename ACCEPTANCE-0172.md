@@ -44,3 +44,15 @@ Unpublished 0.1.71 workflow 43522864538 passed both Mac platforms and Windows
 native/installer upgrade checks, but its new version-check fixture read UTF-8
 source using Windows cp1252. 0.1.72 explicitly decodes that source as UTF-8;
 the failed tag remains traceable and was never publicly released.
+
+## Published
+
+Workflow 43524239032 passed all three platforms and published v0.1.72 from
+bf064d5 at 2026-11-13 23:14:21 UTC. Windows native Codex isolation, first
+installation, upgrade from 0.1.70, config/auth hash preservation and final
+serving-kernel v0.1.4096/MCP compatibility checks all passed.
+
+Website resolver returns 0.1.72. Full accelerated downloads matched GitHub
+asset lengths and SHA-256 for Windows (52,170,752 bytes), Apple Silicon
+(49,520,499 bytes) and Intel Mac (53,987,231 bytes).
+Evidence: /tmp/acu-runtime-speed-verification.json.
