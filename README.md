@@ -1,4 +1,4 @@
-Current release: **0.1.65** removes independent ChatGPT desktop update checks and prompts. Codex CLI updates follow Magpie's own decision; ChatGPT desktop updates stay in the application. First installation, learning settings and output-price sorting remain available.
+Current release: **0.1.66** recommends Fable 5.1 (`claude-fable-5-1`) instead of Fable 5. One-click configuration exposes the new recommendation while retaining active legacy models and explicit selections. `acu-auto` remains the general default; ChatGPT desktop updates stay in the application.
 
 # ACU Runtime 0.1.58
 

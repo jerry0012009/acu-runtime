@@ -153,7 +153,7 @@ function activeChoice() {
 
 // Curated text-model candidates, smoke-tested through Magpie on 2026-11-06.
 // This is a recommendation list, not a permanent availability guarantee.
-const recommendedACUModels = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5'];
+const recommendedACUModels = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1'];
 function recommendedModels(choice) {
   return recommendedACUModels.filter(model => choice?.models?.includes(model));
 }
@@ -1054,12 +1054,13 @@ function renderSetup() {
   document.body.classList.add('overlay-open');
 }
 
-async function applyRecommendedVisibility(agentId, provider, selectedModel) {
+async function applyRecommendedVisibility(agentId, provider, selectedModel, preserveVisibility = false) {
   const catalog = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`);
   if (!Array.isArray(catalog?.models)) throw new Error('接入已保存，但无法读取模型清单，请重试推荐配置');
   const prefix = provider + '/';
   const models = catalog.models.map(model => {
     if (!model.id.startsWith(prefix) || model.own || model.inUse || model.id === prefix + selectedModel) return model;
+    if (preserveVisibility && !recommendedACUModels.includes(model.id.slice(prefix.length))) return model;
     return { ...model, hidden: !recommendedACUModels.includes(model.id.slice(prefix.length)) };
   });
   const body = catalog.only
@@ -1086,7 +1087,7 @@ async function confirmSetup() {
         const configured = result.agents?.find(current => current.id === id);
         if (!configured?.wired || configured.drift) throw new Error('未确认配置成功，请检查设置');
         connectedAgents.push(id);
-        if (!preserve) await applyRecommendedVisibility(id, setup.provider, setup.model);
+        if (!preserve || id === 'workbuddy') await applyRecommendedVisibility(id, setup.provider, setup.model, preserve);
         ui.selected?.delete(id);
         ui.results.push({ id, ok: true, message: result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }

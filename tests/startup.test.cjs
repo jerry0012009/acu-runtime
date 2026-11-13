@@ -593,6 +593,70 @@ test('DeepSeek V4.1 Flash variants are recommended while legacy V4 Flash is omit
   assert(!models.includes('deepseek-v4-flash'));
 });
 
+test('Fable 5.1 replaces Fable 5 in recommendations and respects the account model list', async () => {
+  const instance = await setup({ ready: true, agents: [codex()] });
+  assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5", "claude-fable-5-1", "claude-opus-5-5"] }).join(",")'), 'claude-opus-5-5,claude-fable-5-1');
+  assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5"] }).length'), 0);
+  const options = [
+    {value:'acu-runtime/claude-fable-5',ref:'acu-runtime/claude-fable-5',label:'Fable 5'},
+    {value:'acu-runtime/claude-fable-5-1',ref:'acu-runtime/claude-fable-5-1',label:'Fable 5.1'},
+  ];
+  instance.run('ui.status.connection.choices[0].models = ["claude-fable-5", "claude-fable-5-1"]');
+  instance.run(`ui.status.agents[0].modelOptions = ${JSON.stringify(options)}`);
+  const html = instance.run('agentModelSelect(ui.status.agents[0])');
+  assert(html.includes('value="acu-runtime/claude-fable-5-1"'));
+  assert(!html.includes('value="acu-runtime/claude-fable-5"'));
+  instance.run('ui.status.agents[0].model = "acu-runtime/claude-fable-5"');
+  const selected = instance.run('agentModelSelect(ui.status.agents[0])');
+  assert(selected.includes('value="acu-runtime/claude-fable-5" selected'));
+  assert.equal(posts(instance).length, 0);
+});
+
+test('WorkBuddy one-click setup exposes Fable 5.1 and preserves active legacy and unrelated models', async () => {
+  const choice = {id:'acu-runtime',name:'ACU',models:['acu-auto','claude-fable-5','claude-fable-5-1']};
+  const catalog = {models:[
+    {id:'acu-runtime/acu-auto'},
+    {id:'acu-runtime/claude-fable-5-1',hidden:true},
+    {id:'acu-runtime/claude-fable-5'},
+    {id:'acu-runtime/old-active',inUse:true},
+    {id:'other/private-model'},
+  ]};
+  const instance = await setup({ready:true,connection:{known:true,configured:true,provider:choice.id,choices:[choice]},agents:[{id:'workbuddy',name:'WorkBuddy',detected:true,connected:false,modelOptions:[]}]}, async (route, options) => {
+    if(route==='/runtime/agents/configure') return {body:{agents:[{id:'workbuddy',wired:true}]}};
+    if(route==='/kernel/api/agent-models/workbuddy'&&!options.method) return {body:catalog};
+    if(route==='/runtime/capabilities') return {body:capabilityFixture()};
+  });
+  await instance.run('configureAgent("workbuddy")');
+  assert(instance.elements.overlay.innerHTML.includes('claude-fable-5-1'));
+  assert(!instance.elements.overlay.innerHTML.includes('claude-fable-5、'));
+  await instance.run('confirmSetup()');
+  const visibility = posts(instance).find(call=>call.route==='/kernel/api/agent-models/workbuddy');
+  assert(visibility);
+  assert.deepEqual(JSON.parse(visibility.body), {hidden:['acu-runtime/claude-fable-5']});
+  catalog.models[2].inUse=true;
+  await instance.run('applyRecommendedVisibility("workbuddy","acu-runtime","acu-auto")');
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body), {hidden:[]});
+});
+
+test('repeated WorkBuddy setup reveals current recommendations without replacing existing model visibility', async () => {
+  const choice={id:'acu-runtime',name:'ACU',models:['acu-auto','claude-fable-5','claude-fable-5-1']};
+  const instance=await setup({ready:true,connection:{known:true,configured:true,provider:choice.id,choices:[choice]},agents:[{id:'workbuddy',name:'WorkBuddy',detected:true,connected:true,modelOptions:[]}]},async(route,options)=>{
+    if(route==='/runtime/agents/configure')return {body:{agents:[{id:'workbuddy',wired:true}]}};
+    if(route==='/kernel/api/agent-models/workbuddy'&&!options.method)return {body:{only:true,models:[
+      {id:'acu-runtime/acu-auto'}, {id:'acu-runtime/claude-fable-5-1',hidden:true},
+      {id:'acu-runtime/claude-fable-5',inUse:true}, {id:'acu-runtime/old-hidden',hidden:true},
+      {id:'other/visible'}, {id:'other/hidden',hidden:true},
+    ]}};
+    if(route==='/runtime/capabilities')return {body:capabilityFixture()};
+  });
+  instance.run('ui.selected = new Set(["workbuddy"])');
+  await instance.run('applyAgents()');await instance.run('confirmSetup()');
+  const configure=posts(instance).find(call=>call.route==='/runtime/agents/configure');
+  assert.equal(JSON.parse(configure.body).preserve,true);
+  const visibility=posts(instance).find(call=>call.route==='/kernel/api/agent-models/workbuddy');
+  assert.deepEqual(JSON.parse(visibility.body),{shown:['acu-runtime/acu-auto','acu-runtime/claude-fable-5-1','acu-runtime/claude-fable-5','other/visible']});
+});
+
 test('desktop settings exposes compatibility update status and the check action', async () => {
   const instance = await setup({ desktop: true, version: '0.1.15', update: { supported: true, phase: 'available', current: '0.1.15', kernel: 'v0.1.3150', release: { version: '0.1.16' } } });
   instance.run('ui.page="settings"; render()');

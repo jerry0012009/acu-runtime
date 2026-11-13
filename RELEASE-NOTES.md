@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.65
+# ACU Runtime 0.1.66
+
+推荐模型中的 Fable 升级为 Fable 5.1（`claude-fable-5-1`）。一键配置、各 Agent 推荐选项和 WorkBuddy 推荐模型列表使用同一份清单，不再把 Fable 5.1 隐藏、只推荐旧 Fable 5。
+
+已有明确选中的 Fable 5 和其他来源配置保留，不强制更换模型。通用默认仍为 `acu-auto`；WorkBuddy 仍在任务内选择模型。升级后再次执行一键配置或对应应用的推荐配置，可应用新的推荐列表，无需手填模型 ID。
+
+## 保留 0.1.65 的更新策略
 
 取消 Runtime 对 ChatGPT 桌面端的独立版本检查、催更、“全部更新”及重试入口，不再根据另一份版本清单提示升级到 26.1111。Codex CLI 更新完全沿用 Magpie 返回的更新判断和原生接口；ChatGPT 桌面端更新留在应用内。首次安装 ChatGPT、已有账号和 ACU 接入配置保持不变。
 
@@ -76,9 +82,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.63-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.63-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.63-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.66-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.66-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.66-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
