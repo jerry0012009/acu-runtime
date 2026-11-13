@@ -8,14 +8,14 @@ const sourceRoot = path.resolve(__dirname, '..');
 const { chromium } = process.env.PLAYWRIGHT_MODULE ? require(process.env.PLAYWRIGHT_MODULE) : createRequire(path.join(root, '.build/package.json'))('playwright');
 const output = path.join(root, 'output/runtime-preferences'); fs.mkdirSync(output, { recursive: true });
 let account = { loggedIn: true, identity: 'fixture-one', username: '偏好预览账户', site: 'https://console.acucompute.com' };
-let mode = 'normal', delay = false, reads = 0, writes = [];
+let mode = 'normal', delay = false, reads = 0, writes = [], settingsWrites = [], settingsFailure = false, settingsDelay = 0;
 const summary = '面向终端用户交付软件或浏览器扩展时，以可直接安装、可分发和真实启动验证作为主要验收标准；已明确授权的插件试用应默认具备指定核心能力与可用接入配置。';
 const fixtures = {
  controls: {records:[{id:'11111111-1111-4111-8111-111111111111',summary:'先结论再说明',rule:'先结论；法律文书保留完整论证。',scope:'工作报告',exceptions:'法律文书',revision:'a'.repeat(64),disabled:false}]},
  profile: { status: 'error', error:'profile_refresh_failed', generatedAt: '2026-11-12T12:51:00Z', profile: { summary: '注重可核验的交付、清晰的依据与直接可用的结果。', rays: [{ id: 'hidden-ray',score:80,confidence:70, label: '直接安装使用', category: '交付与核验', summary, scope: '面向用户的交付', sourceIds: ['hidden-source', 'missing-source'] }, {id:'initialized',score:70,confidence:60,label:'简洁与详尽',summary:'按任务保留合适的细节。',category:'表达',scope:'报告',sourceIds:[],bipolar:{origin:'authorized_initialization'}}] } },
  library: { version: 1, records: [{ id: 'hidden-source', summary }, {id:'english',summary:'LongEnglishText'.repeat(50)+' <script>unsafe()</script>'}] },
  activity: { version: 1, partial: true, moreAvailable: true, events: [{ runId: 'hidden-run', trigger: 'explicit_user_preference', recordedAt: '2026-11-12T12:00:00Z', changes: [{ kind:'updated', before: '交付应可安装。', after: summary }, {kind:'updated',before:'unchanged',after:'unchanged'}] }] },
- settings: {globalEnabled:true,learningEnabled:false,injectionEnabled:false},
+ settings: {globalEnabled:true,learningEnabled:false,observerEnabled:true,advisorEnabled:true,injectionEnabled:false,observerInterval:37,effectiveObserverInterval:37,globalObserverInterval:20,usesGlobalObserverInterval:false},
 };
 fixtures.profile.profile.highlights = [{title:'接入省事，保留选择',summary:'尽可能一键接入，同时保留必要授权和内部选模。',sourceIds:['hidden-source'],evidence:[{sourceId:'hidden-source',quote:'面向终端用户'}]}];
 if (process.env.ACU_REAL_PROFILE) fixtures.profile.profile.highlights = JSON.parse(fs.readFileSync(process.env.ACU_REAL_PROFILE,'utf8')).highlights;
@@ -24,6 +24,15 @@ const server = http.createServer(async (req,res) => {
  const url = new URL(req.url, 'http://localhost');
  const json = data => {res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));};
  if(req.method !== 'GET') {
+  if(url.pathname === '/runtime/preferences/settings') {
+   let raw='';for await(const chunk of req)raw+=chunk;
+   const patch=JSON.parse(raw);assert.equal(req.method,'PUT');assert.deepEqual(Object.keys(patch).sort(),['advisorEnabled','injectionEnabled','learningEnabled','observerEnabled','observerInterval']);
+   settingsWrites.push(patch);
+   if(settingsDelay)await new Promise(resolve=>setTimeout(resolve,settingsDelay));
+   if(settingsFailure){res.statusCode=502;return json({error:'设置保存失败，请重试。'});}
+   fixtures.settings={...fixtures.settings,...patch,effectiveObserverInterval:patch.observerInterval??20,usesGlobalObserverInterval:patch.observerInterval==null};
+   return json(fixtures.settings);
+  }
   if(url.pathname.startsWith('/runtime/preferences/controls/')) {let body='';for await(const chunk of req)body+=chunk;const change=JSON.parse(body);assert.equal(change.expected_hash,'a'.repeat(64));assert.equal(change.rule,'先给决策，再说明原因。');assert.equal(change.exceptions,undefined);assert.equal(change.scope,undefined);fixtures.controls.records[0].rule=change.rule;return json({updated:true});}
   writes.push(url.pathname); if(url.pathname === '/runtime/account/logout') account = {}; return json({ok:true});
  }
@@ -63,6 +72,9 @@ const server = http.createServer(async (req,res) => {
    await page.screenshot({path:path.join(output,`preferences-first-${theme}-${width}.png`),fullPage:true});
    assert.equal(await page.locator('.starfish-panel').evaluate(node => node.closest('details') === null && node.previousElementSibling.tagName === 'HEADER' && node.getBoundingClientRect().top < innerHeight / 2),true,'graph must be first and never collapsed');
    assert.equal(await page.locator('.starfish-svg').isVisible(),true);
+   assert.equal(await page.locator('.preference-learning').evaluate(node => node.closest('details') === null && node.previousElementSibling.classList.contains('starfish-panel')),true,'settings directly below graph and expanded');
+   assert.equal(await page.getByRole('switch').count(),5);
+   assert.equal(await page.getByRole('switch',{name:'偏好学习',exact:true}).isChecked(),false);
    await page.locator('.preference-secondary > summary').filter({hasText:'近期变化'}).click();
    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,`overflow ${width} ${theme}`);
    assert.equal(await page.getByText('unchanged',{exact:true}).count(),0);
@@ -101,6 +113,36 @@ const server = http.createServer(async (req,res) => {
   await editingPage.getByRole('button',{name:'缩小图谱',exact:true}).click();assert.notEqual(await svg.getAttribute('viewBox'),originalView);
   await editingPage.getByRole('button',{name:'放大图谱',exact:true}).click();assert.equal(await svg.getAttribute('viewBox'),originalView);
   await editingPage.close();
+  const settingsPage=await browser.newPage();await settingsPage.goto(origin);await settingsPage.locator('[data-page="preferences"]').click();
+  await settingsPage.getByRole('switch',{name:'偏好学习',exact:true}).waitFor();
+  assert.equal(settingsWrites.length,0,'viewing preferences does not change account settings');
+  settingsDelay=700;
+  await settingsPage.getByRole('switch',{name:'偏好学习',exact:true}).click();
+  assert.equal(await settingsPage.getByRole('switch',{name:'任务观察',exact:true}).isDisabled(),true,'serialize settings writes');
+  await settingsPage.getByText('已保存',{exact:true}).waitFor();
+  assert.equal(await settingsPage.getByRole('switch',{name:'偏好学习',exact:true}).isChecked(),true);
+  assert.equal(settingsWrites.at(-1).observerInterval,37,'flag changes preserve interval');
+  assert.equal(settingsWrites.at(-1).injectionEnabled,false,'independent flags stay independent');
+  settingsDelay=0;settingsFailure=true;
+  await settingsPage.getByRole('switch',{name:'任务观察',exact:true}).click();
+  await settingsPage.getByText('设置保存失败，请重试。',{exact:true}).waitFor();
+  assert.equal(await settingsPage.getByRole('switch',{name:'任务观察',exact:true}).isChecked(),true,'failed save restores authoritative state');
+  settingsFailure=false;
+  await settingsPage.getByRole('switch',{name:'Private ACU',exact:true}).click();await settingsPage.getByText('已保存',{exact:true}).waitFor();
+  assert(Object.entries(settingsWrites.at(-1)).filter(([key])=>key.endsWith('Enabled')).every(([,value])=>value===false));
+  await settingsPage.getByRole('switch',{name:'Private ACU',exact:true}).focus();await settingsPage.keyboard.press('Space');await settingsPage.getByText('已保存',{exact:true}).waitFor();
+  assert(Object.entries(settingsWrites.at(-1)).filter(([key])=>key.endsWith('Enabled')).every(([,value])=>value===true));
+  await settingsPage.locator('#pref-interval').fill('51');await settingsPage.locator('#pref-interval').press('Tab');await settingsPage.getByText('已保存',{exact:true}).waitFor();
+  assert.equal(settingsWrites.at(-1).observerInterval,51);
+  await settingsPage.getByRole('button',{name:'恢复默认',exact:true}).click();await settingsPage.getByText('已保存',{exact:true}).waitFor();
+  assert.equal(settingsWrites.at(-1).observerInterval,null);
+  assert.equal(await settingsPage.locator('#pref-interval').inputValue(),'20');
+  const priorWrites=settingsWrites.length;await settingsPage.locator('#pref-interval').fill('0');await settingsPage.locator('#pref-interval').press('Tab');assert.equal(settingsWrites.length,priorWrites,'invalid interval never saved');
+  fixtures.settings.globalEnabled=false;
+  await settingsPage.locator('[data-pref-refresh]').click();await settingsPage.getByText('管理员已关闭学习服务',{exact:true}).waitFor();
+  assert.equal(await settingsPage.getByRole('switch',{disabled:true}).count(),5);
+  fixtures.settings.globalEnabled=true;await settingsPage.close();
+  const persisted=await browser.newPage();await persisted.goto(origin);await persisted.locator('[data-page="preferences"]').click();await persisted.getByRole('switch',{name:'偏好学习',exact:true}).waitFor();assert.equal(await persisted.getByRole('switch',{name:'偏好学习',exact:true}).isChecked(),true);await persisted.close();
   for(const nextMode of ['empty','unsupported','error','revoked']) {
    mode=nextMode; const page=await browser.newPage();await page.goto(origin);await page.locator('[data-page="preferences"]').click();
    const text={empty:'暂无可读的偏好记录。',unsupported:'当前服务暂不支持此视图。',error:'读取失败',revoked:'登录后查看我的偏好'}[mode];
@@ -113,6 +155,6 @@ const server = http.createServer(async (req,res) => {
   fixtures.library={version:1,records:[]};fixtures.profile={status:'empty',profile:null};fixtures.activity={version:1,events:[]};fixtures.controls={records:[]};
   await page.waitForTimeout(6500);assert.equal(await page.getByText(summary,{exact:true}).count(),0);
   await page.locator('[data-pref-logout]').click();await page.getByText('登录后查看我的偏好',{exact:true}).waitFor();assert.deepEqual(writes,['/runtime/account/logout']);
-  await page.close();console.log('PASS: 8 theme/viewport layouts, keyboard comparison, sources, search, cache, empty/404/error/revoked, switch and logout.');
+  await page.close();console.log('PASS: 8 theme/viewport layouts, editable settings, serial saves, failure recovery, master switch, interval/reset, global gate, persistence, keyboard, sources, search, cache and account isolation.');
  } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

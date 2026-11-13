@@ -1,4 +1,4 @@
-Current release: **0.1.61** removes repetitive explanatory copy from preferences, setup and billing. The interactive preference vector graph stays first and always expanded, followed by concise personal highlights. Necessary status, permission and cost information remains available.
+Current release: **0.1.62** adds editable learning controls directly below the preference vector graph, sharing the website's account settings. Model prices show output prices only, with ascending and descending sorting. The graph stays first and always expanded.
 
 # ACU Runtime 0.1.58
 

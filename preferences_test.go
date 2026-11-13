@@ -5,11 +5,138 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
+func TestPreferenceSettingsCloudRoundtrip(t *testing.T) {
+	bearer := os.Getenv("ACU_SETTINGS_ACCEPTANCE_TOKEN")
+	if bearer == "" {
+		t.Skip("explicit cloud acceptance only")
+	}
+	userID, err := strconv.Atoi(os.Getenv("ACU_SETTINGS_ACCEPTANCE_USER"))
+	if err != nil || userID <= 0 {
+		t.Fatal("acceptance user required")
+	}
+	host := &server{token: "acceptance-local", cloudTransport: http.DefaultTransport}
+	host.account.view = accountView{LoggedIn: true, Site: billingSite}
+	host.account.bearer, host.account.userID, host.account.expires = bearer, userID, time.Now().Add(time.Hour).Unix()
+	call := func(method string, body string) map[string]any {
+		t.Helper()
+		req := httptest.NewRequest(method, "http://localhost/runtime/preferences/settings", strings.NewReader(body))
+		req.Header.Set("X-ACU-Token", "acceptance-local")
+		res := httptest.NewRecorder()
+		host.accountPreferences(res, req)
+		if res.Code != 200 {
+			t.Fatalf("cloud settings HTTP %d", res.Code)
+		}
+		var data map[string]any
+		if json.Unmarshal(res.Body.Bytes(), &data) != nil {
+			t.Fatal("invalid cloud response")
+		}
+		return data
+	}
+	before := call(http.MethodGet, "")
+	patch := map[string]any{}
+	for _, key := range []string{"learningEnabled", "observerEnabled", "advisorEnabled", "injectionEnabled"} {
+		if _, ok := before[key].(bool); !ok {
+			t.Fatal("missing settings flags")
+		}
+		patch[key] = before[key]
+	}
+	patch["observerInterval"] = before["observerInterval"]
+	body, err := json.Marshal(patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := call(http.MethodPut, string(body))
+	after := call(http.MethodGet, "")
+	for key, value := range patch {
+		if saved[key] != value || after[key] != value {
+			t.Fatalf("settings did not persist: %s", key)
+		}
+	}
+	t.Log("Runtime GET/PUT/GET matched website settings without changing flags or interval")
+}
+
+func TestPreferenceSettingsUseWebsiteContract(t *testing.T) {
+	for _, interval := range []string{"null", "37"} {
+		t.Run(interval, func(t *testing.T) {
+			host := &server{token: "local"}
+			host.account.view = accountView{LoggedIn: true, Site: billingSite}
+			host.account.bearer, host.account.userID, host.account.expires = "account-session", 42, time.Now().Add(time.Hour).Unix()
+			body := `{"learningEnabled":false,"observerEnabled":true,"advisorEnabled":false,"injectionEnabled":true,"observerInterval":` + interval + `}`
+			host.cloudTransport = accountTransport(func(r *http.Request) (*http.Response, error) {
+				if r.Method != http.MethodPut || r.URL.String() != billingSite+"/api/user/self/acu-advisor/settings" || r.Header.Get("Authorization") != "Bearer account-session" || r.Header.Get("Origin") != billingSite || r.Header.Get("Content-Type") != "application/json" {
+					t.Fatalf("unexpected settings write: %s %s", r.Method, r.URL)
+				}
+				var settings map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+					t.Fatal(err)
+				}
+				if len(settings) != 5 || settings["learningEnabled"] != false || settings["observerEnabled"] != true || settings["advisorEnabled"] != false || settings["injectionEnabled"] != true {
+					t.Fatalf("lost explicit flags: %+v", settings)
+				}
+				if interval == "null" && settings["observerInterval"] != nil || interval == "37" && settings["observerInterval"] != float64(37) {
+					t.Fatalf("interval changed: %+v", settings)
+				}
+				return cloudFixture(`{"success":true,"data":{"learningEnabled":false,"observerEnabled":true,"advisorEnabled":false,"injectionEnabled":true,"observerInterval":` + interval + `,"globalEnabled":true}}`), nil
+			})
+			req := httptest.NewRequest(http.MethodPut, "http://localhost/runtime/preferences/settings?user_id=99", strings.NewReader(body))
+			req.Header.Set("X-ACU-Token", "local")
+			res := httptest.NewRecorder()
+			host.accountPreferences(res, req)
+			if res.Code != 200 || strings.Contains(res.Body.String(), "account-session") {
+				t.Fatalf("settings response: %d %s", res.Code, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestPreferenceSettingsRejectInvalidWritesAndAccountChanges(t *testing.T) {
+	valid := `{"learningEnabled":true,"observerEnabled":false,"advisorEnabled":false,"injectionEnabled":false,"observerInterval":null}`
+	for _, test := range []struct {
+		name, body            string
+		logged, local, change bool
+		want                  int
+	}{
+		{"missing local token", valid, true, false, false, 403},
+		{"missing login", valid, false, true, false, 401},
+		{"partial flags", `{"learningEnabled":true}`, true, true, false, 400},
+		{"foreign owner", strings.TrimSuffix(valid, "}") + `,"newapiUserId":"99"}`, true, true, false, 400},
+		{"invalid interval", strings.Replace(valid, "null", "0", 1), true, true, false, 400},
+		{"oversized interval", strings.Replace(valid, "null", "100001", 1), true, true, false, 400},
+		{"invalid type", strings.Replace(valid, "true", `"true"`, 1), true, true, false, 400},
+		{"account switched", valid, true, true, true, 409},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			host := &server{token: "local"}
+			host.account.view = accountView{LoggedIn: test.logged, Site: billingSite}
+			host.account.bearer, host.account.userID, host.account.expires = "old-session", 42, time.Now().Add(time.Hour).Unix()
+			calls := 0
+			host.cloudTransport = accountTransport(func(r *http.Request) (*http.Response, error) {
+				calls++
+				host.account.mu.Lock()
+				host.account.userID = 43
+				host.account.bearer = "new-session"
+				host.account.mu.Unlock()
+				return cloudFixture(`{"success":true,"data":{"learningEnabled":true}}`), nil
+			})
+			req := httptest.NewRequest(http.MethodPut, "http://localhost/runtime/preferences/settings", strings.NewReader(test.body))
+			if test.local {
+				req.Header.Set("X-ACU-Token", "local")
+			}
+			res := httptest.NewRecorder()
+			host.accountPreferences(res, req)
+			if res.Code != test.want || (!test.change && calls != 0) || strings.Contains(res.Body.String(), `"learningEnabled"`) {
+				t.Fatalf("unsafe settings response: %d %s calls=%d", res.Code, res.Body.String(), calls)
+			}
+		})
+	}
+}
 
 func TestPreferenceOnlyLoginDoesNotSelectOrWriteModelKey(t *testing.T) {
 	host := &server{}

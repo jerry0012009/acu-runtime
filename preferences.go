@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Personal reads use only the official dashboard session, never a model Key.
+// Personal settings use only the official dashboard session, never a model Key.
 func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Header.Get("X-ACU-Token") != host.token {
@@ -21,7 +21,7 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	var input []byte
 	if r.Method == http.MethodPut {
 		parts := strings.Split(name, "/")
-		if len(parts) != 2 || parts[0] != "controls" || len(parts[1]) != 36 || strings.ContainsAny(parts[1], "?#%\\") {
+		if name != "settings" && (len(parts) != 2 || parts[0] != "controls" || len(parts[1]) != 36 || strings.ContainsAny(parts[1], "?#%\\")) {
 			host.json(w, 400, map[string]string{"error": "偏好记录无效"})
 			return
 		}
@@ -31,7 +31,23 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 			host.json(w, 400, map[string]string{"error": "偏好修改无效"})
 			return
 		}
-		paths[name] = "acu-preference-controls/" + parts[1]
+		if name == "settings" {
+			var settings struct {
+				LearningEnabled  *bool `json:"learningEnabled"`
+				ObserverEnabled  *bool `json:"observerEnabled"`
+				AdvisorEnabled   *bool `json:"advisorEnabled"`
+				InjectionEnabled *bool `json:"injectionEnabled"`
+				ObserverInterval *int  `json:"observerInterval"`
+			}
+			decoder := json.NewDecoder(bytes.NewReader(input))
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&settings) != nil || settings.LearningEnabled == nil || settings.ObserverEnabled == nil || settings.AdvisorEnabled == nil || settings.InjectionEnabled == nil || (settings.ObserverInterval != nil && (*settings.ObserverInterval < 1 || *settings.ObserverInterval > 100000)) {
+				host.json(w, 400, map[string]string{"error": "学习设置无效"})
+				return
+			}
+		} else {
+			paths[name] = "acu-preference-controls/" + parts[1]
+		}
 	}
 	path, ok := paths[name]
 	if !ok {

@@ -1,5 +1,20 @@
 .preference-page { max-width: 1120px; margin: 0 auto; padding: 36px 40px 72px; overflow-wrap: anywhere; }
 .preference-understanding { margin: 20px 0 28px; }
+.preference-learning { margin: 24px 0 28px; padding-bottom: 20px; border-bottom: 1px solid var(--acu-line); }
+.preference-learning-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:36px; }
+.preference-learning-heading h2 { margin:0; }
+.preference-setting { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; min-width:0; cursor:pointer; }
+.preference-learning > .preference-setting { font-weight:600; border-bottom:1px solid var(--acu-line); margin-bottom:4px; }
+.preference-setting-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 32px; }
+.preference-setting input { appearance:none; flex:0 0 38px; width:38px; height:22px; margin:0; border-radius:11px; border:1px solid var(--acu-line); background:var(--acu-surface); position:relative; cursor:pointer; }
+.preference-setting input::after { content:''; position:absolute; width:16px; height:16px; border-radius:50%; left:2px; top:2px; background:var(--muted); transition:transform .15s; }
+.preference-setting input:checked { background:var(--acu-accent); border-color:var(--acu-accent); }
+.preference-setting input:checked::after { background:#202120; transform:translateX(16px); }
+.preference-setting input:disabled { opacity:.45; cursor:default; }
+.preference-setting input:focus-visible { outline:2px solid var(--acu-accent); outline-offset:3px; }
+.preference-interval { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.preference-interval input { width:96px; padding:7px 9px; border:1px solid var(--acu-line); border-radius:6px; color:var(--acu-text); background:var(--acu-surface); font:inherit; }
+@media(max-width:480px) { .preference-setting-grid { grid-template-columns:minmax(0,1fr); } }
 .preference-highlights { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 28px; }
 .preference-highlights article { min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--acu-line); }
 .preference-highlights article p { line-height: 1.65; }

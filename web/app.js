@@ -1164,6 +1164,7 @@ app.addEventListener('click', event => {
 });
 app.addEventListener('input', event => { billing?.input(event); preferences?.input(event); });
 app.addEventListener('change', event => {
+  if (preferences?.change(event)) return;
   if(event.target.id === 'startup-enabled'){ const enabled=event.target.checked;ui.startupSaving=true;request('/runtime/startup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})}).then(value=>{ui.startup=value;}).catch(error=>toast(error.message)).finally(()=>{ui.startupSaving=false;render();});return; }
   if (billing?.change(event)) return;
   if (event.target.dataset?.capability) { changeCapabilityModel(event.target); return; }

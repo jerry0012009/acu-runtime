@@ -16,6 +16,7 @@ async function main() {
   let failAccount = false, failPrices = false, localLoads = 0, coldPrices = false, delayPrices = false;
   const calls = [];
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
+  prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
   await page.route('http://billing.test/**', async route => {
     const url = new URL(route.request().url());
     calls.push(url.pathname + url.search);
@@ -71,10 +72,16 @@ async function main() {
     assert.equal(await page.getByRole('searchbox').inputValue(), 'fixture');
     assert(await page.getByRole('searchbox').evaluate(node => node === document.activeElement), 'refresh preserves search focus');
     delayPrices = false;
-    assert(await page.getByRole('columnheader', {name:'倍率',exact:true}).isVisible());
-    assert(await page.getByText('0.06×', {exact:true}).isVisible());
-    await page.getByText('计费详情', { exact: true }).click();
+    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','输出价格']);
+    assert.equal(await page.getByText('0.06×', {exact:true}).count(),0);
+    assert((await page.locator('#billing-price-rows td').last().innerText()).startsWith('¥4.044'));
     await page.getByText(/272,000/).waitFor();
+    await page.getByRole('searchbox').fill('');
+    await page.locator('[data-billing-sort]').selectOption('output_asc');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['free','cheap','测试 Sol','premium','ACU Auto','unknown']);
+    await page.locator('[data-billing-sort]').selectOption('output_desc');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','cheap','free','ACU Auto','unknown']);
+    await page.getByRole('searchbox').fill('sol');
     failPrices = true;
     await page.getByRole('button', { name: '刷新价格' }).click();
     await page.getByText(/价格刷新失败/).waitFor();
@@ -116,7 +123,7 @@ async function main() {
     assert(await page.getByRole('button', { name: '刷新中…', exact: true }).isVisible());
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     assert.deepEqual(errors, []);
-    console.log('PASS: three tabs, preserved local statistics, cloud historical charges, pagination, search, tiered prices, failure recovery, logout isolation, light/dark and narrow layouts.');
+    console.log('PASS: output-only prices, ascending/descending sort, zero and missing prices, tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

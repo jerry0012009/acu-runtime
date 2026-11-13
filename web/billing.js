@@ -98,20 +98,32 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
   function priceRows() {
     const search = state.query.toLowerCase();
     const models = (state.prices?.models || []).filter(model => `${model.model_name} ${model.display_name || ''}`.toLowerCase().includes(search));
-    models.sort((a,b) => state.sort === 'name' ? a.model_name.localeCompare(b.model_name) : (a.payable?.[state.sort] ?? Infinity) - (b.payable?.[state.sort] ?? Infinity));
+    const outputPrice = model => {
+      const value = model.payable?.output_cny_per_million;
+      return value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+    };
+    models.sort((a,b) => {
+      if (state.sort !== 'name') {
+        const left = outputPrice(a), right = outputPrice(b);
+        if (left === null && right !== null) return 1;
+        if (right === null && left !== null) return -1;
+        if (left !== null && right !== null && left !== right) return state.sort === 'output_desc' ? right - left : left - right;
+      }
+      return a.model_name.localeCompare(b.model_name);
+    });
     return models.map(model => {
-      const price = model.payable;
-      const tiers = price?.context_tiers;
-      const details = price ? `<details><summary>计费详情</summary><p>缓存写入 ${money(price.cache_write_cny_per_million)} / 百万 tokens</p>${price.model_multiplier ? `<p>相对${model.reference?.source_type === 'official' ? '官方' : model.reference?.source_type === 'openrouter' ? 'OpenRouter' : '平台'}参考价 ${esc(price.model_multiplier)}×</p>` : ''}${tiers ? `<p>输入超过 ${Number(tiers.thresholdTokens).toLocaleString()} tokens 时：输入 ${money(tiers.longContext.inputPricePerMillion)}，输出 ${money(tiers.longContext.outputPricePerMillion)}，缓存读取 ${money(tiers.longContext.cachedInputPricePerMillion)}，缓存写入 ${money(tiers.longContext.cacheWritePricePerMillion)} / 百万 tokens。</p>` : ''}<p>价格版本：${esc(price.price_version || price.pricing_policy_version || '未提供')}</p></details>` : '';
-      return `<tr><td><strong>${esc(model.display_name || model.model_name)}</strong><small>${esc(model.model_name)}</small></td><td>${money(price?.input_cny_per_million)}</td><td>${money(price?.output_cny_per_million)}</td><td>${money(price?.cached_input_cny_per_million)}</td><td>${price?.model_multiplier != null ? `<strong>${esc(price.model_multiplier)}×</strong><small>相对${model.reference?.source_type === 'official' ? '官方' : model.reference?.source_type === 'openrouter' ? 'OpenRouter' : '平台'}参考价</small>` : '—'}</td><td>${price?.model_multiplier ? '固定零售价' : model.model_name === 'acu-auto' ? '按实际选中模型计费' : '查看官网计费规则'}${details}</td></tr>`;
+      const tiers = model.payable?.context_tiers;
+      const longOutput = tiers?.longContext?.outputPricePerMillion;
+      const tier = tiers && longOutput != null ? `<small>超过 ${Number(tiers.thresholdTokens).toLocaleString()} tokens：${money(longOutput)}</small>` : '';
+      return `<tr><td><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}</td><td>${money(outputPrice(model))}${model.model_name === 'acu-auto' ? '<small>按实际选中模型计费</small>' : ''}${tier}</td></tr>`;
     }).join('');
   }
 
   function pricesPage() {
     const rows = priceRows();
-    return `<section class="panel billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 标准上下文档 · Judge 评估不另收费</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="input_cny_per_million" ${state.sort === 'input_cny_per_million' ? 'selected' : ''}>输入价格从低到高</option><option value="output_cny_per_million" ${state.sort === 'output_cny_per_million' ? 'selected' : ''}>输出价格从低到高</option></select></label></div>
+    return `<section class="panel billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option></select></label></div>
       ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}
-      <div class="billing-table-scroll"><table><thead><tr><th>模型</th><th>输入</th><th>输出</th><th>缓存读取</th><th>倍率</th><th>计费方式</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
+      <div class="billing-table-scroll"><table><thead><tr><th>模型</th><th>输出价格</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
   }
 
   function update(source = '') {
