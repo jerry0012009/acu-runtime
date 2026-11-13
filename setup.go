@@ -7,16 +7,8 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
-
-type keyHealth struct {
-	mu                            sync.Mutex
-	provider, base, masked, state string
-	checked                       time.Time
-	checking                      bool
-}
 
 func (host *server) checkProvider(ctx context.Context, provider string) error {
 	view := host.connection(ctx)
@@ -29,86 +21,7 @@ func (host *server) checkProvider(ctx context.Context, provider string) error {
 	if !found {
 		return errors.New("所选 ACU Key 已删除或停用，请重新选择")
 	}
-	var listed struct {
-		Providers []localProvider `json:"providers"`
-	}
-	if err := host.kernel.exchange(ctx, "GET", "/api/providers", nil, &listed); err != nil {
-		return err
-	}
-	var base string
-	for _, current := range listed.Providers {
-		if current.ID != provider {
-			continue
-		}
-		for _, address := range []string{current.Responses, current.Chat, current.Anthropic} {
-			if value, err := acuBase(address); err == nil {
-				base = value
-				break
-			}
-		}
-	}
-	if base == "" {
-		return errors.New("无法读取 ACU 地址")
-	}
-	var revealed struct {
-		Key string `json:"key"`
-	}
-	if err := host.kernel.exchange(ctx, "POST", "/api/provider/key", map[string]string{"id": provider}, &revealed); err != nil {
-		return err
-	}
-	if revealed.Key == "" {
-		return errors.New("所选 ACU Key 已删除，请重新选择")
-	}
-	var models []struct {
-		ID string `json:"id"`
-	}
-	if err := host.cloudJSON(ctx, "GET", base+"/v1/models", revealed.Key, &models); err != nil {
-		return err
-	}
-	if len(models) == 0 {
-		return errors.New("此 Key 没有可用模型")
-	}
-	return nil
-}
-
-func (host *server) connectionHealth(view connectionView) connectionView {
-	if !view.Configured {
-		return view
-	}
-	health := &host.health
-	health.mu.Lock()
-	if health.provider != view.Provider || health.base != view.Base || health.masked != view.Masked {
-		health.provider, health.base, health.masked, health.state, health.checked = view.Provider, view.Base, view.Masked, "", time.Time{}
-	}
-	if health.state == "invalid" {
-		view.Configured = false
-		view.Error = "Key 已失效，请更换"
-	}
-	if !health.checking && time.Since(health.checked) > 30*time.Second {
-		health.checking = true
-		provider, base, masked := view.Provider, view.Base, view.Masked
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-			defer cancel()
-			err := host.checkProvider(ctx, provider)
-			health.mu.Lock()
-			defer health.mu.Unlock()
-			health.checking = false
-			if health.provider != provider || health.base != base || health.masked != masked {
-				return
-			}
-			health.checked = time.Now()
-			health.state = "valid"
-			if err != nil {
-				health.state = "unknown"
-				if strings.Contains(err.Error(), "已失效") || strings.Contains(err.Error(), "已删除") || strings.Contains(err.Error(), "没有可用模型") {
-					health.state = "invalid"
-				}
-			}
-		}()
-	}
-	health.mu.Unlock()
-	return view
+	return host.kernel.exchange(ctx, "POST", "/api/provider/models", map[string]string{"id": provider}, nil)
 }
 
 type setupOption struct {
@@ -186,11 +99,6 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		return
 	}
 	if err := host.checkProvider(ctx, input.Provider); err != nil {
-		host.health.mu.Lock()
-		if host.health.provider == input.Provider && (strings.Contains(err.Error(), "已失效") || strings.Contains(err.Error(), "已删除") || strings.Contains(err.Error(), "没有可用模型")) {
-			host.health.state, host.health.checked = "invalid", time.Now()
-		}
-		host.health.mu.Unlock()
 		host.json(response, 400, map[string]string{"error": err.Error()})
 		return
 	}

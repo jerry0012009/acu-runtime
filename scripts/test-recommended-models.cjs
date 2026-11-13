@@ -55,7 +55,7 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(configurations.length, 1);
       assert.equal(configurations[0].model, 'acu-auto');
       assert.equal(configurations[0].preserve === true, connected);
-      assert.deepEqual(changes, [{ hidden: connected ? [] : ['acu-runtime/claude-fable-5'] }]);
+      assert.deepEqual(changes, [{ hidden: [] }]);
       assert.deepEqual(errors, []);
       await page.close();
     }

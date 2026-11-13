@@ -116,8 +116,8 @@ node scripts/test-native-login.cjs
 
 首次识图优先推荐当前 ACU Key 提供的 `gpt-6.1-sol`，生图推荐 `gpt-image-2.5-sunburst-2026-09-08`（或其 Sunburst 别名）。已有选择及 `off` 保留。没有推荐候选时提示用户手选，不随意改用其他生图模型。配置状态不代表收费推理已验证成功；Agent 自己决定工具调用，不保证原生能力与 MCP 的固定优先级。
 
-尚未配置搜索后端时，自动分配 [DuckDuckGo MCP Server](https://github.com/nickclyde/duckduckgo-mcp-server)，MIT 许可、无需付费 Key，固定 `duckduckgo-mcp-server[browser]==0.7.0`。搜索与网页提取由该开源项目实现。已有运行环境直接复用；没有环境时 Runtime 优先使用安装包附带并校验 SHA-256 的 uv 0.13.7；开发版本缺少包内环境时自动从 Astral 官方 Release 下载固定版本并校验，在 ACURuntime 私有工具目录解压，调用其包管理器自动准备 Python 3.12 / MCP 依赖后再分配工具。无需用户选择、管理员权限、修改系统 PATH 或手动安装。正式安装包不需要临时去 GitHub 获取运行环境；首次仍需联网下载 MCP / Python 依赖，可能数分钟；失败明确显示可重试原因。
-免费搜索受 DuckDuckGo 可达性和限流影响，搜索内容直接发给 DuckDuckGo，不使用或发送 ACU Key。未来 ACU SearXNG 上线后，在「配置 ACU 搜索服务」填写官方 HTTPS 基址；Runtime 只向官方域名配置当前 ACU Key，由内核执行 Bearer 认证。留空保留原配置，停用 / 移除旧来源在工具目录及内核搜索设置中完成；不会自动删除其他 MCP。
+识图、生图和搜索复用 Magpie 原生 MCP，应用内使用 `acu-vision`、`acu-image`、`acu-search` 名称。工具定义由原生目录安装，不再额外准备 uv、Python 或 DuckDuckGo MCP。模型候选与自动选择由内核提供，不维护型号专属的能力名单，也不以 Runtime 本地 profile 缺失禁用视觉输入。
+未配置搜索来源时使用内核免 Key 搜索；已有来源和显式停用保留。旧版 Runtime 管理的搜索工具在原生工具成功接管后解除重复分配，原记录保留。自定义 MCP、禁用工具和高级选项不自动删除。
 
 新增工具需重新打开 Agent，WorkBuddy 首次仍需信任。PDF 文件读取继续由 Agent 文件工具处理，扫描件需 OCR / 转换，HTTP 图片结果应及时保存；这些边界不因添加 MCP 自动消失。
 

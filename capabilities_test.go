@@ -20,7 +20,7 @@ type capabilityFixture struct {
 
 func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 	t.Helper()
-	f := &capabilityFixture{prefs: map[string]any{"gateway": "http://127.0.0.1:3425", "vision": "", "imageGen": "", "theme": "dark", "searchAPIs": []map[string]any{{"vendor": "searxng", "ready": true}}, "visionModels": []map[string]string{{"id": "acu-runtime/gpt-6.1-sol", "name": "Sol"}}, "imageGenModels": []map[string]string{{"id": "acu-runtime/gpt-image-2.5-sunburst-2026-09-08", "name": "Sunburst"}}}, servers: []map[string]any{{"name": "external", "transport": "stdio", "command": "existing", "agents": []string{"codex"}}}}
+	f := &capabilityFixture{prefs: map[string]any{"gateway": "http://127.0.0.1:3425", "vision": "", "visionAuto": "acu-runtime/gpt-6.1-sol", "imageGen": "", "imageGenAuto": "acu-runtime/gpt-image-2.5-sunburst-2026-09-08", "theme": "dark", "searchAPIs": []map[string]any{{"vendor": "searxng", "ready": true}}, "visionModels": []map[string]string{{"id": "acu-runtime/gpt-6.1-sol", "name": "Sol"}}, "imageGenModels": []map[string]string{{"id": "acu-runtime/gpt-image-2.5-sunburst-2026-09-08", "name": "Sunburst"}}}, servers: []map[string]any{{"name": "external", "transport": "stdio", "command": "existing", "agents": []string{"codex"}}}}
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == "POST" {
@@ -28,7 +28,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		}
 		switch r.URL.Path {
 		case "/api/providers":
-			io.WriteString(w, strings.Replace(setupProviders, `"models":[`, `"models":[{"id":"gpt-6.1-sol","on":true},`, 1))
+			io.WriteString(w, strings.Replace(setupProviders, `"models":[`, `"models":[{"id":"gpt-6.1-sol","on":true,"images":true},`, 1))
 		case "/api/state":
 			io.WriteString(w, `{"agents":[{"id":"codex"},{"id":"claude"},{"id":"hermes"},{"id":"workbuddy"}]}`)
 		case "/api/settings":
@@ -38,6 +38,36 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			json.NewEncoder(w).Encode(f.prefs)
 		case "/api/library":
 			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers})
+		case "/api/library/market/servers":
+			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"}]}`)
+		case "/api/library/market/server":
+			var in struct{ ID string }
+			json.NewDecoder(r.Body).Decode(&in)
+			kind := map[string]string{"magpie-vision": "vision", "magpie-image": "image", "magpie-web-search": "search"}[in.ID]
+			f.servers = append(f.servers, map[string]any{"name": in.ID, "transport": "stdio", "command": "/native/magpie", "args": []string{"mcp", kind}, "agents": []string{}})
+			io.WriteString(w, `{}`)
+		case "/api/library/servers/agents":
+			var in struct {
+				Name   string
+				Agents []string
+			}
+			json.NewDecoder(r.Body).Decode(&in)
+			for _, s := range f.servers {
+				if s["name"] == in.Name {
+					s["agents"] = in.Agents
+				}
+			}
+			io.WriteString(w, `{}`)
+		case "/api/library/servers/remove":
+			var in struct{ Name string }
+			json.NewDecoder(r.Body).Decode(&in)
+			for i, s := range f.servers {
+				if s["name"] == in.Name {
+					f.servers = append(f.servers[:i], f.servers[i+1:]...)
+					break
+				}
+			}
+			io.WriteString(w, `{}`)
 		case "/api/library/skills/probe":
 			io.WriteString(w, `{"candidates":[{"name":"acu-image-tools","path":"."}]}`)
 		case "/api/library/skills/install":
@@ -78,7 +108,11 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			http.Error(w, "unexpected", 404)
 		}
 	}))
-	host.prepareSearch = func(context.Context, string) error { return nil }
+	host.setKernelSetting = func(ctx context.Context, key, value string) error {
+		f.writes = append(f.writes, "native-setting:"+key)
+		f.prefs[key] = value
+		return nil
+	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
 	return host, f
 }
@@ -90,7 +124,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Vision != "acu-runtime/gpt-6.1-sol" || !strings.Contains(view.ImageGen, "sunburst") || len(f.servers) != 4 {
+	if view.Vision != "" || view.ImageGen != "" || len(f.servers) != 4 {
 		t.Fatalf("recommendations missing: %+v", view)
 	}
 	f.prefs["vision"] = "off"
@@ -118,7 +152,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	}
 }
 func TestCapabilityValidationBeforeMutation(t *testing.T) {
-	for _, kind := range []string{"conflict", "model", "agent", "provider", "url", "gateway"} {
+	for _, kind := range []string{"conflict", "model", "agent", "provider", "url"} {
 		t.Run(kind, func(t *testing.T) {
 			host, f := capabilityTestHost(t)
 			in := capabilityInput{Provider: "acu-runtime", Agents: []string{"codex"}}
@@ -147,12 +181,12 @@ func TestCapabilityValidationBeforeMutation(t *testing.T) {
 		})
 	}
 }
-func TestCapabilitySearchKeyStaysInKernel(t *testing.T) {
+func TestCapabilityDoesNotExtractModelKeyForSearch(t *testing.T) {
 	host, f := capabilityTestHost(t)
 	url := "https://search.acu.best"
 	response := httptest.NewRecorder()
 	host.capabilities(response, httptest.NewRequest("POST", "/runtime/capabilities", strings.NewReader(`{"provider":"acu-runtime","agents":["codex"],"searchURL":"`+url+`"}`)))
-	if response.Code != 200 || f.searchKey != "private-acu-test-key" || strings.Contains(response.Body.String(), "private-acu-test-key") {
+	if response.Code != 400 || f.searchKey != "" || strings.Contains(response.Body.String(), "private-acu-test-key") {
 		t.Fatalf("search delegation failed: %d", response.Code)
 	}
 }
@@ -163,22 +197,7 @@ func TestCapabilityPartialFailure(t *testing.T) {
 		t.Fatalf("false success: %v", err)
 	}
 }
-func TestCapabilitySearchURLBoundary(t *testing.T) {
-	for _, url := range []string{"http://search.acu.best", "https://acu.best.evil.test", "https://acu.best@evil.test", "https://search.acu.best:8443", "https://search.acu.best?key=x", "https://127.0.0.1"} {
-		if validateSearchURL(url) == nil {
-			t.Errorf("accepted %s", url)
-		}
-	}
-	for _, url := range []string{"https://search.acu.best", "https://search.acucompute.com/api", ""} {
-		if err := validateSearchURL(url); err != nil {
-			t.Error(err)
-		}
-	}
-}
-func TestCapabilityFreeSearchUsesNoSecrets(t *testing.T) {
-	if freeSearchCommand() == "" {
-		t.Skip("uvx not installed")
-	}
+func TestCapabilityDisabledSearchDoesNotInstallExtraRuntime(t *testing.T) {
 	host, f := capabilityTestHost(t)
 	// An explicit disabled source is retained; the extra free MCP remains available.
 	f.prefs["searchAPIs"] = []map[string]any{{"vendor": "you", "off": true}}
@@ -186,15 +205,12 @@ func TestCapabilityFreeSearchUsesNoSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !view.FreeSearchConfigured {
-		t.Fatal("free search missing")
+	if view.FreeSearchConfigured || view.SearchReady {
+		t.Fatal("disabled native search overridden")
 	}
 	for _, s := range f.servers {
-		if s["name"] == "acu-free-search" {
-			b, _ := json.Marshal(s)
-			if s["transport"] != "stdio" || strings.Contains(string(b), "private-acu") || !strings.Contains(string(b), "==0.7.0") {
-				t.Fatalf("incorrect free search: %s", b)
-			}
+		if s["name"] == "acu-free-search" || s["name"] == "acu-search" {
+			t.Fatal("extra search installed")
 		}
 	}
 }
@@ -208,7 +224,7 @@ func TestCapabilityModelSaveDoesNotTouchTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(f.writes) != 1 || f.writes[0] != "/api/settings" {
+	if len(f.writes) != 1 || f.writes[0] != "native-setting:vision" {
 		t.Fatalf("model save rewrote tools: %v", f.writes)
 	}
 	if f.prefs["imageGen"] != "" {
@@ -228,10 +244,6 @@ func TestCapabilityModelSaveRejectsMixedOperations(t *testing.T) {
 func TestCapabilityPrefersNativeKeylessSearch(t *testing.T) {
 	host, f := capabilityTestHost(t)
 	f.prefs["searchAPIs"] = []any{}
-	host.prepareSearch = func(context.Context, string) error {
-		t.Fatal("prepared extra package despite native search")
-		return nil
-	}
 	view, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", Agents: []string{"codex"}})
 	if err != nil {
 		t.Fatal(err)

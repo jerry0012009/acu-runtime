@@ -55,6 +55,11 @@ func (host *server) ensureACUContext(ctx context.Context, provider string) error
 // Use the kernel's native, keyless search before preparing an extra package.
 // An explicitly disabled/configured source is a user choice and stays intact.
 func (host *server) ensureNativeSearch(ctx context.Context, prefs map[string]json.RawMessage) (bool, error) {
+	var searcher string
+	json.Unmarshal(prefs["searcher"], &searcher)
+	if searcher != "" {
+		return false, nil
+	}
 	var apis []json.RawMessage
 	json.Unmarshal(prefs["searchAPIs"], &apis)
 	if len(apis) != 0 {

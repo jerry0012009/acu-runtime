@@ -381,7 +381,7 @@ test('one click previews options, and only confirmation configures selected agen
   assert(!instance.elements.overlay.innerHTML.includes('role="switch"'));
   assert.equal(instance.run('ui.setup.model'), 'acu-auto');
   await instance.run('confirmSetup()');
-  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/kernel/api/agent-models/codex', '/runtime/capabilities']);
+  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/runtime/capabilities']);
   assert.deepEqual(JSON.parse(posts(instance)[0].body), { agent: 'codex', provider: 'acu-runtime', model: 'acu-auto', auxiliary: false });
   assert.equal(instance.run('ui.selected.has("codex")'), false);
 });
@@ -569,7 +569,7 @@ test('ordinary inventory excludes routing groups and bulk actions preserve their
 });
 
 
-test('recommendations hide older and special-purpose models but protect active and unrelated entries', async () => {
+test('recommendations do not rewrite native model visibility', async () => {
   const instance = await setup({ ready: true, agents: [codex()] }, async (route, options) => {
     if (route === '/kernel/api/agent-models/codex' && !options.method) return { body: { models: [
       { id: 'acu-runtime/gpt-6.1-sol', hidden: true },
@@ -578,9 +578,8 @@ test('recommendations hide older and special-purpose models but protect active a
       { id: 'auto/image' }, { id: 'other/hidden', hidden: true }
     ] } };
   });
-  await instance.run('applyRecommendedVisibility("codex", "acu-runtime", "acu-auto")');
-  const payload = JSON.parse(posts(instance).at(-1).body);
-  assert.deepEqual(payload.hidden, ['acu-runtime/gpt-image-1', 'other/hidden']);
+  await instance.run('configureAgent("codex")');
+  assert(!posts(instance).some(call=>call.route.startsWith('/kernel/api/agent-models/')));
   assert.equal(instance.run('recommendedModels({ models: ["gpt-image-1", "gpt-6.1-sol", "glm-5.3-flash"] }).join(",")'), 'gpt-6.1-sol,glm-5.3-flash');
 });
 

@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 const setupProviders = `{"providers":[{"id":"acu-runtime","name":"ACU","chat":"https://acu.best/v1","key":{"set":true,"masked":"sk-fixture"},"models":[{"id":"acu-auto","on":true}]}]}`
@@ -50,61 +49,26 @@ func TestProviderProbeRejectsRemovedKeysWithoutRevealingOrWriting(t *testing.T) 
 	}
 }
 
-func TestProviderHealthDistinguishesRevocationFromNetworkAndCloudflare(t *testing.T) {
-	for _, current := range []struct {
-		name   string
-		status int
-		state  string
-	}{
-		{"valid", 200, "valid"}, {"revoked", 401, "invalid"}, {"cloudflare", 403, "unknown"}, {"rate-limit", 429, "unknown"}, {"network", 0, "unknown"},
-	} {
-		t.Run(current.name, func(t *testing.T) {
-			host, _ := testServer(t, http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-				switch request.URL.Path {
-				case "/api/providers":
-					io.WriteString(response, setupProviders)
-				case "/api/provider/key":
-					io.WriteString(response, `{"key":"fixture-secret"}`)
-				default:
-					t.Errorf("unexpected kernel request: %s", request.URL.Path)
-				}
-			}))
-			host.cloudTransport = modelProbe(t, current.status)
-			if current.status == 0 {
-				host.cloudTransport = accountTransport(func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") })
+func TestProviderCheckDelegatesToKernelWithoutRevealingKey(t *testing.T) {
+	for _, status := range []int{200, 401, 403, 429, 503} {
+		host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/providers" {
+				io.WriteString(w, setupProviders)
+				return
 			}
-			view := host.connection(context.Background())
-			host.connectionHealth(view)
-			deadline := time.Now().Add(3 * time.Second)
-			for {
-				host.health.mu.Lock()
-				state, checking := host.health.state, host.health.checking
-				host.health.mu.Unlock()
-				if !checking {
-					if state != current.state {
-						t.Fatalf("health = %s, want %s", state, current.state)
-					}
-					break
-				}
-				if time.Now().After(deadline) {
-					t.Fatal("health check did not finish")
-				}
-				time.Sleep(time.Millisecond)
+			if r.URL.Path != "/api/provider/models" || r.Method != "POST" {
+				t.Errorf("unexpected key access %s", r.URL.Path)
 			}
-			if got := host.connectionHealth(view); got.Configured != (current.state != "invalid") {
-				t.Fatalf("invalid saved key still appeared connected: %+v", got)
-			}
-			host.health.mu.Lock()
-			host.health.state = "invalid"
-			host.health.mu.Unlock()
-			view.Masked = "sk-new-key"
-			host.health.mu.Lock()
-			host.health.checking = true
-			host.health.mu.Unlock()
-			if !host.connectionHealth(view).Configured {
-				t.Fatal("old revocation was applied to a replacement key")
-			}
+			w.WriteHeader(status)
+			io.WriteString(w, `{}`)
+		}))
+		host.cloudTransport = accountTransport(func(*http.Request) (*http.Response, error) {
+			t.Fatal("Runtime bypassed kernel")
+			return nil, errors.New("unexpected")
 		})
+		if err := host.checkProvider(context.Background(), "acu-runtime"); (err == nil) != (status == 200) {
+			t.Fatalf("kernel error not preserved: %d %v", status, err)
+		}
 	}
 }
 
@@ -157,6 +121,12 @@ func TestAgentSetupUsesExactNativeModelAndPreservesOtherSettings(t *testing.T) {
 					return
 				case "/api/provider/key":
 					io.WriteString(response, `{"key":"fixture-secret"}`)
+					return
+				case "/api/provider/models":
+					if current.revoked {
+						response.WriteHeader(401)
+					}
+					io.WriteString(response, `{}`)
 					return
 				case "/api/agents/connect/" + current.agent:
 					connects++
@@ -234,6 +204,8 @@ func TestAgentSetupPreserveDoesNotRewriteConnectedModel(t *testing.T) {
 			io.WriteString(w, setupProviders)
 		case "/api/provider/key":
 			io.WriteString(w, `{"key":"fixture-secret"}`)
+		case "/api/provider/models":
+			io.WriteString(w, `{}`)
 		case "/api/state":
 			io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"fields":[{"key":"model","value":"other/custom-model"}]}]}`)
 		default:

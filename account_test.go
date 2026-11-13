@@ -61,8 +61,18 @@ func TestManualConnectionPreparesThreeProtocolsWithoutInference(t *testing.T) {
 	var writes []map[string]any
 	var paths []string
 	host, _ := testServer(t, http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/provider/list" {
+			paths = append(paths, "native-list")
+			io.WriteString(response, `{"models":[{"id":"acu-auto"},{"id":"gpt-6.1-sol"},{"id":"acu-auto"}]}`)
+			return
+		}
 		if request.Method == http.MethodGet {
 			io.WriteString(response, `{"providers":[]}`)
+			return
+		}
+		if request.URL.Path == "/api/provider/models" {
+			paths = append(paths, "native-refresh")
+			io.WriteString(response, `{}`)
 			return
 		}
 		if request.URL.Path != "/api/provider/save" {
@@ -83,7 +93,7 @@ func TestManualConnectionPreparesThreeProtocolsWithoutInference(t *testing.T) {
 	if err := host.saveACUConnection(context.Background(), "https://acu.best/v1", "fixture-model-key"); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(paths, ",") != "GET /v1/models" || len(writes) != 1 {
+	if strings.Join(paths, ",") != "native-list,native-refresh" || len(writes) != 1 {
 		t.Fatalf("unexpected inference or write: %v, %v", paths, writes)
 	}
 	for field, expected := range map[string]string{"id": "acu-runtime", "chat": "https://acu.best/v1", "responses": "https://acu.best/v1", "anthropic": "https://acu.best", "modelsURL": "https://acu.best/v1/models"} {
@@ -104,6 +114,17 @@ func TestConnectionFailureNeverOverwritesExistingProviders(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			host, _ := testServer(t, http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				if request.URL.Path == "/api/provider/list" {
+					if test.name == "invalid-key" {
+						response.WriteHeader(401)
+					}
+					if test.name == "no-models" {
+						io.WriteString(response, `{"models":[]}`)
+					} else {
+						io.WriteString(response, `{"models":[{"id":"acu-auto"}]}`)
+					}
+					return
+				}
 				if request.Method != "GET" {
 					t.Error("configuration was overwritten after a failure")
 				}
@@ -156,6 +177,10 @@ func TestNativeAccountBridgeOriginNonceExpiryAndWindow(t *testing.T) {
 func TestAccountLoginAndSelectedKeyStayInNativeBackend(t *testing.T) {
 	var savedKey string
 	host, _ := testServer(t, http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/provider/list" {
+			io.WriteString(response, `{"models":[{"id":"acu-auto"}]}`)
+			return
+		}
 		if request.URL.Path == "/api/provider/save" {
 			var body struct {
 				Key string `json:"key"`
@@ -216,7 +241,7 @@ func TestAccountLoginAndSelectedKeyStayInNativeBackend(t *testing.T) {
 			t.Fatal("full API credential leaked to browser")
 		}
 	}
-	if strings.Join(remotePaths, ",") != "/api/user/self,/api/token/,/api/token/7/key,/v1/models,/api/token/9/key,/v1/models" {
+	if strings.Join(remotePaths, ",") != "/api/user/self,/api/token/,/api/token/7/key,/api/token/9/key" {
 		t.Fatalf("unexpected key reveal/inference: %v", remotePaths)
 	}
 	host.account.expires = time.Now().Add(-time.Second).Unix()

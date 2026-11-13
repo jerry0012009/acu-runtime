@@ -62,6 +62,8 @@ func TestNativeLoginSmoke(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		switch request.URL.Path {
+		case "/api/provider/list":
+			io.WriteString(response, `{"models":[{"id":"acu-auto"}]}`)
 		case "/api/provider/save":
 			providerWrites++
 			var input struct {

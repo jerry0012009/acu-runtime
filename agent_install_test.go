@@ -138,12 +138,14 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 			io.WriteString(w, setupProviders)
 		case "/api/provider/key":
 			io.WriteString(w, `{"key":"fixture-secret"}`)
+		case "/api/provider/models":
+			io.WriteString(w, `{}`)
 		case "/api/state":
 			io.WriteString(w, `{"agents":[{"id":"workbuddy","wired":true,"fields":[]}]}`)
 		case "/api/settings":
 			io.WriteString(w, `{"gateway":"http://127.0.0.1:3425","vision":"existing/vision","imageGen":"off","searchAPIs":[{"vendor":"you","ready":true}]}`)
 		case "/api/library":
-			io.WriteString(w, `{"servers":[]}`)
+			io.WriteString(w, `{"servers":[{"name":"acu-vision","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-image","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-search","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]}]}`)
 		case "/api/library/servers/save":
 			io.WriteString(w, `{}`)
 		case "/api/library/skills/probe":
@@ -171,7 +173,7 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 			n++
 		}
 	}
-	if n != 3 {
-		t.Fatalf("expected three kernel-managed MCP assignments, got %d", n)
+	if n != 0 {
+		t.Fatalf("rewrote already assigned native tools: %d", n)
 	}
 }

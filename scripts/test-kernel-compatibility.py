@@ -15,6 +15,9 @@ import sys
 import tempfile
 import time
 import urllib.request
+import threading
+import queue
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 def free_port():
@@ -25,6 +28,14 @@ def free_port():
 
 kernel, runtime = [str(Path(p).resolve()) for p in sys.argv[1:3]]
 flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+class ModelList(BaseHTTPRequestHandler):
+    def do_GET(self):
+        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, {"id": "gpt-image-2.5-sunburst-2026-09-08", "kind": "image"}]}).encode()
+        self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(payload)
+    def log_message(self, *args):
+        pass
+vendor = ThreadingHTTPServer(("127.0.0.1", 0), ModelList)
+threading.Thread(target=vendor.serve_forever, daemon=True).start()
 with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
     root = Path(folder)
     env = os.environ.copy()
@@ -113,7 +124,8 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             wait(origin + "/?k=" + env["MAGPIE_WEB_KEY"])
             models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08"]
             request(origin + "/api/provider/save", {"id": "acu-runtime", "name": "ACU fixture",
-                "key": "not-a-real-key", "new": True, "chat": "https://acu.best/v1", "models": models})
+                "key": "not-a-real-key", "new": True, "chat": "https://acu.best/v1", "modelsURL":"http://127.0.0.1:"+str(vendor.server_port)+"/v1/models", "models": models})
+            request(origin + "/api/provider/models", {"id":"acu-runtime"})
             request(origin + "/api/agents/rescan", {})
             ids = ["codex", "claude", "hermes", "workbuddy"]
             agents = {a["id"]: a for a in request(origin + "/api/state")["agents"]}
@@ -147,20 +159,34 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             assert {s["name"] for s in owned} == {"acu-image", "acu-vision", "acu-search"}, owned
             for tool in owned:
                 assert set(tool["agents"]) == set(ids), tool
-            assert repeated["vision"] == "acu-runtime/gpt-6.1-sol"
-            assert repeated["imageGen"] == "acu-runtime/gpt-image-2.5-sunburst-2026-09-08"
+            assert repeated["vision"] == "acu-runtime/gpt-6.1-sol" or repeated["visionAuto"], repeated
+            assert repeated["imageGen"] == "" and repeated["imageGenAuto"], repeated
             assert repeated["searchReady"]
             assert "mcp_servers.mine" in (Path(env["CODEX_HOME"]) / "config.toml").read_text()
             before = config_files()
             changed = request(rt + "/runtime/capabilities", {"provider": "acu-runtime", "modelsOnly": True, "vision": "off"}, token)
             assert changed["vision"] == "off" and config_files() == before
-            # Check the HTTP MCP protocol and advertised tools, without a model call.
+            # Native stdio definitions and ACU names must survive real agent sync.
             for tool in owned:
-                req = urllib.request.Request(tool["url"], data=json.dumps({"jsonrpc": "2.0", "id": 1,
-                    "method": "tools/list", "params": {}}).encode(), headers={"Content-Type": "application/json",
-                    "Accept": "application/json, text/event-stream"})
-                with client.open(req, timeout=20) as response:
-                    data = response.read().decode()
+                assert tool["transport"] == "stdio" and tool["args"][0] == "mcp", tool
+                assert Path(tool["command"]).is_file(), tool
+                proc = subprocess.Popen([tool["command"], *tool["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
+                replies = queue.Queue()
+                threading.Thread(target=lambda: [replies.put(line) for line in proc.stdout], daemon=True).start()
+                def rpc(message):
+                    proc.stdin.write(json.dumps(message)+'\n'); proc.stdin.flush()
+                    if 'id' not in message:
+                        return ''
+                    while True:
+                        line = replies.get(timeout=30)
+                        if json.loads(line).get('id') == message['id']:
+                            return line
+                try:
+                    rpc({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"fixture","version":"1"}}})
+                    rpc({"jsonrpc":"2.0","method":"notifications/initialized"})
+                    data = rpc({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}})
+                finally:
+                    proc.terminate(); proc.wait(timeout=10)
                 for expected in {"acu-image": ["generate_image", "generation_result"],
                                  "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"]}[tool["name"]]:
                     assert expected in data, (tool["name"], data[:500])
@@ -181,3 +207,4 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait(timeout=10)
+vendor.shutdown()

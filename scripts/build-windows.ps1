@@ -11,14 +11,6 @@ try {
     $application = Join-Path $output 'ACU Runtime.exe'
     & $GoExecutable build -tags desktop,production -ldflags '-H windowsgui' -o $application .
     if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed' }
-    $search = (& $application --search-runtime-release-json | Out-String | ConvertFrom-Json)
-    $searchArchive = Join-Path $root 'web/search-runtime.archive'
-    if (!(Test-Path -LiteralPath $searchArchive) -or (Get-FileHash -LiteralPath $searchArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $search.sha256) {
-        python scripts/download-release.py astral-sh/uv $search.version $search.name $search.sha256 $searchArchive
-        if ($LASTEXITCODE -ne 0) { throw 'Search runtime download or checksum failed' }
-    }
-    & $GoExecutable build -tags desktop,production -ldflags '-H windowsgui' -o $application .
-    if ($LASTEXITCODE -ne 0) { throw 'Bundled desktop build failed' }
     $release = (& $application --kernel-release-json | Out-String | ConvertFrom-Json)
     if (!$release.sha256 -or $release.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Invalid kernel manifest' }
     $kernel = Join-Path $kernelDirectory 'acu-kernel.exe'

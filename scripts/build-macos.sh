@@ -10,16 +10,6 @@ app="$out/ACU Runtime.app"
 mkdir -p "$app/Contents/MacOS/kernel" "$app/Contents/Resources"
 export CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=12.0
 go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
-"$app/Contents/MacOS/ACU Runtime" --search-runtime-release-json > "$out/search-release.json"
-python3 - "$out/search-release.json" <<'PY'
-import json, pathlib, sys
-sys.path.insert(0, 'scripts')
-from importlib import import_module
-download = import_module('download-release').download
-manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
-download('astral-sh/uv', manifest['version'], manifest['name'], manifest['sha256'], 'web/search-runtime.archive')
-PY
-go build -tags desktop,production -trimpath -o "$app/Contents/MacOS/ACU Runtime" .
 "$app/Contents/MacOS/ACU Runtime" --kernel-release-json > "$out/kernel-release.json"
 python3 - "$out/kernel-release.json" "$app" "$version" <<'PY'
 import json, pathlib, plistlib, sys

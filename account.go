@@ -492,15 +492,18 @@ func (host *server) saveACUConnection(ctx context.Context, address, key string) 
 	if key == "" || len(key) > 4096 || strings.ContainsAny(key, "\r\n\t ") {
 		return errors.New("请输入完整的 ACU API Key")
 	}
-	var models []struct {
-		ID string `json:"id"`
+	connection := map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models"}
+	var listed struct {
+		Models []struct {
+			ID string `json:"id"`
+		} `json:"models"`
 	}
-	if err := host.cloudJSON(ctx, http.MethodGet, base+"/v1/models", key, &models); err != nil {
+	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/list", connection, &listed); err != nil {
 		return err
 	}
 	ids := []string{}
 	seen := map[string]bool{}
-	for _, model := range models {
+	for _, model := range listed.Models {
 		if model.ID != "" && len(model.ID) <= 256 && !strings.ContainsAny(model.ID, "\r\n\t") && !seen[model.ID] {
 			ids = append(ids, model.ID)
 			seen[model.ID] = true
@@ -525,14 +528,19 @@ func (host *server) saveACUConnection(ctx context.Context, address, key string) 
 		}
 		found, off = true, provider.Off
 	}
-	body := map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models", "models": ids, "new": !found}
+	body := connection
+	body["models"], body["new"] = ids, !found
 	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/save", body, nil); err != nil {
 		return err
 	}
 	if off {
-		return host.kernel.exchange(ctx, http.MethodPost, "/api/provider/on", map[string]string{"id": "acu-runtime"}, nil)
+		if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/on", map[string]string{"id": "acu-runtime"}, nil); err != nil {
+			return err
+		}
 	}
-	return nil
+	// The add-form list is chat-only and does not persist the native media
+	// catalog. Refresh the saved provider as the native editor does.
+	return host.kernel.exchange(ctx, http.MethodPost, "/api/provider/models", map[string]string{"id": "acu-runtime"}, nil)
 }
 
 func (host *server) configureACU(response http.ResponseWriter, request *http.Request) {

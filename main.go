@@ -101,10 +101,9 @@ type server struct {
 	prices           priceCache
 	loginRequests    chan loginTicket
 	cloudTransport   http.RoundTripper
-	health           keyHealth
 	update           updateState
 	capabilityMu     sync.Mutex
-	prepareSearch    func(context.Context, string) error
+	setKernelSetting func(context.Context, string, string) error
 	imageSkillSource func() (string, error)
 	agentInstall     agentInstallState
 	agentVersions    agentVersionCache
@@ -539,7 +538,7 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 	var groups []routingGroupView
 	if ready {
 		ctx, cancel := context.WithTimeout(request.Context(), 12*time.Second)
-		connection = host.connectionHealth(host.connection(ctx))
+		connection = host.connection(ctx)
 		groups = host.modelInventory(ctx, agents)
 		cancel()
 	}
@@ -738,20 +737,11 @@ func main() {
 	agentPackagesFrom := flag.String("agent-packages-from", "", "optional offline vendor packages beside the installer")
 	agentPackagesJSON := flag.Bool("agent-packages-json", false, "print official desktop package metadata")
 	releaseJSON := flag.Bool("kernel-release-json", false, "print the pinned kernel package metadata")
-	searchReleaseJSON := flag.Bool("search-runtime-release-json", false, "print the pinned search runtime metadata")
 	flag.Parse()
 	if *agentPackagesJSON {
 		workbuddy, _ := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
 		chatgpt, _ := chatGPTPackage(runtime.GOOS, runtime.GOARCH)
 		json.NewEncoder(os.Stdout).Encode(map[string]agentPackage{"workbuddy": workbuddy, "chatgpt": chatgpt})
-		return
-	}
-	if *searchReleaseJSON {
-		release, err := searchRuntimeRelease(runtime.GOOS, runtime.GOARCH)
-		if err != nil {
-			log.Fatal(err)
-		}
-		json.NewEncoder(os.Stdout).Encode(map[string]string{"version": searchRuntimeVersion, "name": release.name, "sha256": release.sha256})
 		return
 	}
 	if *releaseJSON {
