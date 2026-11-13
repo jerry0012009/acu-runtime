@@ -805,12 +805,12 @@ test('install action supplies selected ACU model and keeps credentials out of re
  assert(!call.body.includes('sk-'));
 });
 
-test('desktop update stays on its own Agent card, never inside first-install recommendations',async()=>{
- const state={desktop:true,platform:'windows',ready:true,agents:[codex()],agentInstall:{agent:'codex',phase:'downloading',update:true,downloaded:50,total:100,message:'verbose download mechanism'}};
+test('supported desktop update stays on its own Agent card, never inside first-install recommendations',async()=>{
+ const state={desktop:true,platform:'windows',ready:true,agents:[{id:'workbuddy',name:'WorkBuddy',detected:true}],agentInstall:{agent:'workbuddy',phase:'downloading',update:true,downloaded:50,total:100,message:'verbose download mechanism'}};
  const instance=await setup(state);await instance.refresh();
  assert.equal(instance.run('agentInstallPanel(1)'),'');
  const card=instance.run('agentCard(ui.status.agents[0])');
- assert(card.includes('ChatGPT · 下载中 50%'));
+ assert(card.includes('WorkBuddy · 下载中 50%'));
  assert(card.includes('取消更新'));
  assert(!card.includes('verbose download mechanism'));
  assert(!instance.run('homeUpdates()').includes('ChatGPT · 下载中'));
@@ -887,15 +887,16 @@ test('all Agent updates retain individual failures and postpone Runtime restart'
  assert(instance.elements.app.innerHTML.includes('更新完成'));
 });
 
-test('ChatGPT update appears on its Agent only when a newer installed desktop version is confirmed',async()=>{
+test('ChatGPT desktop feed cannot create a Runtime update offer or install request',async()=>{
  const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async(route,options)=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:{version:'26.1106.6628.0',latest:'26.1112.100.0',update:true,installed:true,desktop:true}}}}:route==='/runtime/agents/install'?{body:{agent:'codex',phase:'complete',update:true,message:'official'}}:undefined);
  await instance.run('checkAgentVersions()');
  const html=instance.elements.app.innerHTML;
- assert(html.includes('更新 ChatGPT 桌面端 · 26.1106.6628.0 → 26.1112.100.0'));
- assert(instance.run('homeUpdates()').includes('更新 ChatGPT 桌面端')===false);
+ assert(!html.includes('更新 ChatGPT 桌面端'));
+ assert(!instance.run('homeUpdates()').includes('项可更新'));
+ await instance.run('updateAgents(["chatgpt"])');
+ assert.equal(instance.elements.overlay.innerHTML,'');
  await instance.run('installAgent("codex",true)');
- const input=JSON.parse(posts(instance).find(c=>c.route==='/runtime/agents/install').body);
- assert.deepEqual(input,{agent:'codex',update:true});
+ assert(!posts(instance).some(c=>c.route==='/runtime/agents/install'));
  assert(!posts(instance).some(c=>c.route.includes('/api/set')||c.route.includes('/agents/configure')));
 });
 test('current or unconfirmed desktop versions never show an update button',async()=>{
@@ -906,34 +907,35 @@ test('current or unconfirmed desktop versions never show an update button',async
  }
 });
 
-test('desktop update clears old offer and completion banner without restarting Runtime',async()=>{
+test('supported desktop update clears old offer and completion banner without restarting Runtime',async()=>{
  let installed=false;
- const state={desktop:true,platform:'windows',ready:true,agents:[codex()]};
- const instance=await setup(state,async route=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:{version:installed?'26.1111.2228.0':'26.1106.6628.0',latest:'26.1111.2228.0',update:!installed,installed:true,desktop:true}}}}:route==='/runtime/agents/install'?(installed=true,{body:{agent:'codex',phase:'complete',update:true,version:'26.1111.2228.0',message:'ChatGPT 已更新至 26.1111.2228.0'}}):undefined);
+ const state={desktop:true,platform:'windows',ready:true,agents:[{id:'workbuddy',name:'WorkBuddy',detected:true}]};
+ const instance=await setup(state,async route=>route==='/runtime/agents/versions'?{body:{agents:{'workbuddy-desktop':{version:installed?'2.0':'1.0',latest:'2.0',update:!installed,installed:true,desktop:true}}}}:route==='/runtime/agents/install'?(installed=true,{body:{agent:'workbuddy',phase:'complete',update:true,message:'WorkBuddy 已更新'}}):undefined);
  await instance.run('checkAgentVersions()');
- await instance.run('updateAgents(["chatgpt"])');await instance.elements['confirm-action'].onclick();
+ await instance.run('updateAgents(["workbuddy-desktop"])');await instance.elements['confirm-action'].onclick();
  assert(!instance.elements.app.innerHTML.includes('更新 ChatGPT 桌面端 ·'));
  assert(!instance.elements.app.innerHTML.includes('更新完成，请按应用提示重新打开'));
- assert(instance.elements.app.innerHTML.includes('ChatGPT 桌面端 26.1111.2228.0 · 已是最新'));
+ assert(instance.elements.app.innerHTML.includes('WorkBuddy 桌面端 2.0 · 已是最新'));
  assert(!instance.run('homeUpdates()').includes('已更新至'));
- state.agentInstall={agent:'codex',phase:'complete',update:true,message:'old completion'};
+ state.agentInstall={agent:'workbuddy',phase:'complete',update:true,message:'old completion'};
  await instance.refresh();
  assert(!instance.run('homeUpdates()').includes('old completion'),'status polling must not revive completion banner');
  assert(!posts(instance).some(c=>c.route==='/runtime/desktop/quit'||c.route==='/runtime/update/install'));
 });
 
-test('desktop update failure stays visible and does not claim completion',async()=>{
- const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async route=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:{version:'26.1106.6628.0',latest:'26.1111.2228.0',update:true,installed:true,desktop:true}}}}:route==='/runtime/agents/install'?{body:{agent:'codex',phase:'error',update:true,message:'更新尚未生效：当前版本 26.1106.6628.0'}}:undefined);
- await instance.run('checkAgentVersions()');await instance.run('updateAgents(["chatgpt"])');await instance.elements['confirm-action'].onclick();
- assert(instance.elements.app.innerHTML.includes('更新尚未生效'));
- assert(!instance.elements.app.innerHTML.includes('更新完成'));
+test('retired ChatGPT desktop failure does not revive update prompts on polling',async()=>{
+ const state={desktop:true,platform:'windows',ready:true,agents:[codex()],agentInstall:{agent:'codex',phase:'error',update:true,message:'新版安装包未同步'}};
+ const instance=await setup(state);await instance.refresh();
+ assert(!instance.elements.app.innerHTML.includes('新版安装包未同步'));
+ assert(!instance.elements.app.innerHTML.includes('重试更新'));
+ assert(!instance.elements.app.innerHTML.includes('更新 ChatGPT'));
 });
 
-test('network change cannot erase a previously confirmed desktop update',async()=>{
+test('network changes never create ChatGPT desktop update prompts',async()=>{
  let offline=false;
  const instance=await setup({desktop:true,platform:'windows',ready:true,agents:[codex()]},async route=>route==='/runtime/agents/versions'?{body:{agents:{chatgpt:offline?{version:'26.1106.6628.0',installed:true,desktop:true,update:false,error:'最新版本暂时无法确认'}:{version:'26.1106.6628.0',latest:'26.1111.2228.0',installed:true,desktop:true,update:true}}}}:undefined);
  await instance.run('checkAgentVersions()');offline=true;await instance.run('checkAgentVersions()');
- assert(instance.elements.app.innerHTML.includes('26.1106.6628.0 → 26.1111.2228.0'));
- assert(instance.elements.app.innerHTML.includes('最新版本暂时无法确认'));
+ assert(!instance.elements.app.innerHTML.includes('26.1106.6628.0 → 26.1111.2228.0'));
+ assert(!instance.elements.app.innerHTML.includes('最新版本暂时无法确认'));
  assert(!instance.elements.app.innerHTML.includes('已是最新'));
 });

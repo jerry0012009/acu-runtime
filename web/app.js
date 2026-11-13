@@ -88,7 +88,7 @@ async function refresh(rescan = false, quiet = false) {
     if (ui.status.ready && ui.status.desktop && !ui.agentVersionChecking && (!ui.agentVersionChecked || Date.now() - ui.agentVersionChecked > (ui.agentVersionsPending ? 5000 : 60000))) {
       checkAgentVersions();
     }
-    if (ui.status.agentInstall?.phase) {
+    if (ui.status.agentInstall?.phase && !(ui.status.agentInstall.update && ui.status.agentInstall.agent === 'codex')) {
       const install = ui.status.agentInstall;
       const info = ui.agentVersions[install.agent === 'codex' ? 'chatgpt' : 'workbuddy-desktop'];
       if (!(install.update && install.phase === 'complete' && info?.installed && info.latest && !info.update && !info.error)) ui.agentInstall = install;
@@ -251,6 +251,7 @@ function agentInstallPanel(count) {
 }
 
 async function updateDesktopAgent(id) {
+  if (id === 'chatgpt') throw new Error('ChatGPT 桌面端请使用应用内更新');
   const agent=id==='chatgpt'?'codex':'workbuddy';
   ui.agentInstall=await request('/runtime/agents/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent,update:true})});
   const deadline=Date.now()+60*60*1000;
@@ -586,10 +587,10 @@ function agentCard(agent) {
 
 function agentVersionLabel(id) { return id === 'chatgpt' ? 'ChatGPT 桌面端' : id === 'workbuddy-desktop' ? 'WorkBuddy 桌面端' : `${names[id] || id}${id === 'codex' ? ' CLI' : ''}`; }
 function availableAgentUpdates() {
-  return Object.entries(ui.agentVersions).filter(([id,info]) => (names[id] || ['chatgpt','workbuddy-desktop'].includes(id)) && info.update && info.version && info.latest && (info.installed || ui.status?.agents?.some(agent => agent.id === id && agent.detected)));
+  return Object.entries(ui.agentVersions).filter(([id,info]) => (names[id] || id === 'workbuddy-desktop') && info.update && info.version && info.latest && (info.installed || ui.status?.agents?.some(agent => agent.id === id && agent.detected)));
 }
 function agentUpdateControl(id) {
-  const ids = id === 'codex' ? ['codex','chatgpt'] : id === 'workbuddy' ? ['workbuddy','workbuddy-desktop'] : [id];
+  const ids = id === 'workbuddy' ? ['workbuddy','workbuddy-desktop'] : [id];
   return ids.map(key => {
     const info=ui.agentVersions[key],result=ui.agentUpdates[key];
     const install=ui.agentInstall;
@@ -613,7 +614,7 @@ function homeUpdates() {
   const running = ui.updatingAgents || ['checking', 'downloading', 'restarting'].includes(update.phase) || (ui.agentInstall && !['complete', 'error'].includes(ui.agentInstall.phase));
   const runtimeLabel = update.phase === 'available' ? `ACU Runtime ${update.release?.version} 可更新（含配套内核）` : update.phase === 'downloading' ? `正在下载 Runtime 更新${update.total ? ` · ${Math.round(update.downloaded / update.total * 100)}%` : ''}` : update.phase === 'restarting' ? '正在更新 Runtime 与内核…' : update.phase === 'error' ? update.message || '更新检查失败，可重试' : update.phase === 'checking' ? '正在检查 Runtime 更新…' : '应用更新';
   const install=ui.agentInstall;
-  const fallback=install?.update && !['complete'].includes(install.phase) && !ui.status?.agents?.some(agent=>agent.detected && agent.id===install.agent) ? desktopUpdateProgress(install) : '';
+  const fallback=install?.update && install.agent !== 'codex' && !['complete'].includes(install.phase) && !ui.status?.agents?.some(agent=>agent.detected && agent.id===install.agent) ? desktopUpdateProgress(install) : '';
   return `<div class="home-update-bar" aria-label="应用更新"><span role="status">${escapeHTML(runtimeLabel)}${available.length ? ` · ${available.length} 项可更新` : ''}</span><div>${update.phase === 'available' ? `<button class="text-button" data-action="install-update" ${running ? 'disabled' : ''}>更新 Runtime 与内核</button>` : ''}${available.length || update.phase === 'available' ? `<button class="text-button" data-action="update-all" ${running ? 'disabled' : ''}>全部更新</button>` : ''}<button class="text-button" data-action="check-all-updates" ${running ? 'disabled' : ''}>${running ? '正在处理…' : '检查更新'}</button></div>${ui.agentVersionError ? `<small>${escapeHTML(ui.agentVersionError)}</small>` : ''}${fallback}</div>`;
 }
 
@@ -1187,7 +1188,6 @@ app.addEventListener('click', event => {
     capabilities: openCapabilities,
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'install-agent': () => installAgent(control.dataset.agentId),
-    'update-chatgpt': () => showModal('更新 ChatGPT', '<p>请先保存工作并关闭 ChatGPT。将下载官方最新完整安装包并验证签名；Windows 可能要求管理员确认，已有账号与数据保留。</p>', '下载并更新', () => installAgent('codex', true)),
     'cancel-agent-install': async () => { try { await request('/runtime/agents/install/cancel', { method: 'POST' }); await refresh(); } catch (error) { toast(error.message); } },
     'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },

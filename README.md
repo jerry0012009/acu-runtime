@@ -1,4 +1,4 @@
-Current release: **0.1.64** verifies ChatGPT update package and installed versions, rejects stale full installers, and separates first installation from per-app update progress. It retains accelerated Runtime downloads, editable learning settings and output-price sorting.
+Current release: **0.1.65** removes independent ChatGPT desktop update checks and prompts. Codex CLI updates follow Magpie's own decision; ChatGPT desktop updates stay in the application. First installation, learning settings and output-price sorting remain available.
 
 # ACU Runtime 0.1.58
 

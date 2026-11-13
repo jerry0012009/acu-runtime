@@ -222,15 +222,16 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 	defer func() { s.mu.Lock(); s.running = false; s.mu.Unlock() }()
 	fail := func(err error) { s.phase("error", err.Error()) }
 	if update {
+		if id == "codex" {
+			fail(errors.New("ChatGPT 桌面端请使用应用内更新"))
+			return
+		}
 		defer func() {
 			host.agentVersions.Lock()
 			host.agentVersions.at = time.Time{}
 			host.agentVersions.Unlock()
 		}()
-		key, label := "chatgpt", "ChatGPT"
-		if id == "workbuddy" {
-			key, label = "workbuddy-desktop", "WorkBuddy"
-		}
+		key, label := "workbuddy-desktop", "WorkBuddy"
 		info, ok := host.desktopAgentVersions(ctx)[key]
 		if !ok || !info.Installed {
 			fail(errors.New("未检测到 " + label + " 桌面端，请使用安装入口"))
@@ -244,16 +245,7 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 			s.phase("complete", label+" 已是最新版本（"+info.Version+"）")
 			return
 		}
-		if id == "codex" {
-			if running, probeErr := codexDesktopOpen(); probeErr != nil || running {
-				fail(errors.New("更新客户端前请保存并退出 ChatGPT；更新只替换客户端，不修改 ACU 配置"))
-				return
-			}
-			if err := host.prepareChatGPT(ctx, true); err != nil {
-				fail(err)
-				return
-			}
-		} else {
+		{
 			pkg, err := latestWorkBuddyPackage(ctx, runtime.GOOS, runtime.GOARCH)
 			if err != nil {
 				fail(err)
@@ -286,19 +278,7 @@ func (host *server) runAgentInstall(ctx context.Context, id, provider, model str
 				return
 			}
 		}
-		if id == "codex" {
-			verified, err := host.verifyDesktopUpdate(ctx, key, info.Latest)
-			if err != nil {
-				fail(err)
-				return
-			}
-			s.mu.Lock()
-			s.view.Version = verified.Version
-			s.mu.Unlock()
-			s.phase("complete", label+" 已更新至 "+verified.Version)
-		} else {
-			s.phase("complete", label+" 桌面端已更新，账号与 ACU 接入配置保留。")
-		}
+		s.phase("complete", label+" 桌面端已更新，账号与 ACU 接入配置保留。")
 		return
 	}
 
@@ -440,7 +420,7 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 400, map[string]string{"error": "不支持的应用安装请求"})
 		return
 	}
-	if in.Update && in.Agent != "codex" && in.Agent != "workbuddy" {
+	if in.Update && in.Agent == "codex" {
 		host.json(w, 400, map[string]string{"error": "此应用请使用客户端内更新"})
 		return
 	}

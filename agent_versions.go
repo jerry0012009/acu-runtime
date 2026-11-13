@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,36 +52,8 @@ func desktopVersionNewer(latest, current string) bool {
 }
 
 func latestDesktopVersion(ctx context.Context, id string) (string, error) {
-	if id == "chatgpt" {
-		var release struct {
-			Version  string `json:"buildVersion"`
-			Identity string `json:"packageIdentity"`
-		}
-		err := readChatGPTMetadata(ctx, chatGPTDownloadClient(), "https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json", &release)
-		if err != nil {
-			var mirror chatGPTMirrorRelease
-			if readChatGPTMetadata(ctx, chatGPTDownloadClient(), "https://codexapp.agentsmirror.com/latest/manifest", &mirror) != nil {
-				return "", err
-			}
-			arch := "x64"
-			if runtime.GOARCH == "arm64" {
-				arch = "arm64"
-			}
-			candidate := mirror.Sources.Windows.Architectures[arch]
-			hash, hashErr := base64.StdEncoding.DecodeString(candidate.Catalog.Hash)
-			age := time.Since(mirror.GeneratedAt)
-			if !candidate.Downloadable || !validAppxVersion(candidate.Version) || hashErr != nil || len(hash) != 32 || age < -time.Hour || age > 7*24*time.Hour {
-				return "", err
-			}
-			if candidate.CurrentForCodexVersion != nil && !*candidate.CurrentForCodexVersion {
-				return "", fmt.Errorf("镜像安装包尚未同步最新版")
-			}
-			return candidate.Version, nil
-		}
-		if release.Identity != "OpenAI.Codex" || !validAppxVersion(release.Version) {
-			return "", http.ErrNotSupported
-		}
-		return release.Version, nil
+	if id != "workbuddy-desktop" {
+		return "", http.ErrNotSupported
 	}
 	pkg, err := latestWorkBuddyPackage(ctx, "windows", "amd64")
 	if err != nil {
@@ -120,6 +90,12 @@ func (host *server) desktopAgentVersions(ctx context.Context) map[string]desktop
 			continue
 		}
 		info := desktopVersion{Version: v, Installed: true, Desktop: true}
+		// ChatGPT desktop updates belong to its own updater. Magpie's CLI
+		// decision is returned separately, without consulting another release feed.
+		if id == "chatgpt" {
+			result[id] = info
+			continue
+		}
 		next, err := latest(ctx, id)
 		if err != nil {
 			info.Error = "最新版本暂时无法确认"

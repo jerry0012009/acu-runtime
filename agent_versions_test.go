@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -48,37 +51,75 @@ func TestDesktopUpdateVerifiesRegistrationAndInvalidatesOldCache(t *testing.T) {
 		})
 	}
 }
-func TestUnconfirmedOrCurrentDesktopHasNoUpdateOffer(t *testing.T) {
-	for _, tc := range []struct {
-		latest string
-		err    error
-		want   bool
-	}{{"26.1112.10.0", nil, true}, {"26.1106.6628.0", nil, false}, {"26.1101.1.0", nil, false}, {"", errors.New("offline"), false}} {
-		host := &server{}
-		probes := 0
-		host.agentVersions.probe = func(context.Context) map[string]string {
-			probes++
-			return map[string]string{"chatgpt": "26.1106.6628.0"}
-		}
-		host.agentVersions.latest = func(context.Context, string) (string, error) { return tc.latest, tc.err }
-		got := host.desktopAgentVersions(context.Background())["chatgpt"]
-		if got.Update != tc.want {
-			t.Fatalf("unexpected update: %+v", got)
-		}
-		host.desktopAgentVersions(context.Background())
-		if probes != 1 {
-			t.Fatal("version check did not reuse its bounded cache")
-		}
+func TestChatGPTInstalledVersionNeverConsultsAnIndependentUpdateFeed(t *testing.T) {
+	host := &server{}
+	probes := 0
+	host.agentVersions.probe = func(context.Context) map[string]string {
+		probes++
+		return map[string]string{"chatgpt": "26.1106.6628.0"}
+	}
+	host.agentVersions.latest = func(context.Context, string) (string, error) {
+		t.Fatal("ChatGPT desktop queried an independent latest feed")
+		return "26.1111.2228.0", nil
+	}
+	got := host.desktopAgentVersions(context.Background())["chatgpt"]
+	if got.Version != "26.1106.6628.0" || !got.Installed || got.Update || got.Latest != "" || got.Error != "" {
+		t.Fatalf("unsolicited desktop update: %+v", got)
+	}
+	host.desktopAgentVersions(context.Background())
+	if probes != 1 {
+		t.Fatal("version probe cache not reused")
 	}
 }
-func TestClientUpdateDoesNotConfigureAnAlreadyCurrentAgent(t *testing.T) {
+
+func TestAgentVersionEndpointPreservesMagpieUpdateDecision(t *testing.T) {
+	for _, update := range []bool{false, true} {
+		t.Run(fmt.Sprint(update), func(t *testing.T) {
+			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/agents/cli" || r.Method != "GET" {
+					t.Fatalf("unexpected kernel call %s %s", r.Method, r.URL.Path)
+				}
+				json.NewEncoder(w).Encode(map[string]any{"agents": map[string]any{"codex": map[string]any{"version": "0.167.0", "latest": "0.168.0", "update": update, "via": "npm", "app": "26.1106.6628.0"}}, "pending": false})
+			}))
+			host.agentVersions.probe = func(context.Context) map[string]string { return map[string]string{"chatgpt": "26.1106.6628.0"} }
+			host.agentVersions.latest = func(context.Context, string) (string, error) {
+				t.Fatal("independent ChatGPT feed called")
+				return "", nil
+			}
+			res := httptest.NewRecorder()
+			host.agentVersionStatus(res, httptest.NewRequest("GET", "/runtime/agents/versions", nil))
+			var got struct {
+				Agents map[string]struct {
+					Update                    bool
+					Version, Latest, Via, App string
+				}
+			}
+			if json.Unmarshal(res.Body.Bytes(), &got) != nil || res.Code != 200 {
+				t.Fatal("invalid version response")
+			}
+			if got.Agents["codex"].Update != update || got.Agents["codex"].Via != "npm" || got.Agents["codex"].App != "26.1106.6628.0" {
+				t.Fatalf("Magpie decision changed: %+v", got)
+			}
+			if got.Agents["chatgpt"].Update || got.Agents["chatgpt"].Latest != "" {
+				t.Fatal("desktop update injected")
+			}
+		})
+	}
+}
+func TestChatGPTDesktopUpdateCannotBypassNativeUpdateBoundary(t *testing.T) {
 	host, _ := testServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("client update touched model configuration") }))
-	host.agentVersions.probe = func(context.Context) map[string]string { return map[string]string{"chatgpt": "26.1106.6628.0"} }
-	host.agentVersions.latest = func(context.Context, string) (string, error) { return "26.1106.6628.0", nil }
+	host.agentVersions.probe = func(context.Context) map[string]string { t.Fatal("disabled updater probed desktop"); return nil }
 	host.account.view.Selected = 9
+	host.desktop = true
+	req := httptest.NewRequest("POST", "/runtime/agents/install", strings.NewReader(`{"agent":"codex","update":true}`))
+	res := httptest.NewRecorder()
+	host.agentInstaller(res, req)
+	if res.Code != 400 || host.agentInstall.running {
+		t.Fatalf("desktop update accepted: %d", res.Code)
+	}
 	host.runAgentInstall(context.Background(), "codex", "", "", true)
-	if host.agentInstall.snapshot().Phase != "complete" || host.account.view.Selected != 9 {
-		t.Fatal("current desktop update did not preserve configured account")
+	if host.agentInstall.snapshot().Phase != "error" || host.account.view.Selected != 9 {
+		t.Fatal("disabled desktop update did not preserve configured account")
 	}
 }
 
