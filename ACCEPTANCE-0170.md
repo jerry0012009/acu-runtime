@@ -36,3 +36,17 @@ Only Runtime packages are published. No Router/Console/Private deployment,
 schema/environment change or user account mutation.
 
 Reference: https://developers.openai.com/codex/config-reference/
+
+## Published
+
+Workflow 43519005071 passed Windows x64, macOS arm64 and macOS Intel, and
+published v0.1.70 from 08e9868 at 2026-11-13 22:35:54 UTC. The official site
+resolver returns v0.1.70. Full downloads for all three installers matched the
+GitHub asset sizes and SHA-256 digests.
+
+Windows upgrade/download: 52,072,448 bytes, SHA-256
+bda3e5815402b3286131a332962254906c8603dcb4cd64cfc025ccb94eacaf86.
+Apple Silicon DMG: 50,169,719 bytes, SHA-256
+fe41006beb5fea233d33921d494a28bb87b37ec99af452c57169978e491c6bff.
+Intel Mac DMG: 53,930,595 bytes, SHA-256
+0ed53f44b35fe0d7fdf44afb08a2b96c222d4c80be1157f7694e355bacd4f6d3.
