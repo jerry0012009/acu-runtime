@@ -53,3 +53,21 @@ Native protocol metadata may still identify Magpie; library/plugin names are ACU
 The shipped kernel path is stable across package replacement. Cross-computer
 configuration sync involving a removed ACU-named kernel executable is not covered
 by this release's native self-healing guarantee.
+
+## Published
+
+Workflow 43510144958 passed Windows x64, macOS arm64 and macOS Intel, then
+published v0.1.68 at 2026-11-13 21:35:08 UTC from d268aa8. Windows native login,
+renewal, quiet Codex transaction, official first installation, old installer
+upgrade and migrated native MCP compatibility all passed.
+
+The official website resolver returns 0.1.68. Full accelerated downloads matched
+GitHub asset sizes and SHA-256 on all platforms:
+
+- Windows: 51,913,728 bytes, previously 67,160,064 bytes (about 23% smaller).
+- Apple Silicon DMG: 49,492,650 bytes.
+- Intel Mac DMG: 54,186,212 bytes.
+
+Download evidence: /tmp/acu-runtime-speed-verification.json. Live native MCP
+usage was recorded for GPT-6.1 Sol and Sunburst image generation; the latter
+saved and visually verified the requested red square/blue circle image.
