@@ -14,7 +14,7 @@ const state = {agents:[{id:'codex',name:'Codex',wired:true,path:'/fixture/config
   await page.route('http://login.test/**',async route=>{
    const u=new URL(route.request().url());
    if(u.pathname==='/api/state')return route.fulfill({json:state});
-   if(u.pathname==='/boot.js')return route.fulfill({contentType:'text/javascript',body:`window.bootPrefs={lang:'zh',theme:'${theme}',web:true,version:'0.1.3940'};`});
+   if(u.pathname==='/boot.js')return route.fulfill({contentType:'text/javascript',body:`window.bootPrefs={lang:'zh',theme:'${theme}',web:true,version:'0.1.4096'};`});
    if(u.pathname.startsWith('/api/'))return route.fulfill({json:{providers:[],presets:[],excluded:[],gateway:{groups:[],calls:[]}}});
    const local=u.pathname.startsWith('/ui/');
    const file=local?path.join(__dirname,'../web',u.pathname.slice(4)):path.join(assets,u.pathname==='/'?'index.html':u.pathname.slice(1));

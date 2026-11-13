@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.70
+# ACU Runtime 0.1.71
+
+配套 Magpie 内核从 v0.1.3940 更新至最新正式版 v0.1.4096，随 Runtime 一起安装，固定官方 SHA-256 校验。包含新版 Codex 配置兼容、桌面模型列表和网关效率改进。
+
+保留自动兼容登录、ACU 显示名、原生识图/生图/搜索和既有配置。Windows 验证从 0.1.70 升级后实际运行新版内核，无需单独安装 Magpie。
+
+## 保留 0.1.70 的 ACU 显示优化
 
 通过 Runtime 配置 Codex 后，供应商显示名称改为“ACU”。保留内部供应商标识、已有会话、模型路由与登录方式，不迁移账号、不增加后台改名机制。
 
@@ -106,9 +112,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.70-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.70-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.70-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.71-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.71-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.71-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

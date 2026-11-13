@@ -122,6 +122,9 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             processes.append(subprocess.Popen([kernel, "web", "--addr", origin.split("//")[1], "--no-open"],
                 env=env, stdout=log, stderr=log, **flags))
             wait(origin + "/?k=" + env["MAGPIE_WEB_KEY"])
+            expected_kernel = re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text())[1]
+            actual_kernel = json.loads(wait("http://" + env["MAGPIE_ADDR"] + "/"))["version"]
+            assert actual_kernel == expected_kernel, (actual_kernel, expected_kernel)
             models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08"]
             request(origin + "/api/provider/save", {"id": "acu-runtime", "name": "ACU fixture",
                 "key": "not-a-real-key", "new": True, "chat": "https://acu.best/v1", "modelsURL":"http://127.0.0.1:"+str(vendor.server_port)+"/v1/models", "models": models})
@@ -206,7 +209,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 for expected in {"acu-image": ["generate_image", "generation_result"],
                                  "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"]}[tool["name"]]:
                     assert expected in data, (tool["name"], data[:500])
-            print(json.dumps({"runtime": status["version"], "fourAgentsConfigured": True,
+            print(json.dumps({"runtime": status["version"], "kernel": actual_kernel, "fourAgentsConfigured": True,
                 "kernelPolicyCLI": True, "repeatNoDuplicates": True, "existingMCPPreserved": True, "legacyMigration": True,
                 "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True,
                 "freshCodexUsesAPIWithoutChatGPTAccount": True}))

@@ -1,3 +1,15 @@
+## Runtime 0.1.71 / Magpie 0.1.4096
+
+Current paired kernel is official v0.1.4096. Runtime preserves the native login
+policy rather than forcing API-only mode; historical auth.json does not require
+account/read to return an account. ACU display branding changes only provider
+name, not ID. Native MCP definitions remain native stdio servers. See
+ACCEPTANCE-0171.md and the release workflow for current platform evidence.
+Windows upgrade acceptance starts with Runtime 0.1.70 / Magpie 0.1.3940 and
+checks both the new serving version and configuration/auth preservation.
+
+The sections below are historical evidence, not current configuration guidance.
+
 ## Windows Runtime 0.1.55 candidate / Magpie 0.1.3935
 
 The known desktop failure involves both a prefixed model absent from the effective catalog and the upstream gateway ending ChatGPT's hosted app-server on route changes. Windows configuration now sets native Magpie API routing, validates retained ChatGPT identity and actual model visibility, and changes routes with the owned idle gateway stopped. The existing desktop is left running until the user reopens it. Snapshot rollback includes native ownership metadata and catalogs; cancellation does not leave the gateway stopped. Advanced model/disconnect routes use the same transaction. Headless validators/configuration commands use owned Windows jobs, never a broad process-name kill.
