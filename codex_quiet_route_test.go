@@ -41,6 +41,7 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatal("explicit test kernel required")
 	}
 	signedInAuth := os.Getenv("ACU_QUIET_CHATGPT_AUTH")
+	probeExecutable := os.Getenv("ACU_QUIET_CODEX_EXE")
 	root := t.TempDir()
 	for _, name := range []string{"USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "HERMES_HOME", "WORKBUDDY_CONFIG_DIR"} {
 		p := filepath.Join(root, name)
@@ -73,6 +74,12 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if probeExecutable != "" {
+		k.codexValidate = func(ctx context.Context, model string) error {
+			return probeCodexConfiguration(ctx, probeExecutable, model)
+		}
+	}
+	defaultValidate := k.codexValidate
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
 	defer cancel()
 	defer func() {
@@ -107,7 +114,15 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	configureStarted := time.Now()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/kernel/api/set", strings.NewReader(`{"agent":"codex","field":"model","value":"acu-runtime/acu-auto"}`)).WithContext(ctx)
-	host.proxy(w, req)
+	if probeExecutable != "" {
+		state, e := k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false)
+		if e != nil {
+			t.Fatal(e)
+		}
+		host.json(w, 200, state)
+	} else {
+		host.proxy(w, req)
+	}
 	if w.Code != 200 {
 		t.Fatalf("advanced model proxy: %d %s", w.Code, w.Body.String())
 	}
@@ -129,6 +144,39 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatal("existing MCP lost")
 	}
 	before := append([]byte(nil), b...)
+	assertLogin := func(state map[string]json.RawMessage, want string) {
+		t.Helper()
+		var agents []setupAgent
+		json.Unmarshal(state["agents"], &agents)
+		for _, agent := range agents {
+			if agent.ID != "codex" {
+				continue
+			}
+			for _, field := range agent.Fields {
+				if field.Key == "login" {
+					if field.Value != want {
+						t.Fatalf("model selection changed login mode: %q want %q", field.Value, want)
+					}
+					return
+				}
+			}
+		}
+		t.Fatal("missing native login field")
+	}
+	assertLogin(state, "")
+	for _, mode := range []string{"api", "chatgpt", ""} {
+		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"login", mode}}, false)
+		if err != nil {
+			t.Fatal("native login change", mode, err)
+		}
+		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false)
+		if err != nil {
+			t.Fatal("model change with native login", mode, err)
+		}
+		assertLogin(state, mode)
+	}
+	b, _ = os.ReadFile(filepath.Join(codex, "config.toml"))
+	before = append([]byte(nil), b...)
 	_, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "unregistered-model-does-not-exist"}}, false)
 	if err == nil {
 		t.Fatal("unloadable selection passed validation")
@@ -153,7 +201,7 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	interrupted, interrupt := context.WithCancel(ctx)
 	k.codexValidate = func(context.Context, string) error { interrupt(); return context.Canceled }
 	_, err = k.changeCodexQuietly(interrupted, []codexFieldChange{{"model", "acu-runtime/second-model"}}, false)
-	k.codexValidate = nil
+	k.codexValidate = defaultValidate
 	if err == nil {
 		t.Fatal("canceled post-write validation succeeded")
 	}

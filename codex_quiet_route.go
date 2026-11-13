@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 	"time"
 )
 
@@ -59,6 +60,11 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 	snapshot, err := snapshotCodexRoute(executable)
 	if err != nil {
 		return nil, errors.New("无法备份 Codex 配置，未更改配置")
+	}
+	authPath := filepath.Join(codexConfigDirectory(), "auth.json")
+	authBefore, authErr := os.ReadFile(authPath)
+	if authErr != nil && !os.IsNotExist(authErr) {
+		return nil, errors.New("无法读取 Codex 登录配置，请重试")
 	}
 	if err = command.Process.Kill(); err != nil {
 		return nil, errors.New("无法暂停内核路由观察，未更改 Codex 配置")
@@ -178,17 +184,8 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 	if disconnect {
 		err = run("codex", "default")
 	} else {
-		// A prefixed ACU model needs Magpie as the explicit provider. Its
-		// native API mode keeps a signed-in ChatGPT identity through
-		// requires_openai_auth; the probe below verifies that identity.
-		for _, change := range changes {
-			if change.Field == "model" && strings.Contains(change.Value, "/") {
-				if err = run("codex", "login", "api"); err != nil {
-					return nil, errors.New("无法配置 Codex 原生 API 接入模式，已取消接入")
-				}
-				break
-			}
-		}
+		// Let the native default adapt to the account, and retain explicit
+		// login choices. Selecting a model must not force API-only mode.
 		for _, change := range changes {
 			value := change.Value
 			if value == "" {
@@ -213,6 +210,9 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 		validate = validateInstalledCodex
 	}
 	if err = validate(ctx, model); err != nil {
+		return nil, err
+	}
+	if err = verifyCodexAuthUnchanged(authPath, authBefore, authErr); err != nil {
 		return nil, err
 	}
 	restored = true

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,11 @@ import (
 // No threads, tools or paid requests: ask the installed Codex process to parse
 // the complete configuration and list its actual models, then end only this probe.
 func probeCodexConfiguration(ctx context.Context, executable, model string) error {
+	authPath := filepath.Join(codexConfigDirectory(), "auth.json")
+	authBefore, authErr := os.ReadFile(authPath)
+	if authErr != nil && !os.IsNotExist(authErr) {
+		return errors.New("无法读取 Codex 登录配置，请重试")
+	}
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 	c := exec.CommandContext(ctx, executable, "app-server")
@@ -66,21 +72,9 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 		return errors.New("Codex 配置初始化失败，已取消本次接入")
 	}
 	enc.Encode(map[string]any{"method": "initialized", "params": map[string]any{}})
-	var auth struct {
-		Mode string `json:"auth_mode"`
-	}
-	if data, e := os.ReadFile(filepath.Join(codexConfigDirectory(), "auth.json")); e == nil {
-		json.Unmarshal(data, &auth)
-	}
-	if auth.Mode == "chatgpt" {
-		raw, e := call(4, "account/read", map[string]bool{"refreshToken": false})
-		var account struct {
-			Account json.RawMessage `json:"account"`
-		}
-		if e != nil || json.Unmarshal(raw, &account) != nil || len(account.Account) == 0 || string(account.Account) == "null" {
-			return errors.New("当前配置无法保留 ChatGPT 登录身份，已取消本次接入")
-		}
-	}
+	// account/read may legitimately return null in the kernel's API or
+	// exhausted-account mode. The native kernel owns that policy, not the
+	// historical auth_mode in auth.json. Check configuration and models here.
 	raw, err := call(2, "config/read", map[string]bool{"includeLayers": false})
 	if err != nil {
 		return errors.New("Codex 无法读取配置，已取消本次接入")
@@ -97,7 +91,7 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 		return errors.New("Codex 读取的模型与所选模型不一致")
 	}
 	if model == "" {
-		return nil
+		return verifyCodexAuthUnchanged(authPath, authBefore, authErr)
 	}
 	raw, err = call(3, "model/list", map[string]bool{"includeHidden": true})
 	if err != nil {
@@ -115,10 +109,21 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 	if model != "" {
 		for _, m := range models.Data {
 			if m.ID == model || m.Model == model {
-				return nil
+				return verifyCodexAuthUnchanged(authPath, authBefore, authErr)
 			}
 		}
 		return errors.New("Codex 模型目录尚未包含所选 ACU 模型，已取消本次接入")
+	}
+	return nil
+}
+
+func verifyCodexAuthUnchanged(path string, before []byte, beforeErr error) error {
+	after, err := os.ReadFile(path)
+	if os.IsNotExist(beforeErr) && os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil || beforeErr != nil || !bytes.Equal(before, after) {
+		return errors.New("Codex 登录配置已变化，请重新尝试接入")
 	}
 	return nil
 }

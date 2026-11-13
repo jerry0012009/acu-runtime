@@ -1,4 +1,12 @@
-# ACU Runtime 0.1.68
+# ACU Runtime 0.1.69
+
+修复 Codex 接入时误报“无法保留 ChatGPT 登录身份”：不再把历史登录文件和当前 API 模式的账号返回混为一谈。继续核验配置和所选模型，并检查登录凭据未被接入过程改动。
+
+切换 ACU 模型不再强制改为 API 模式。默认沿用内核自动兼容策略，已有手动选择保留。高级登录设置简化为“自动兼容（推荐）”“仅 ChatGPT”“ACU API”，各保留一句区别。
+
+保留 Windows 防闪退配置流程、请求等待、失败恢复及已有聊天和工具配置。
+
+## 保留 0.1.68 的原生能力接入
 
 识图、生图与搜索直接使用内核原生工具，应用内名称为 `acu-vision`、`acu-image`、`acu-search`。无需额外下载 Python、uv 或搜索插件。
 
@@ -90,9 +98,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.68-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.68-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.68-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.69-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.69-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.69-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
