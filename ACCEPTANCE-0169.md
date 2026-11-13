@@ -39,3 +39,15 @@ Reference: https://developers.openai.com/codex/app-server/
 
 Only Runtime packages are released; no Router/Console/Private restart or schema,
 environment, existing API Key or user authentication configuration change.
+
+## Published
+
+Workflow 43515092042 passed all three platforms and published v0.1.69 from
+5b83f30 at 2026-11-13 22:08:01 UTC. Windows installed-Codex isolation passed
+all three native login choices, model validation, cancellation and rollback.
+Native login/session renewal, official first installation, old installer
+upgrade and packaged native MCP compatibility also passed.
+
+The website resolver returns 0.1.69. Full accelerated Windows, Apple Silicon
+and Intel Mac downloads matched GitHub asset lengths and SHA-256 digests.
+Evidence: /tmp/acu-runtime-speed-verification.json.
