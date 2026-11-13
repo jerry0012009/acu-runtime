@@ -105,12 +105,13 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1></header>${content()}</main></div>`;
     const chart = app.querySelector('.starfish-panel');
     const page = app.querySelector('.preference-page');
+    if (chart) page.querySelector('header').after(chart);
     if (ui.status?.account?.loggedIn && !state.revoked && state.data.profile?.profile?.highlights?.length) {
       const overview = document.createElement('div');
       overview.innerHTML = understanding(state.data.profile);
-      page.querySelector('header').after(overview);
+      (chart || page.querySelector('header')).after(overview);
     }
-    // The complete catalog stays available; the first screen is a bounded, grounded selection.
+    // Keep the interactive graph first and always visible; only long catalogs collapse.
     for (const id of ['pref-overview', 'pref-records']) {
       const section = app.querySelector(`#${id}`)?.closest('section');
       if (!section) continue;
@@ -133,7 +134,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     }).join('')}`;
     app.querySelector('.preference-page')?.append(management);
     const activity = app.querySelector('#pref-activity')?.closest('section');
-    for (const [section, label] of [[state.data.profile?.profile?.highlights?.length ? chart : null, '探索偏好图谱'], [activity, '近期变化'], [management, '管理偏好']]) {
+    for (const [section, label] of [[activity, '近期变化'], [management, '管理偏好']]) {
       if (!section) continue;
       const disclosure = document.createElement('details');
       disclosure.className = 'preference-secondary';

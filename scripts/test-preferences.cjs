@@ -56,7 +56,8 @@ const server = http.createServer(async (req,res) => {
    assert.equal(await page.locator('.preference-catalog[open]').count(),0);
    assert.equal(await page.getByText('摘要更新',{exact:true}).isVisible(),false);
    await page.screenshot({path:path.join(output,`preferences-first-${theme}-${width}.png`),fullPage:true});
-   await page.locator('.preference-secondary > summary').filter({hasText:'探索偏好图谱'}).click();
+   assert.equal(await page.locator('.starfish-panel').evaluate(node => node.closest('details') === null && node.previousElementSibling.tagName === 'HEADER' && node.getBoundingClientRect().top < innerHeight / 2),true,'graph must be first and never collapsed');
+   assert.equal(await page.locator('.starfish-svg').isVisible(),true);
    await page.locator('.preference-secondary > summary').filter({hasText:'近期变化'}).click();
    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true,`overflow ${width} ${theme}`);
    assert.equal(await page.getByText('unchanged',{exact:true}).count(),0);
@@ -79,13 +80,14 @@ const server = http.createServer(async (req,res) => {
   const editingPage=await browser.newPage();await editingPage.goto(origin);await editingPage.locator('[data-page="preferences"]').click();
   await editingPage.getByText(firstHighlight,{exact:true}).waitFor();
   await editingPage.locator('.preference-secondary > summary').filter({hasText:'管理偏好'}).click();
-  await editingPage.locator('.preference-secondary > summary').filter({hasText:'探索偏好图谱'}).click();
+  assert.equal(await editingPage.locator('.starfish-svg').isVisible(),true);
   const editing=editingPage.locator('[data-pref-record]').first();await editing.locator('summary').click();
   await editing.locator('[name="rule"]').fill('先给决策，再说明原因。');
   await editingPage.locator('svg [data-star-ray]').last().focus();await editingPage.keyboard.press('Enter');
   assert.equal(await editing.locator('[name="rule"]').inputValue(),'先给决策，再说明原因。');
   await editingPage.locator('#preference-search').fill('找不到');
   await editingPage.locator('#preference-search').fill('');
+  assert.equal(await editingPage.locator('.starfish-panel').evaluate(node => node.closest('details') === null && node.previousElementSibling.tagName === 'HEADER'),true,'rerender keeps graph first');
   assert.equal(await editing.locator('[name="rule"]').inputValue(),'先给决策，再说明原因。');
   assert.equal(await editing.locator('[name="exceptions"]').inputValue(),'法律文书');
   await editing.getByRole('button',{name:'保存修正',exact:true}).click();

@@ -1,4 +1,4 @@
-Current release: **0.1.59** adds a concise, source-grounded preference overview when supplied by ACU. Full records, recent changes and management remain available on demand. It retains the 0.1.58 price-loading fixes.
+Current release: **0.1.60** keeps the interactive preference vector graph at the top of My Preferences, always expanded. Concise grounded highlights follow the graph; long records, recent changes and management remain available on demand.
 
 # ACU Runtime 0.1.58
 
