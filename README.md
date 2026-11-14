@@ -1,4 +1,4 @@
-Current release: **0.1.78** adds team creative vectors alongside personal preferences for authorized members. Both views reuse the existing interactive starfish, with team sources kept separate and the graph always expanded. Retains native model catalog refresh and official Magpie v0.1.4096.
+Current release: **0.1.79** exposes native video model discovery and an explicit video-tool switch, including existing disabled-tool configurations. Adds Kimi K3.1 Pro, Grok 4.7 and Gemini 3.8 Flash recommendations. Retains team creative vectors, model catalog refresh and official Magpie v0.1.4096.
 
 # ACU Runtime 0.1.58
 

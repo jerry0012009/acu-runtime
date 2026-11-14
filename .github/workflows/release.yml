@@ -61,8 +61,15 @@ jobs:
           node scripts/test-billing.cjs
           node scripts/test-install-updates.cjs
           node scripts/test-capability-refresh.cjs
+          node scripts/test-video-capabilities.cjs
           node scripts/test-recommended-models.cjs
           node scripts/test-work-review.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-screenshots-${{ matrix.platform }}
+          path: ${{ runner.temp }}/acu-preference-browser/output/runtime-video/*.png
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -31,7 +31,7 @@ flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {
 listed_images = ["gpt-image-2.5-sunburst-2026-09-08"]
 class ModelList(BaseHTTPRequestHandler):
     def do_GET(self):
-        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, *[{"id":model,"kind":"image"} for model in listed_images]]}).encode()
+        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, {"id":"grok-imagine-video","kind":"video"}, {"id":"grok-imagine-video-1.5","kind":"video"}, *[{"id":model,"kind":"image"} for model in listed_images]]}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(payload)
     def log_message(self, *args):
         pass
@@ -126,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             expected_kernel = re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text(encoding="utf-8"))[1]
             actual_kernel = json.loads(wait("http://" + env["MAGPIE_ADDR"] + "/"))["version"]
             assert actual_kernel == expected_kernel, (actual_kernel, expected_kernel)
-            models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08"]
+            models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08", "grok-imagine-video", "grok-imagine-video-1.5"]
             request(origin + "/api/provider/save", {"id": "acu-runtime", "name": "ACU fixture",
                 "key": "not-a-real-key", "new": True, "chat": "https://acu.best/v1", "modelsURL":"http://127.0.0.1:"+str(vendor.server_port)+"/v1/models", "models": models})
             request(origin + "/api/provider/models", {"id":"acu-runtime"})
@@ -191,6 +191,12 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             assert repeated["vision"] == "acu-runtime/gpt-6.1-sol" or repeated["visionAuto"], repeated
             assert repeated["imageGen"] == "" and repeated["imageGenAuto"], repeated
             assert repeated["searchReady"]
+            assert {m["id"] for m in repeated["videoModels"]} == {"acu-runtime/grok-imagine-video", "acu-runtime/grok-imagine-video-1.5"}, repeated
+            assert not repeated["videoEnabled"], repeated
+            enabled = request(rt + "/runtime/capabilities", {"provider":"acu-runtime","videoEnabled":True}, token)
+            assert enabled["videoEnabled"], enabled
+            current_image = next(s for s in request(origin+"/api/library")["servers"] if s["name"]=="acu-image")
+            assert not current_image.get("disabledTools") and current_image["startupTimeout"]==73 and set(current_image["agents"])==set(ids), current_image
             assert "mcp_servers.mine" in (Path(env["CODEX_HOME"]) / "config.toml").read_text()
             before = config_files()
             changed = request(rt + "/runtime/capabilities", {"provider": "acu-runtime", "modelsOnly": True, "vision": "off"}, token)

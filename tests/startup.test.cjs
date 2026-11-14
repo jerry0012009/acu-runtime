@@ -274,7 +274,7 @@ test('capability preview reads shared settings without modifying tools or claimi
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route === '/api/settings' ? { body: settings } : undefined);
   await instance.run('configureAgent("codex")');
   const html = instance.elements.overlay.innerHTML;
-  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '配置状态', '同时添加 ACU 内核生图 MCP', '暂不提供']) assert(html.includes(phrase), phrase);
+  for (const phrase of ['未启用', '示例生图 · 已有来源', '已有搜索', '配置状态', '同时添加 ACU 内核生图 MCP', '可在媒体设置中检查']) assert(html.includes(phrase), phrase);
   assert(!html.includes('已有配置 ≠ 已验证可用'));
   assert(!html.includes('关闭的搜索'));
   assert(!html.includes('missing/image'));
@@ -682,7 +682,7 @@ test('bulk setup prepares kernel MCP only for confirmed agents and can opt out',
     if (enabled) {
       assert.deepEqual(JSON.parse(tools[0].body), { provider: 'acu-runtime', agents: ['codex'] });
       assert(instance.elements.app.innerHTML.includes('搜索待配置'));
-      assert(instance.elements.app.innerHTML.includes('图片与搜索'));
+      assert(instance.elements.app.innerHTML.includes('图片、视频与搜索'));
     }
   }
 });
@@ -752,7 +752,8 @@ test('configured apps show status and explicit actions without switches or ACU p
  await instance.run('openCapabilities()');
  const html=instance.elements.app.innerHTML;
  for(const phrase of ['已接入 ✓','一键检查并补齐','使用免费搜索','保存模型设置','高级设置']) assert(html.includes(phrase),phrase);
- for(const phrase of ['3/3','type="checkbox"','ACU 搜索待配置','扫描件','HTTP','MCP','searchURL']) assert(!html.includes(phrase),phrase);
+ for(const phrase of ['3/3','ACU 搜索待配置','扫描件','HTTP','MCP','searchURL']) assert(!html.includes(phrase),phrase);
+ assert(html.includes('data-video-enabled'));
  assert(html.includes('data-save-capabilities disabled'));
  await instance.run('saveCapabilities()');assert.equal(posts(instance).length,0);
  await instance.run('configureCapabilities("check")');

@@ -15,11 +15,14 @@ fs.mkdirSync(output, { recursive: true });
       const page = await browser.newPage({ viewport: { width, height: 950 }, colorScheme: theme });
       const errors = [], changes = [], configurations = [];
       page.on('pageerror', error => errors.push(error.message));
-      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'claude-fable-5', 'claude-fable-5-1'] };
+      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'claude-fable-5', 'claude-fable-5-1','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
       const agent = { id: 'workbuddy', name: 'WorkBuddy', detected: true, connected, wired: connected, modelOptions: [] };
       const catalog = { models: [
         { id: 'acu-runtime/acu-auto' },
         { id: 'acu-runtime/claude-fable-5-1', hidden: true },
+        { id: 'acu-runtime/kimi-k3.1-pro', hidden: true },
+        { id: 'acu-runtime/grok-4.7', hidden: true },
+        { id: 'acu-runtime/gemini-3.8-flash', hidden: true },
         { id: 'acu-runtime/claude-fable-5' },
         { id: 'other/visible' },
       ] };
@@ -46,6 +49,7 @@ fs.mkdirSync(output, { recursive: true });
       await page.locator('.setup-adjustments > summary').click();
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-1"]').count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5"]').count(), 0);
+      for (const model of ['kimi-k3.1-pro','grok-4.7','gemini-3.8-flash']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
       assert.equal(await page.locator('#setup-model').inputValue(), 'acu-auto');
       assert(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth));
       await page.screenshot({ path: path.join(output, `${connected ? 'existing' : 'fresh'}-${theme}-${width}.png`), fullPage: true });

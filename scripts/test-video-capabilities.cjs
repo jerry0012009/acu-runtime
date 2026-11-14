@@ -1,0 +1,45 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
+const web = path.resolve(__dirname, '../web');
+const output = path.join(process.env.ACU_TEST_WORKSPACE, 'output/runtime-video');
+fs.mkdirSync(output, { recursive: true });
+(async () => {
+ const browser = await chromium.launch({headless:true});
+ try {
+  for (const colorScheme of ['light','dark']) for (const width of [390,1440]) {
+   const page = await browser.newPage({viewport:{width,height:1000},colorScheme});
+   let enabled = false; const writes = [], errors = [];
+   page.on('pageerror', error => errors.push(error.message));
+   const view = () => ({provider:'acu-runtime',vision:'off',imageGen:'',visionModels:[],imageModels:[],tools:[{name:'acu-image',agents:['workbuddy']}],searchReady:true,videoEnabled:enabled,videoBlocked:false,videoAuto:'acu-runtime/grok-imagine-video',videoModels:[{id:'acu-runtime/grok-imagine-video',name:'Grok Imagine Video'},{id:'acu-runtime/grok-imagine-video-1.5',name:'Grok Imagine Video 1.5'}]});
+   await page.route('http://video.test/**', async route => {
+    const req = route.request(), u = new URL(req.url());
+    if (u.pathname === '/runtime/status') return route.fulfill({json:{ready:true,agents:[{id:'workbuddy',name:'WorkBuddy',detected:true,connected:true}],connection:{known:true,configured:true,provider:'acu-runtime',choices:[{id:'acu-runtime',name:'ACU',models:['acu-auto','kimi-k3.1-pro']}]}}});
+    if (u.pathname.startsWith('/runtime/capabilities')) {
+     if (req.method() === 'POST' && !u.pathname.endsWith('refresh')) { const body=req.postDataJSON(); writes.push(body); enabled=body.videoEnabled; }
+     return route.fulfill({json:view()});
+    }
+    if (u.pathname.startsWith('/runtime/')) return route.fulfill({json:{}});
+    const file=path.join(web,u.pathname==='/'?'index.html':u.pathname.replace('/ui/',''));
+    if(!fs.existsSync(file))return route.fulfill({status:404,body:''});
+    return route.fulfill({contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html',body:fs.readFileSync(file,'utf8').replace('__ACU_TOKEN__','fixture')});
+   });
+   await page.goto('http://video.test/');
+   await page.locator('[data-action="capabilities"]').first().click();
+   const panel=page.locator('.capability-video-panel');await panel.waitFor();
+   await page.waitForFunction(()=>!document.querySelector('[data-refresh-capability-models]').disabled);
+   assert.deepEqual(writes,[]);
+   await page.locator('[data-video-enabled]').check();
+   await page.waitForFunction(()=>document.querySelector('[data-video-enabled]')?.checked&&!document.querySelector('[data-video-enabled]').disabled);
+   assert.deepEqual(writes,[{provider:'acu-runtime',videoEnabled:true}]);
+   await page.locator('#video-request-model').selectOption('acu-runtime/grok-imagine-video-1.5');
+   assert((await page.locator('#video-request').inputValue()).includes('acu-runtime/grok-imagine-video-1.5'));
+   assert.equal(writes.length,1);
+   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await panel.screenshot({path:path.join(output,`${colorScheme}-${width}.png`)});
+   assert.deepEqual(errors,[]);await page.close();
+  }
+  console.log('PASS: video model discovery, explicit enable, model-specific request, no hidden writes, desktop/mobile themes.');
+ } finally {await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});
