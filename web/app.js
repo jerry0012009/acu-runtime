@@ -32,6 +32,7 @@ let pendingNative = launchQuery.get('native');
 const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usage', 'routing', 'plugins', 'masking']);
 const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML });
 const preferences = globalThis.createACUPreferences?.({ app, ui, request, navigation, escapeHTML });
+const workReview = globalThis.createACUWorkReview?.({ app, ui, request, navigation, escapeHTML, icon });
 
 
 async function request(path, options = {}) {
@@ -77,6 +78,7 @@ async function refresh(rescan = false, quiet = false) {
     if(ui.status.desktop && !ui.startup && !ui.startupLoading){ui.startupLoading=true;try{ui.startup=await request('/runtime/startup');}catch{ui.startup={supported:false,error:'自启动状态暂时无法读取'};}finally{ui.startupLoading=false;}}
     billing?.syncAccount();
     preferences?.syncAccount();
+    workReview?.syncAccount();
     if (ui.status.desktop && ui.status.update?.supported && !ui.startupUpdateChecked) {
       ui.startupUpdateChecked = true;
       // One read-only release check per window session. Installation is
@@ -128,7 +130,7 @@ async function refresh(rescan = false, quiet = false) {
 
 function navigation() {
   return `<aside class="sidebar"><a class="brand" href="#overview" data-page="overview" aria-label="ACU Runtime 首页"><span class="brand-symbol">A</span><span>ACU<span class="brand-sub">RUNTIME</span></span></a>
-    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['preferences', 'shield', '我的偏好'], ['usage', 'clock', '用量与费用'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>
+    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['work-review', 'clock', '工作回顾'], ['preferences', 'shield', '我的偏好'], ['usage', 'clock', '用量与费用'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>
     <div class="sidebar-bottom"><span class="sidebar-signature">LESS COST.<br>MORE POSSIBILITY.</span></div></aside>`;
 }
 
@@ -763,6 +765,7 @@ function settingsPage() {
 }
 
 function render() {
+  if (ui.page === 'work-review' && workReview) { workReview.render(); return; }
   if (ui.page === 'preferences' && preferences) { preferences.render(); return; }
   if (ui.page === 'usage' && billing) { billing.render(); return; }
   if (ui.frame) return;
@@ -1167,6 +1170,7 @@ function openNative(view, agent = '', developer = false, tab = '', focus = '', a
 app.addEventListener('click', event => {
   if (ui.applying || ui.accountBusy) return;
   if (preferences?.click(event)) return;
+  if (workReview?.click(event)) return;
   if (billing?.click(event)) return;
   const page = event.target.closest('[data-page]');
   if (page) { const navigate = () => { ui.capabilityReturn = false; ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); }; if (ui.page === 'capabilities') leaveCapabilities(navigate); else navigate(); return; }

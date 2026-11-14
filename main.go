@@ -657,7 +657,7 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.startupSettings(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/agents/versions":
 			host.agentVersionStatus(response, request)
-		case (request.Method == http.MethodGet || request.Method == http.MethodPut) && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
+		case (request.Method == http.MethodGet || request.Method == http.MethodPut || request.Method == http.MethodPost) && strings.HasPrefix(request.URL.Path, "/runtime/preferences/"):
 			host.accountPreferences(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/prices":
 			host.modelPrices(response, request)

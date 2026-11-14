@@ -34,6 +34,7 @@ jobs:
           node --check web/app.js
           node --check web/billing.js
           node --check web/preferences.js
+          node --check web/work-review.js
           node --check web/preference-starfish.js
           node --test tests/*.test.cjs
       - name: Test Go and native desktop
@@ -59,11 +60,18 @@ jobs:
           node scripts/test-billing.cjs
           node scripts/test-install-updates.cjs
           node scripts/test-recommended-models.cjs
+          node scripts/test-work-review.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: preference-screenshots-${{ matrix.platform }}
           path: ${{ runner.temp }}/acu-preference-browser/output/runtime-preferences/*.png
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: work-review-screenshots-${{ matrix.platform }}
+          path: ${{ runner.temp }}/acu-preference-browser/output/runtime-work-review/*.png
           if-no-files-found: ignore
       - name: Verify native Windows preference page and session renewal
         if: runner.os == 'Windows'

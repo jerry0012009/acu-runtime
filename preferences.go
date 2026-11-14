@@ -18,7 +18,27 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/runtime/preferences/")
 	paths := map[string]string{"profile": "acu-preference-profile", "library": "acu-preference-library", "activity": "acu-preference-activity", "settings": "acu-advisor/settings", "controls": "acu-preference-controls"}
+	paths["work-review"] = "acu-work-review"
 	var input []byte
+	if r.Method == http.MethodPost {
+		parts := strings.Split(name, "/")
+		if len(parts) != 2 || parts[0] != "feedback" || len(parts[1]) > 100 || strings.ContainsAny(parts[1], "?#%\\") {
+			host.json(w, 400, map[string]string{"error": "反馈记录无效"})
+			return
+		}
+		var err error
+		input, err = io.ReadAll(io.LimitReader(r.Body, 1001))
+		var body struct {
+			Feedback string `json:"feedback"`
+		}
+		decoder := json.NewDecoder(bytes.NewReader(input))
+		decoder.DisallowUnknownFields()
+		if err != nil || len(input) > 1000 || decoder.Decode(&body) != nil || (body.Feedback != "helpful" && body.Feedback != "inaccurate" && body.Feedback != "ignored") {
+			host.json(w, 400, map[string]string{"error": "反馈内容无效"})
+			return
+		}
+		paths[name] = "acu-advisor/" + parts[1] + "/feedback"
+	}
 	if r.Method == http.MethodPut {
 		parts := strings.Split(name, "/")
 		if name != "settings" && (len(parts) != 2 || parts[0] != "controls" || len(parts[1]) != 36 || strings.ContainsAny(parts[1], "?#%\\")) {
@@ -77,7 +97,7 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Authorization", "Bearer "+bearer)
 	req.Header.Set("Accept", "application/json")
-	if r.Method == http.MethodPut {
+	if r.Method == http.MethodPut || r.Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Origin", site)
 	}
@@ -126,7 +146,7 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 502, map[string]string{"error": "偏好数据格式暂不可用。"})
 		return
 	}
-	if name == "library" || name == "activity" {
+	if name == "library" || name == "activity" || name == "work-review" {
 		var version struct {
 			Version int `json:"version"`
 		}
