@@ -1,4 +1,8 @@
-# ACU Runtime 0.1.73
+# ACU Runtime 0.1.74
+
+工作回顾优先呈现具体变化：新图片建议附带简短中文摘要与适用依据，复用生图前已有模型调用，不新增总结请求。英文补充、来源原文与请求编号收进“原始记录”。分类改为“纠偏建议 / 记住的偏好 / 图片调整”，去掉重复更新时间与说明。
+
+## 保留 0.1.73 的工作回顾
 
 新增“工作回顾”：按日期查看纠偏参考、偏好变化与图片视觉建议，展开查看具体内容和依据。支持分类筛选、手动刷新、纠偏反馈，并可从偏好变化进入现有管理入口。不会增加弹窗或邮件。
 
@@ -118,9 +122,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.73-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.73-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.73-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.74-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.74-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.74-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

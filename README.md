@@ -1,4 +1,4 @@
-Current release: **0.1.73** adds an account-owned Work Review for advice, preference changes and image guidance. Bundles the official Magpie v0.1.4096 CLI kernel with pinned SHA-256 digests, native Codex compatibility, ACU display branding and configuration-preserving upgrades.
+Current release: **0.1.74** simplifies Work Review with concise Chinese image summaries and applicability explanations. Original prompts and source excerpts remain available in secondary details. Bundles the official Magpie v0.1.4096 CLI kernel with pinned SHA-256 digests.
 
 # ACU Runtime 0.1.58
 
