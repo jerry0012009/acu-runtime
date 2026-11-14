@@ -28,3 +28,15 @@ Acceptance:
 
 No Router/Console/Private restart or model permission changes. Runtime packages
 only. Actual user Windows profile is not accessible from this host.
+
+## Published
+
+Workflow 43600591643 passed Windows x64, macOS arm64 and macOS Intel and
+published v0.1.75 from d7db335 at 2026-11-14 13:45:29 UTC. The old-catalog
+refresh browser regression and native kernel fixture passed on every platform.
+Windows native login, quiet Codex transaction and installer upgrade also passed.
+
+The website resolves 0.1.75. Full accelerated downloads matched GitHub asset
+lengths and SHA-256 for Windows (52,177,408 bytes), Apple Silicon (49,530,446
+bytes) and Intel Mac (53,931,148 bytes).
+Evidence: /tmp/acu-runtime-speed-verification.json.
