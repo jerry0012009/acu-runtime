@@ -319,3 +319,31 @@ func (host *server) capabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	host.json(w, 200, view)
 }
+
+func (host *server) refreshCapabilityModels(w http.ResponseWriter, r *http.Request) {
+	host.capabilityMu.Lock()
+	defer host.capabilityMu.Unlock()
+	var input struct {
+		Provider string `json:"provider"`
+	}
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+	d.DisallowUnknownFields()
+	if d.Decode(&input) != nil || input.Provider == "" {
+		host.json(w, 400, map[string]string{"error": "请选择 ACU 模型来源"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 35*time.Second)
+	defer cancel()
+	// Native refresh persists the vendor's media catalog. Reading settings
+	// alone only sees the last fetched list, including for existing users.
+	if err := host.checkProvider(ctx, input.Provider); err != nil {
+		host.json(w, 400, map[string]string{"error": "模型列表未更新，请重试"})
+		return
+	}
+	view, _, _, err := host.capabilityRead(ctx, input.Provider)
+	if err != nil {
+		host.json(w, 400, map[string]string{"error": "无法读取更新后的模型列表，请重试"})
+		return
+	}
+	host.json(w, 200, view)
+}

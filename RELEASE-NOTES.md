@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.74
+# ACU Runtime 0.1.75
+
+修复已接入用户的生图列表停留在旧目录、看不到 GPT Image 2.6 的问题。进入「图片与搜索」先显示已有配置，再自动通过内核刷新模型目录；「常用模型」旁增加刷新按钮。
+
+刷新保留当前模型和未保存修改，失败不清空已有列表。无需重新添加 Key，也无需绕到高级来源页。新模型的可见范围仍按当前 Key 的权限提供。
+
+## 保留 0.1.74 的工作回顾优化
 
 工作回顾优先呈现具体变化：新图片建议附带简短中文摘要与适用依据，复用生图前已有模型调用，不新增总结请求。英文补充、来源原文与请求编号收进“原始记录”。分类改为“纠偏建议 / 记住的偏好 / 图片调整”，去掉重复更新时间与说明。
 
@@ -122,9 +128,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.74-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.74-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.74-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.75-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.75-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.75-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

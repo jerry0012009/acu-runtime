@@ -11,11 +11,12 @@ import (
 )
 
 type capabilityFixture struct {
-	prefs     map[string]any
-	servers   []map[string]any
-	writes    []string
-	fail      bool
-	searchKey string
+	prefs        map[string]any
+	servers      []map[string]any
+	writes       []string
+	fail         bool
+	searchKey    string
+	refreshError bool
 }
 
 func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
@@ -27,6 +28,13 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			f.writes = append(f.writes, r.URL.Path)
 		}
 		switch r.URL.Path {
+		case "/api/provider/models":
+			if f.refreshError {
+				http.Error(w, "network unavailable", 502)
+				return
+			}
+			f.prefs["imageGenModels"] = []map[string]string{{"id": "acu-runtime/gpt-image-2.5-sunburst-2026-09-08"}, {"id": "acu-runtime/gpt-image-2.6-sunburst"}, {"id": "acu-runtime/gpt-image-2.6-flare"}}
+			io.WriteString(w, `{}`)
 		case "/api/providers":
 			io.WriteString(w, strings.Replace(setupProviders, `"models":[`, `"models":[{"id":"gpt-6.1-sol","on":true,"images":true},`, 1))
 		case "/api/state":
@@ -115,6 +123,39 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
 	return host, f
+}
+
+func TestCapabilityRefreshUpdatesExistingCatalogWithoutChangingPicks(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	f.prefs["imageGen"] = "acu-runtime/gpt-image-2.5-sunburst-2026-09-08"
+	w := httptest.NewRecorder()
+	host.refreshCapabilityModels(w, httptest.NewRequest("POST", "/runtime/capabilities/refresh", strings.NewReader(`{"provider":"acu-runtime"}`)))
+	var view capabilityView
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &view) != nil || len(view.ImageModels) != 3 || view.ImageGen != f.prefs["imageGen"] {
+		t.Fatalf("refresh did not preserve old choice and expose new models: %d %s", w.Code, w.Body.String())
+	}
+	if len(f.writes) != 1 || f.writes[0] != "/api/provider/models" {
+		t.Fatalf("unexpected configuration writes %v", f.writes)
+	}
+}
+
+func TestCapabilityRefreshFailureAndInvalidProviderPreserveExistingCatalog(t *testing.T) {
+	for _, provider := range []string{"acu-runtime", "not-acu"} {
+		t.Run(provider, func(t *testing.T) {
+			host, f := capabilityTestHost(t)
+			f.refreshError = true
+			before, _ := json.Marshal(f.prefs)
+			w := httptest.NewRecorder()
+			host.refreshCapabilityModels(w, httptest.NewRequest("POST", "/runtime/capabilities/refresh", strings.NewReader(`{"provider":"`+provider+`"}`)))
+			after, _ := json.Marshal(f.prefs)
+			if w.Code != 400 || string(before) != string(after) {
+				t.Fatalf("failed refresh changed existing settings: %d %s", w.Code, w.Body.String())
+			}
+			if provider == "not-acu" && len(f.writes) != 0 {
+				t.Fatal("unknown provider refreshed")
+			}
+		})
+	}
 }
 func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	host, f := capabilityTestHost(t)

@@ -826,6 +826,26 @@ async function openCapabilities() {
   if (ui.capabilities !== current) return;
   current.loading = false;
   renderCapabilities();
+  if (current.view) await refreshCapabilityModels();
+}
+
+async function refreshCapabilityModels() {
+  const current = ui.capabilities;
+  if (!current || current.refreshing || current.saving) return;
+  current.refreshing = true;
+  current.error = '';
+  renderCapabilities();
+  try {
+    const view = await request('/runtime/capabilities/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: current.provider }) });
+    if (ui.capabilities !== current) return;
+    // A later save may have changed picks while the catalog request ran.
+    if (!current.saving) current.view = view;
+  } catch (error) {
+    if (ui.capabilities === current) current.error = error.message;
+  } finally {
+    current.refreshing = false;
+    if (ui.capabilities === current) renderCapabilities();
+  }
 }
 
 function capabilityAgentState(view, id) {
@@ -852,7 +872,8 @@ function renderCapabilities() {
     const failure = current.toolFailures?.[agent.id];
     return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${!failure && state.count === 3 ? 'complete' : ''}" title="已接入表示工具配置已写入；实际使用取决于模型和应用权限。">${failure ? '需要处理' : state.count === 3 ? '已接入 ✓' : state.count ? '待补齐' : '待接入'}${state.custom ? ' · 自定义设置' : ''}</span>${failure ? `<span class="capability-tool-error">${escapeHTML(failure)}</span>` : ''}</div>${failure ? `<button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>重试</button>` : ''}</div>`;
   }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}<p class="capability-intro capability-help">首次配置或新增工具后，请重新打开对应应用。</p><div class="capability-check-actions"><span class="capability-intro">检查并补齐各应用的识图、生图和搜索工具，保留已有选择。</span><button class="button primary" data-configure-capabilities="check" ${current.saving || !agents.length ? 'disabled' : ''}>${current.saving === 'tools' ? '正在检查…' : '一键检查并补齐'}</button></div></section><section class="panel capability-advanced-panel"><h2>高级设置</h2><p>更多模型来源、搜索服务和工具权限设置。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="settings" ${current.saving ? 'disabled' : ''}>模型与搜索设置</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></section>` : `<section class="panel capability-model-panel"><p>${current.loading ? '正在读取配置…' : '配置暂未读取，请返回后重试。'}</p></section>`;
-  app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress || current.toolSummary ? `<p class="capability-progress" role="status">${escapeHTML(current.progress || current.toolSummary)}</p>` : ''}${body}</main></div>`;
+  const displayedBody = body.replace('<h2>常用模型</h2>', `<div class="capability-list-heading"><h2>常用模型</h2><button type="button" class="icon-button" data-refresh-capability-models title="刷新模型" aria-label="刷新模型" ${current.refreshing || current.saving ? 'disabled' : ''}>${icon('refresh', current.refreshing ? 'spinning' : '')}</button></div>`);
+  app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress || current.toolSummary ? `<p class="capability-progress" role="status">${escapeHTML(current.progress || current.toolSummary)}</p>` : ''}${displayedBody}</main></div>`;
 }
 
 function changeCapabilityModel(target) {
@@ -862,7 +883,7 @@ function changeCapabilityModel(target) {
   if (target.value === current.view[key]) delete current.draft[key];
   else current.draft[key] = target.value;
   const save = app.querySelector('[data-save-capabilities]');
-  if (save) save.disabled = !Object.keys(current.draft).length;
+  if (save) save.disabled = current.refreshing || !Object.keys(current.draft).length;
   const status = app.querySelector('.capability-model-actions [role="status"]');
   if (status) status.textContent = Object.keys(current.draft).length ? '有未保存的修改' : '';
 }
@@ -892,7 +913,7 @@ function openCapabilityAdvanced(view) {
 
 async function saveCapabilities() {
   const current = ui.capabilities;
-  if (!current?.view || current.saving || !Object.keys(current.draft).length) return;
+  if (!current?.view || current.saving || current.refreshing || !Object.keys(current.draft).length) return;
   current.saving = 'models';
   current.error = '';
   renderCapabilities();
@@ -908,7 +929,7 @@ async function saveCapabilities() {
 
 async function configureCapabilities(target) {
   const current = ui.capabilities;
-  if (!current?.view || current.saving) return;
+  if (!current?.view || current.saving || current.refreshing) return;
   const detected = (ui.status?.agents || []).filter(agent => agent.detected);
   const agents = target === 'check' ? detected : detected.filter(agent => agent.id === target && current.toolFailures?.[agent.id]);
   if (!agents.length) return;
@@ -1175,6 +1196,7 @@ app.addEventListener('click', event => {
   const page = event.target.closest('[data-page]');
   if (page) { const navigate = () => { ui.capabilityReturn = false; ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); }; if (ui.page === 'capabilities') leaveCapabilities(navigate); else navigate(); return; }
   if (event.target.closest('[data-capability-back]')) { returnFromCapabilities(); return; }
+  if (event.target.closest('[data-refresh-capability-models]')) { refreshCapabilityModels(); return; }
   if (event.target.closest('[data-save-capabilities]')) { event.preventDefault?.(); saveCapabilities(); return; }
   const configureTools = event.target.closest('[data-configure-capabilities]');
   if (configureTools) { configureCapabilities(configureTools.dataset.configureCapabilities); return; }

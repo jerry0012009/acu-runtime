@@ -37,7 +37,7 @@ async function setup(state, handler) {
   return { calls, timers, elements, listeners, run: command => vm.runInContext(command, context), select: (id, checked) => change({ dataset: { selectAgent: id }, checked }), change, refresh: () => vm.runInContext('refresh()', context) };
 }
 
-const posts = instance => instance.calls.filter(call => call.method === 'POST' && call.route !== '/kernel/api/provider/models');
+const posts = instance => instance.calls.filter(call => call.method === 'POST' && call.route !== '/kernel/api/provider/models' && call.route !== '/runtime/capabilities/refresh');
 
 const inventory = () => ({ models: [
   { id: 'acu-runtime/acu-auto', name: 'acu-auto', group: 'ACU', inUse: true },
@@ -698,6 +698,31 @@ test('capability manager preserves untouched external models and sends only expl
   assert.deepEqual(JSON.parse(posts(instance)[0].body), { provider: 'acu-runtime', modelsOnly: true, vision: 'acu-runtime/gpt-6.1-sol' });
 });
 
+test('opening capabilities refreshes an old catalog and keeps the selected model', async () => {
+ const old={...capabilityFixture(),imageGen:'acu-runtime/image-2.5',imageModels:[{id:'acu-runtime/image-2.5'}]};
+ const fresh={...old,imageModels:[...old.imageModels,{id:'acu-runtime/image-2.6'}]};
+ const instance=await setup({ready:true,agents:[codex()]},async route=>route==='/runtime/capabilities/refresh'?{body:fresh}:route.startsWith('/runtime/capabilities')?{body:old}:undefined);
+ await instance.run('openCapabilities()');
+ assert.equal(instance.calls.filter(c=>c.route==='/runtime/capabilities/refresh').length,1);
+ assert(instance.elements.app.innerHTML.includes('acu-runtime/image-2.6'));
+ assert.equal(instance.run('ui.capabilities.view.imageGen'),'acu-runtime/image-2.5');
+ assert(instance.elements.app.innerHTML.includes('data-refresh-capability-models'));
+ assert.equal(posts(instance).length,0);
+});
+
+test('catalog refresh failure retains cached choices and drafts and can retry', async () => {
+ let fail=true;
+ const view=capabilityFixture();
+ const instance=await setup({ready:true,agents:[codex()]},async route=>route==='/runtime/capabilities/refresh'?(fail?{ok:false,body:{error:'模型列表未更新，请重试'}}:{body:{...view,imageModels:[{id:'new-image'}]}}):route.startsWith('/runtime/capabilities')?{body:view}:undefined);
+ await instance.run('openCapabilities()');
+ assert(instance.elements.app.innerHTML.includes('模型列表未更新'));
+ instance.change({dataset:{capability:'vision'},value:'off'});
+ fail=false;await instance.run('refreshCapabilityModels()');
+ assert.equal(instance.run('ui.capabilities.draft.vision'),'off');
+ assert(instance.elements.app.innerHTML.includes('new-image'));
+ assert.equal(instance.run('ui.capabilities.error'),'');
+});
+
 test('capability save failure remains visible and retryable', async () => {
   const instance = await setup({ ready: true, agents: [codex()] }, async (route, options) => route.startsWith('/runtime/capabilities') ? options.method === 'POST' ? { ok: false, body: { error: '部分 Agent 写入失败' } } : { body: capabilityFixture() } : undefined);
   await instance.run('openCapabilities()');
@@ -818,7 +843,7 @@ test('returning a model to its saved value clears the draft and leaves without a
 });
 
 test('save before advanced navigation only continues after a successful save',async()=>{
- const instance=await setup({ready:true,agents:[codex()]},async (route,options)=>route.startsWith('/runtime/capabilities')?{body:{...capabilityFixture(),...(options.method==='POST'?{vision:'off'}:{})}}:undefined);
+ const instance=await setup({ready:true,agents:[codex()]},async (route,options)=>route.startsWith('/runtime/capabilities')?{body:{...capabilityFixture(),...(route==='/runtime/capabilities'&&options.method==='POST'?{vision:'off'}:{})}}:undefined);
  await instance.run('openCapabilities()');
  instance.change({dataset:{capability:'vision'},value:'off'});
  instance.run('openCapabilityAdvanced("settings")');

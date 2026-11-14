@@ -28,9 +28,10 @@ def free_port():
 
 kernel, runtime = [str(Path(p).resolve()) for p in sys.argv[1:3]]
 flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+listed_images = ["gpt-image-2.5-sunburst-2026-09-08"]
 class ModelList(BaseHTTPRequestHandler):
     def do_GET(self):
-        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, {"id": "gpt-image-2.5-sunburst-2026-09-08", "kind": "image"}]}).encode()
+        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, *[{"id":model,"kind":"image"} for model in listed_images]]}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(payload)
     def log_message(self, *args):
         pass
@@ -154,6 +155,15 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             token = re.search(r'name="acu-token" content="([^"]+)"', html)[1]
             status = request(rt + "/runtime/status")
             assert status["ready"] and len([a for a in status["agents"] if a["connected"]]) == 4
+            old_image = "acu-runtime/gpt-image-2.5-sunburst-2026-09-08"
+            request(rt + "/runtime/capabilities", {"provider":"acu-runtime", "modelsOnly":True, "imageGen":old_image}, token)
+            listed_images.extend(["gpt-image-2.6-sunburst", "gpt-image-2.6-flare"])
+            cached = request(rt + "/runtime/capabilities?provider=acu-runtime")
+            assert not any("2.6" in m["id"] for m in cached["imageModels"]), cached
+            refreshed = request(rt + "/runtime/capabilities/refresh", {"provider":"acu-runtime"}, token)
+            assert {"acu-runtime/gpt-image-2.6-sunburst", "acu-runtime/gpt-image-2.6-flare"}.issubset({m["id"] for m in refreshed["imageModels"]}), refreshed
+            assert refreshed["imageGen"] == old_image, refreshed
+            request(rt + "/runtime/capabilities", {"provider":"acu-runtime", "modelsOnly":True, "imageGen":""}, token)
             for name, kind in (("acu-vision", "vision"), ("acu-image", "image")):
                 request(origin + "/api/library/servers/save", {"old":"", "server":{
                     "name":name, "transport":"http", "url":"http://127.0.0.1:3425/mcp/magpie/"+kind,
@@ -210,7 +220,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                                  "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"]}[tool["name"]]:
                     assert expected in data, (tool["name"], data[:500])
             print(json.dumps({"runtime": status["version"], "kernel": actual_kernel, "fourAgentsConfigured": True,
-                "kernelPolicyCLI": True, "repeatNoDuplicates": True, "existingMCPPreserved": True, "legacyMigration": True,
+                "kernelPolicyCLI": True, "existingCatalogRefresh": True, "repeatNoDuplicates": True, "existingMCPPreserved": True, "legacyMigration": True,
                 "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True,
                 "freshCodexUsesAPIWithoutChatGPTAccount": True}))
         except Exception:

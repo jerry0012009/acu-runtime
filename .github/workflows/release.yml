@@ -59,6 +59,7 @@ jobs:
           node scripts/test-starfish.cjs
           node scripts/test-billing.cjs
           node scripts/test-install-updates.cjs
+          node scripts/test-capability-refresh.cjs
           node scripts/test-recommended-models.cjs
           node scripts/test-work-review.cjs
       - uses: actions/upload-artifact@v4

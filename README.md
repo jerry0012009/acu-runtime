@@ -1,4 +1,4 @@
-Current release: **0.1.74** simplifies Work Review with concise Chinese image summaries and applicability explanations. Original prompts and source excerpts remain available in secondary details. Bundles the official Magpie v0.1.4096 CLI kernel with pinned SHA-256 digests.
+Current release: **0.1.75** refreshes native image/vision model catalogs when opening Images and Search, so existing users receive newly available models such as GPT Image 2.6. Includes a direct refresh control, preserves selections/drafts and retains cached choices on failure. Bundles official Magpie v0.1.4096.
 
 # ACU Runtime 0.1.58
 
