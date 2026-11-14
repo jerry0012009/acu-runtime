@@ -11,6 +11,7 @@ let account = { loggedIn: true, identity: 'fixture-one', username: '偏好预览
 let mode = 'normal', delay = false, reads = 0, writes = [], settingsWrites = [], settingsFailure = false, settingsDelay = 0;
 const summary = '面向终端用户交付软件或浏览器扩展时，以可直接安装、可分发和真实启动验证作为主要验收标准；已明确授权的插件试用应默认具备指定核心能力与可用接入配置。';
 const fixtures = {
+ teams: {version:1,spaces:[]},
  controls: {records:[{id:'11111111-1111-4111-8111-111111111111',summary:'先结论再说明',rule:'先结论；法律文书保留完整论证。',scope:'工作报告',exceptions:'法律文书',revision:'a'.repeat(64),disabled:false}]},
  profile: { status: 'error', error:'profile_refresh_failed', generatedAt: '2026-11-12T12:51:00Z', profile: { summary: '注重可核验的交付、清晰的依据与直接可用的结果。', rays: [{ id: 'hidden-ray',score:80,confidence:70, label: '直接安装使用', category: '交付与核验', summary, scope: '面向用户的交付', sourceIds: ['hidden-source', 'missing-source'] }, {id:'initialized',score:70,confidence:60,label:'简洁与详尽',summary:'按任务保留合适的细节。',category:'表达',scope:'报告',sourceIds:[],bipolar:{origin:'authorized_initialization'}}] } },
  library: { version: 1, records: [{ id: 'hidden-source', summary }, {id:'english',summary:'LongEnglishText'.repeat(50)+' <script>unsafe()</script>'}] },

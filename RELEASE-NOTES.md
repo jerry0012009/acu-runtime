@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.75
+# ACU Runtime 0.1.76
+
+Authorized GYZ members can switch between personal preferences and team creative
+vectors. The existing starfish stays expanded, with concise creative choices and
+team source details. Account changes clear the previous team's view. Personal
+learning settings remain in the personal view. Existing model refresh, image
+models and native kernel integrations are retained.
 
 修复已接入用户的生图列表停留在旧目录、看不到 GPT Image 2.6 的问题。进入「图片与搜索」先显示已有配置，再自动通过内核刷新模型目录；「常用模型」旁增加刷新按钮。
 
@@ -128,9 +134,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.75-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.75-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.75-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.76-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.76-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.76-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

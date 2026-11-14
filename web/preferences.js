@@ -7,9 +7,17 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
   const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('zh-CN') : '时间未提供';
   const note = text => `<p class="preference-note" role="status">${esc(text)}</p>`;
   const drafts = new Map();
+  let teamKey = '';
+  const teams = () => state.data.teams?.spaces || [];
+  const activeTeam = () => teams().find(space => space.key === teamKey);
+  function spaceTabs() {
+    if (!teams().length) return '';
+    return `<div class="preference-spaces" role="tablist" aria-label="偏好空间"><button class="button secondary" role="tab" aria-selected="${!teamKey}" data-pref-space="">我的偏好</button>${teams().map(space => `<button class="button secondary" role="tab" aria-selected="${teamKey===space.key}" data-pref-space="${esc(space.key)}">${esc(space.key)}</button>`).join('')}</div>`;
+  }
   const saving = new Set();
   let zoom=1;
   function clear() {
+    teamKey = '';
     state.settingsSaving = false; state.settingsSaved = false;
     drafts.clear(); saving.clear();
     zoom=1; graph?.reset();
@@ -26,15 +34,17 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const generation = state.generation;
     let retry = false;
     const controller = new AbortController(); state.controller = controller; state.busy = true; state.errors = {}; update();
-    await Promise.all(Object.keys(titles).map(async name => {
+    await Promise.all([...Object.keys(titles), 'teams'].map(async name => {
       try {
         const data = await request(`/runtime/preferences/${name}`, { signal: controller.signal, allowProfileStateError: name === 'profile' });
         if (generation !== state.generation) return;
         if ((name === 'library' && (data.version !== 1 || !Array.isArray(data.records))) || (name === 'activity' && (data.version !== 1 || !Array.isArray(data.events)))) throw new Error('偏好接口版本或数据格式暂不兼容。');
         if (name === 'settings' && state.settingsSaving) return;
         state.data[name] = name === 'profile' && !data.profile && ['queued','generating','error'].includes(data.status) && state.data.profile?.profile ? { ...data, profile: state.data.profile.profile, generatedAt: state.data.profile.generatedAt } : data;
+        if (name === 'teams' && (!data || data.version !== 1 || !Array.isArray(data.spaces))) state.data.teams = {version:1,spaces:[]};
       } catch (error) {
         if (generation !== state.generation || error.name === 'AbortError') return;
+        if (name === 'teams' && error.status !== 401) { state.data.teams = {version:1,spaces:[]}; return; }
         if (error.status === 401) {
           clear(); state.revoked = true; state.errors.session = '登录会话已失效或无权限，请重新登录。'; update(); return;
         }
@@ -45,16 +55,20 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     if (generation === state.generation) {
       state.retries = retry ? state.retries + 1 : 0;
       const retrySoon = retry && state.retries <= 3;
-      state.busy = false; state.loaded = retrySoon ? 0 : Date.now(); update();
+      state.busy = false; state.loaded = retrySoon ? 0 : Date.now();
       clearTimeout(state.refreshTimer);
-      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retrySoon ? state.retryDelay : preferenceCacheMs + 10);
+      const pending = teams().some(space => ['queued','generating'].includes(space.view?.status));
+      if (teamKey && !activeTeam()) {teamKey=''; graph?.reset();}
+      update();
+      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retrySoon ? state.retryDelay : pending ? 10000 : teams().length ? 60000 : preferenceCacheMs + 10);
       state.retryDelay = retry ? Math.min(state.retryDelay * 2, 30000) : 1500;
 
     }
   }
   function sourceList(ray) {
-    const records = state.data.library?.records || [];
+    const records = activeTeam()?.records || state.data.library?.records || [];
     const sources = (ray.sourceIds || []).map(id => records.find(record => record.id === id));
+    if (activeTeam() && ray.evidence?.length) return `<details class="preference-sources"><summary>相关记录</summary>${ray.evidence.map(entry=>`<p>${esc(entry.quote)}</p>`).join('')}</details>`;
     return `<details class="preference-sources"><summary>相关记录</summary>${state.errors.library ? note(state.errors.library) : sources.length ? sources.map(record => record?.summary ? `<p>${esc(record.summary)}</p>` : note('此条偏好记录暂不可用。')).join('') : note('暂无可读的偏好记录。')}</details>`;
   }
   function understanding(profile) {
@@ -106,6 +120,8 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
   function content() {
     const account = ui.status?.account;
     if (!account?.loggedIn || state.revoked) return `<section class="panel preference-empty"><h2>登录后查看我的偏好</h2>${state.errors.session || account?.error ? note(state.errors.session || account.error) : ''}<button class="button primary" data-action="account-login" ${account?.pending || !ui.status?.desktop ? 'disabled' : ''}>${account?.pending ? '登录中…' : '登录 ACU'}</button></section>`;
+    const team = activeTeam();
+    if (team) return `${graph?.render(team.view) || note(['queued','generating'].includes(team.view?.status) ? '正在整理创作向量…' : '暂无创作经验')}${team.view?.profile ? understanding(team.view).replace('已记住的偏好','团队创作经验') : ''}<button class="text-button" data-pref-refresh ${state.busy?'disabled':''}>刷新</button>`;
     const profile = state.data.profile, library = state.data.library, activity = state.data.activity;
     const query = state.query.trim().toLocaleLowerCase();
     const match = text => !query || String(text || '').toLocaleLowerCase().includes(query);
@@ -149,6 +165,16 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const caret = active ? document.activeElement.selectionStart : null;
     const opened = new Set([...(app.querySelectorAll?.('details') || [])].filter(detail=>detail.open && !detail.dataset.autoEmpty).map(detail=>detail.querySelector('summary')?.textContent));
     app.innerHTML = `${navigation()}<div class="main-shell"><main class="preference-page"><header><div class="eyebrow">个人记录</div><h1>我的偏好</h1></header>${content()}</main></div>`;
+    if (activeTeam()) {
+      const page=app.querySelector('.preference-page');
+      page.querySelector('h1').textContent = `${teamKey} 创作向量`;
+      page.querySelector('.eyebrow').textContent = '团队空间';
+      const heading=page.querySelector('.starfish-header h2'); if(heading)heading.textContent='创作向量';
+      const tabs=document.createElement('div'); tabs.innerHTML=spaceTabs();page.querySelector('header').after(tabs);
+      graph?.bind(app);
+      if(shouldLoad){syncAccount();load();}
+      return;
+    }
     const chart = app.querySelector('.starfish-panel');
     const page = app.querySelector('.preference-page');
     if (chart) page.querySelector('header').after(chart);
@@ -206,9 +232,12 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     if (focusedSetting) app.querySelector(`[data-pref-setting="${CSS.escape(focusedSetting)}"]`)?.focus();
     if (focusedInterval) app.querySelector('#pref-interval')?.focus();
     graph?.bind(app);
+    if (teams().length) { const tabs=document.createElement('div');tabs.innerHTML=spaceTabs();app.querySelector('.preference-page > header').after(tabs); }
     if (shouldLoad) { syncAccount(); load(); }
   }
   function click(event) {
+    const space = event.target.closest('[data-pref-space]');
+    if(space){teamKey=space.dataset.prefSpace;graph?.reset();state.selected='';update();return true;}
     if (event.target.closest('[data-pref-interval-reset]')) { saveSettings({observerInterval:null}); return true; }
     const zoomButton=event.target.closest('[data-pref-zoom]');
     if(zoomButton){zoom=Math.max(1,Math.min(2.5,zoom+Number(zoomButton.dataset.prefZoom)*.5));update();return true;}

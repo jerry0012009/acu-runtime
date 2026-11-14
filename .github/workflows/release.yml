@@ -56,6 +56,7 @@ jobs:
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
           export ACU_TEST_WORKSPACE="$RUNNER_TEMP/acu-preference-browser"
           node scripts/test-preferences.cjs
+          node scripts/test-team-preferences.cjs
           node scripts/test-starfish.cjs
           node scripts/test-billing.cjs
           node scripts/test-install-updates.cjs
