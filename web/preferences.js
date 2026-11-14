@@ -72,9 +72,10 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     return `<details class="preference-sources"><summary>相关记录</summary>${state.errors.library ? note(state.errors.library) : sources.length ? sources.map(record => record?.summary ? `<p>${esc(record.summary)}</p>` : note('此条偏好记录暂不可用。')).join('') : note('暂无可读的偏好记录。')}</details>`;
   }
   function understanding(profile) {
+    const records = activeTeam()?.records || state.data.library?.records || [];
     const items = (profile?.profile?.highlights || []).slice(0, 5);
     if (!items.length) return `<section class="preference-understanding"><h2>已记住的偏好</h2><p>${esc(profile?.profile?.summary || '暂无已整理的偏好。')}</p></section>`;
-    return `<section class="preference-understanding" aria-label="已记住的偏好"><h2>已记住的偏好</h2><div class="preference-highlights">${items.map(item => `<article><h3>${esc(item.title)}</h3><p>${esc(item.summary)}</p><details><summary>相关记录</summary>${(item.sourceIds || []).map(id => { const record = state.data.library?.records?.find(record => record.id === id); return `<p>${esc(record?.summary || '相关记录暂不可用。')}</p>`; }).join('')}</details></article>`).join('')}</div></section>`;
+    return `<section class="preference-understanding" aria-label="已记住的偏好"><h2>已记住的偏好</h2><div class="preference-highlights">${items.map(item => `<article><h3>${esc(item.title)}</h3><p>${esc(item.summary)}</p><details><summary>相关记录</summary>${(item.sourceIds || []).map(id => { const record = records.find(record => record.id === id); return `<p>${esc(record?.summary || item.evidence?.find(entry=>entry.sourceId===id)?.quote || '相关记录暂不可用。')}</p>`; }).join('')}</details></article>`).join('')}</div></section>`;
   }
   function learningControls(settings) {
     if (!settingKeys.every(key => typeof settings?.[key] === 'boolean') || typeof settings.globalEnabled !== 'boolean') return '';
@@ -121,7 +122,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const account = ui.status?.account;
     if (!account?.loggedIn || state.revoked) return `<section class="panel preference-empty"><h2>登录后查看我的偏好</h2>${state.errors.session || account?.error ? note(state.errors.session || account.error) : ''}<button class="button primary" data-action="account-login" ${account?.pending || !ui.status?.desktop ? 'disabled' : ''}>${account?.pending ? '登录中…' : '登录 ACU'}</button></section>`;
     const team = activeTeam();
-    if (team) return `${graph?.render(team.view) || note(['queued','generating'].includes(team.view?.status) ? '正在整理创作向量…' : '暂无创作经验')}${team.view?.profile ? understanding(team.view).replace('已记住的偏好','团队创作经验') : ''}<button class="text-button" data-pref-refresh ${state.busy?'disabled':''}>刷新</button>`;
+    if (team) return `${graph?.render(team.view) || note(['queued','generating'].includes(team.view?.status) ? '正在整理创作向量…' : '暂无创作经验')}${team.view?.profile ? understanding(team.view).replaceAll('已记住的偏好','团队创作经验') : ''}<button class="text-button" data-pref-refresh ${state.busy?'disabled':''}>刷新</button>`;
     const profile = state.data.profile, library = state.data.library, activity = state.data.activity;
     const query = state.query.trim().toLocaleLowerCase();
     const match = text => !query || String(text || '').toLocaleLowerCase().includes(query);

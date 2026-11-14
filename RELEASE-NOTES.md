@@ -1,4 +1,4 @@
-# ACU Runtime 0.1.76
+# ACU Runtime 0.1.77
 
 Authorized GYZ members can switch between personal preferences and team creative
 vectors. The existing starfish stays expanded, with concise creative choices and
@@ -134,9 +134,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.76-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.76-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.76-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.77-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.77-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.77-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
