@@ -1,4 +1,4 @@
-Current release: **0.1.77** adds team creative vectors alongside personal preferences for authorized members. Both views reuse the existing interactive starfish, with team sources kept separate and the graph always expanded. Retains native model catalog refresh and official Magpie v0.1.4096.
+Current release: **0.1.78** adds team creative vectors alongside personal preferences for authorized members. Both views reuse the existing interactive starfish, with team sources kept separate and the graph always expanded. Retains native model catalog refresh and official Magpie v0.1.4096.
 
 # ACU Runtime 0.1.58
 

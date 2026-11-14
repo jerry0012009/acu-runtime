@@ -100,6 +100,8 @@ func TestNativeLoginSmoke(t *testing.T) {
 	}))
 	host.cloudTransport = accountTransport(func(request *http.Request) (*http.Response, error) {
 		switch request.URL.Path {
+		case "/api/user/self/acu-team-preferences":
+			return cloudFixture(`{"success":true,"data":{"version":1,"spaces":[]}}`), nil
 		case "/api/user/self/acu-preference-profile":
 			rays := []map[string]any{}
 			count := 3
