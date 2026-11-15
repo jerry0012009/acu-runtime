@@ -66,6 +66,18 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 				}
 			}
 			io.WriteString(w, `{}`)
+		case "/api/library/servers/tools":
+			var in struct {
+				Name  string
+				Names []string
+			}
+			json.NewDecoder(r.Body).Decode(&in)
+			for _, s := range f.servers {
+				if s["name"] == in.Name {
+					s["disabledTools"] = in.Names
+				}
+			}
+			io.WriteString(w, `{}`)
 		case "/api/library/servers/remove":
 			var in struct{ Name string }
 			json.NewDecoder(r.Body).Decode(&in)

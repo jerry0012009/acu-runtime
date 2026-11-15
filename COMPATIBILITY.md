@@ -151,3 +151,15 @@ Windows Runtime rejects Codex route/model/restart writes while the OpenAI.Codex 
 The user confirmed the repaired Windows build fixed the desktop crash loop. Windows route writes now stop only the verified owned idle watcher, verify Codex identity/config/model, and restart the watcher on the complete route; failures restore the original files. Advanced restart/catalog-write endpoints cannot bypass this path. Packaged Magpie is pinned to 0.1.3940 for all four kernel architectures. Runtime installer manifests derive from the actual payload and are executed in verify-only mode during packaging. CI installs published 0.1.56, hands off by PID to the new setup, checks ready/version and the actual serving kernel, and verifies existing Codex config/auth digests are unchanged.
 
 Local 0.1.3940 isolated native routing passed initial configuration, invalid-model rollback, cancellation and disconnect. Initial parse/model configuration measured 6.8 seconds before final release runs; this excludes downloads, account sign-in and remote latency. Three-platform package acceptance is recorded in the release workflow, not inferred from local Windows tests.
+# Runtime 0.1.79 Media Access
+
+Video candidates and the automatic model are read from the pinned native image
+MCP's `tools/list` schema, without a generation request. Enabling video changes
+only `generate_video` in the existing managed server's disabled-tools list via
+the native Library API; other disabled tools, assignments and custom launcher
+options remain intact. The native kernel has no persisted video-default setting,
+so the UI's model-specific request explicitly names a model instead.
+
+Release compatibility fixtures now list video models and exercise an old disabled
+video tool across all four Agent configuration writers. Browser checks cover
+light/dark, desktop/mobile, new model recommendations and explicit video enable.

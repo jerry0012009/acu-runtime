@@ -19,6 +19,7 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/runtime/preferences/")
 	paths := map[string]string{"profile": "acu-preference-profile", "library": "acu-preference-library", "activity": "acu-preference-activity", "settings": "acu-advisor/settings", "controls": "acu-preference-controls"}
 	paths["work-review"] = "acu-work-review"
+	paths["teams"] = "acu-team-preferences"
 	var input []byte
 	if r.Method == http.MethodPost {
 		parts := strings.Split(name, "/")
@@ -118,6 +119,10 @@ func (host *server) accountPreferences(w http.ResponseWriter, r *http.Request) {
 	}
 	if res.StatusCode == 404 {
 		host.json(w, 404, map[string]string{"error": "当前服务暂不支持此偏好视图。"})
+		return
+	}
+	if res.StatusCode == 403 && name == "teams" {
+		host.json(w, 200, map[string]any{"version": 1, "spaces": []any{}})
 		return
 	}
 	if res.StatusCode == 401 || res.StatusCode == 403 {

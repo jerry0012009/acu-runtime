@@ -67,3 +67,5 @@
 .preference-graph,.preference-controls { margin: 14px 0; border-bottom: 1px solid var(--acu-line); padding-bottom: 12px; }
 @media(max-width: 800px) { .preference-page { padding: 24px 20px 60px; } .preference-rays { grid-template-columns: minmax(0,1fr); } }
 @media(max-width: 480px) { .preference-page { padding: 20px 12px 60px; } .preference-page h1 { font-size: 26px; } .preference-ray,.preference-record,.preference-change { padding: 14px; } .preference-actions { width: 100%; } }
+.preference-spaces { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.preference-spaces [aria-selected="true"] { border-color: var(--acu-accent); }

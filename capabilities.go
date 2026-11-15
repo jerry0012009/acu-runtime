@@ -50,6 +50,11 @@ type capabilityView struct {
 	ImageGenAuto         string            `json:"imageGenAuto"`
 	VisionModels         []capabilityModel `json:"visionModels"`
 	ImageModels          []capabilityModel `json:"imageModels"`
+	VideoModels          []capabilityModel `json:"videoModels"`
+	VideoAuto            string            `json:"videoAuto"`
+	VideoEnabled         bool              `json:"videoEnabled"`
+	VideoBlocked         bool              `json:"videoBlocked"`
+	VideoError           string            `json:"videoError,omitempty"`
 	Tools                []capabilityTool  `json:"tools"`
 	SearchReady          bool              `json:"searchReady"`
 	SearchURL            string            `json:"searchURL"`
@@ -58,13 +63,14 @@ type capabilityView struct {
 	Messages             []string          `json:"messages"`
 }
 type capabilityInput struct {
-	Provider   string   `json:"provider"`
-	Agents     []string `json:"agents"`
-	Vision     *string  `json:"vision"`
-	ImageGen   *string  `json:"imageGen"`
-	SearchURL  *string  `json:"searchURL"`
-	FreeSearch *bool    `json:"freeSearch"`
-	ModelsOnly bool     `json:"modelsOnly"`
+	Provider     string   `json:"provider"`
+	Agents       []string `json:"agents"`
+	Vision       *string  `json:"vision"`
+	ImageGen     *string  `json:"imageGen"`
+	SearchURL    *string  `json:"searchURL"`
+	FreeSearch   *bool    `json:"freeSearch"`
+	ModelsOnly   bool     `json:"modelsOnly"`
+	VideoEnabled *bool    `json:"videoEnabled"`
 }
 
 func (host *server) capabilityRead(ctx context.Context, provider string) (capabilityView, map[string]json.RawMessage, capabilityLibrary, error) {
@@ -96,6 +102,12 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	for _, tool := range lib.Servers {
 		if tool.Note == capabilityOwner {
+			if tool.Name == "acu-image" {
+				view.VideoEnabled = tool.stored["paused"] != true && len(tool.Agents) > 0
+				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("generate_video")) {
+					view.VideoEnabled = false
+				}
+			}
 			tool.Custom = tool.stored["hub"] != nil && tool.stored["hub"] != ""
 			if disabled, ok := tool.stored["disabledTools"].([]any); ok {
 				tool.Custom = tool.Custom || (tool.Name != "acu-image" && len(disabled) > 0) || (tool.Name == "acu-image" && (len(disabled) != 1 || disabled[0] != "generate_video"))
@@ -106,6 +118,8 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 			}
 		}
 	}
+	view.VideoBlocked = view.ImageGen == "off"
+	view.VideoModels, view.VideoAuto, view.VideoError = host.nativeVideoModels(ctx, provider)
 	view.FreeSearchAvailable = true
 	var apis []struct {
 		Vendor, URL string
@@ -149,6 +163,16 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	}
 	if choice == nil {
 		return view, errors.New("请选择可用的 ACU Key")
+	}
+	if input.VideoEnabled != nil {
+		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil {
+			return view, errors.New("请单独保存视频工具设置")
+		}
+		if err := host.setVideoToolEnabled(ctx, lib, *input.VideoEnabled); err != nil {
+			return view, err
+		}
+		view, _, _, err = host.capabilityRead(ctx, input.Provider)
+		return view, err
 	}
 	if input.SearchURL != nil && *input.SearchURL != "" {
 		return view, errors.New("请在高级搜索设置中配置搜索服务")
