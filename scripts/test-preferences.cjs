@@ -61,7 +61,13 @@ const server = http.createServer(async (req,res) => {
   for(const theme of ['light','dark']) for(const width of [320,390,768,1440]) {
    const page=await browser.newPage({viewport:{width,height:1000},colorScheme:theme});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
-   await page.goto(origin);await page.locator('[data-page="preferences"]').click();await page.getByText(firstHighlight,{exact:true}).waitFor();
+   const beforeWarmup=reads;
+   const warmed=page.waitForResponse(response=>response.url().endsWith('/runtime/preferences/teams'));
+   await page.goto(origin);
+   await warmed;
+   await page.waitForFunction(()=>!document.querySelector('.preference-page'));
+   assert(reads>=beforeWarmup+6,'startup must read preference data before navigating');
+   await page.locator('[data-page="preferences"]').click();await page.getByText(firstHighlight,{exact:true}).waitFor();
    assert.equal(await page.locator('.preference-understanding').innerText().then(text=>text.length<420),true);
    assert.equal(await page.locator('.preference-catalog[open]').count(),0);
    const renderedText = await page.locator('.preference-page').textContent();

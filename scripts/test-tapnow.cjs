@@ -26,7 +26,7 @@ async function main() {
       calls.push(url.pathname);
       let result={};
       if(url.pathname==='/runtime/status') result=status;
-      else if(url.pathname==='/runtime/tapnow/install') {installCount++;prepared=true;phase='waiting';result=tapnowState();}
+      else if(url.pathname==='/runtime/tapnow/configure') {installCount++;prepared=true;phase='waiting';confirmed=false;result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/connect') {phase='waiting';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/cancel') {phase='unknown';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/check') {checks++;result=tapnowState();}
@@ -41,7 +41,7 @@ async function main() {
     assert.equal(installCount,0);
     await other.locator('summary').click();
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');
-    await page.locator('[data-tapnow="install"][data-edition="companion"]').click();
+    await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
     await page.getByText('文件已就绪，等待 Chrome 加载', {exact:false}).waitFor();
     await page.locator('[data-tapnow="browser"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/browser'));
@@ -62,10 +62,13 @@ async function main() {
       await page.screenshot({path:path.join(output,`runtime-${width}-${theme}.png`),fullPage:true});
     }
     confirmed=true;
-    await page.getByText('配置已确认', {exact:false}).waitFor();
+    await page.locator('.tapnow-state').filter({hasText:'配置已确认'}).waitFor();
     assert.equal(await page.locator('.tapnow-install-guide').count(),0);
     await page.locator('[data-tapnow="check"]').click();
     assert.equal(checks,1);
+    await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
+    await page.getByText('文件已就绪，等待 Chrome 加载').waitFor();
+    assert.equal(installCount,2,'configured plugin must still check/update on the primary action');
     assert.deepEqual(errors,[]);
     console.log('PASS: collapsed opt-in, single-click authorization without extra checkbox, receipt state; 8 viewport/theme screenshots');
   } finally {await browser.close();}

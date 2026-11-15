@@ -35,11 +35,10 @@
       return `<div class="tapnow-agent" data-agent="tapnow"><div class="tapnow-heading"><div>${icon('globe')}<h3>TapNow</h3><span>Chrome 扩展</span></div><button class="icon-button" data-tapnow="check" title="检查插件更新" aria-label="检查插件更新" ${operation || state?.busy ? 'disabled' : ''}>${icon('refresh')}</button></div>
         ${error ? `<p class="tapnow-error" role="alert">${esc(error)} <button class="text-button" data-tapnow="refresh">重试读取状态</button></p>` : ''}${state?.message && !error ? `<p class="tapnow-note" role="status">${esc(state.message)}</p>` : ''}${loading ? '<p role="status">正在读取插件状态</p>' : ''}
         <div class="tapnow-editions">${editions.map(e => {
-          const preparing = state?.preparing === e.edition || operation === `install:${e.edition}`;
+          const preparing = state?.preparing === e.edition || operation === `configure:${e.edition}` || operation === `install:${e.edition}`;
           const phase = state?.phase === 'preparing-video' ? '正在准备视频读取组件' : state?.phase === 'downloading' ? '正在下载、校验并解压插件' : state?.phase === 'registering' ? '正在准备本机连接组件' : '正在检查插件与连接';
           const connection = preparing ? phase : e.connection === 'configured' ? `配置已确认 · 插件 ${esc(e.version || '')}` : e.connection === 'saving' ? '正在保存并验证配置' : e.connection === 'waiting' ? '文件已就绪，等待 Chrome 加载' : e.connection === 'expired' ? '授权已过期，文件保留，可重新接入' : e.connection === 'error' ? esc(e.connectionError || '配置未完成，请重试') : e.prepared ? '文件已保留，尚未确认接入' : '尚未开启';
-          const command = e.prepared ? 'connect' : 'install';
-          return `<div class="tapnow-edition"><div><h4>${labels[e.edition]}</h4><p>${e.edition === 'backup' ? '本人画布、素材备份与完整性核对 · 无需 ACU Key' : '节点审阅 · 使用当前 ACU Key'}</p><p class="tapnow-state" role="status">${connection}</p></div><div class="tapnow-actions">${preparing ? `<button class="text-button" data-tapnow="cancel" data-edition="${e.edition}">取消准备</button>` : waiting(e) ? '' : `<button class="button ${e.edition === 'companion' ? 'primary' : 'secondary'}" data-tapnow="${command}" data-edition="${e.edition}" ${disabled(e) ? 'disabled' : ''}>${icon(e.prepared ? 'link' : 'arrow')}${e.prepared ? e.connection === 'configured' ? '重新接入' : '继续接入' : '开启'}</button>${!e.prepared ? `<button class="text-button" data-tapnow="connect" data-edition="${e.edition}" ${disabled(e) ? 'disabled' : ''}>已安装</button>` : ''}`}${e.update ? `<button class="button secondary" data-tapnow="install" data-edition="${e.edition}" ${disabled(e) ? 'disabled' : ''}>${icon('refresh')}更新至 ${esc(e.latest)}</button>` : ''}</div>${preparing ? '<progress aria-label="插件准备进度"></progress>' : guide(e)}${e.connection === 'configured' ? `<p class="tapnow-note tapnow-complete">${icon('check')}接入完成；在 Chrome 中打开自己的 TapNow 画布${e.edition === 'companion' ? '，刷新后检测节点' : '，选择备份目录'}。</p>` : ''}</div>`;
+          return `<div class="tapnow-edition"><div><h4>${labels[e.edition]}</h4><p>${e.edition === 'backup' ? '更新资产备份插件 · 无需 ACU Key' : '更新插件并替换为当前 ACU API Key 与模型'}</p><p class="tapnow-state" role="status">${connection}</p>${e.reloadRequired ? `<p class="tapnow-note">请先在 Chrome 加载或重新加载 ${esc(e.requiredVersion || '')}，再继续配置。</p>` : ''}</div><div class="tapnow-actions">${preparing ? `<button class="text-button" data-tapnow="cancel" data-edition="${e.edition}">取消准备</button>` : waiting(e) ? '' : `<button class="button ${e.edition === 'companion' ? 'primary' : 'secondary'}" data-tapnow="configure" data-edition="${e.edition}" ${disabled(e) ? 'disabled' : ''}>${icon('refresh')}一键配置${e.update ? ` · ${esc(e.latest)}` : ''}</button>`}</div>${preparing ? '<progress aria-label="插件准备进度"></progress>' : guide(e)}${e.connection === 'configured' ? `<p class="tapnow-note tapnow-complete">${icon('check')}配置已确认；在 Chrome 中打开自己的 TapNow 画布${e.edition === 'companion' ? '，刷新后检测节点' : '，选择备份目录'}。</p>` : ''}</div>`;
         }).join('')}</div>
         ${choice ? `<div class="tapnow-config"><label for="tapnow-model">副驾驶模型</label><select id="tapnow-model" ${operation || state?.busy ? 'disabled' : ''}>${choice.models.map(m => `<option value="${esc(m)}" ${m === model ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div><p class="tapnow-note">点击开启或接入即授权安装准备和所选 Key 的本机配置；节点检测可能发送文字与勾选的图片并产生费用。</p>` : '<p class="tapnow-note">副驾驶需先连接 ACU；资产备份可直接开启。</p>'}</div>`;
     }
@@ -55,17 +54,17 @@
       }
       if (operation && action !== 'cancel' || ui.applying || ui.accountBusy) return;
       const current = ++generation;
-      if (['install', 'connect', 'check'].includes(action)) operation = `${action}:${edition || ''}`;
+      if (['configure', 'install', 'connect', 'check'].includes(action)) operation = `${action}:${edition || ''}`;
       error = ''; render();
       let progressTimer;
-      if (action === 'install') progressTimer = setInterval(async () => {
+      if (action === 'install' || action === 'configure') progressTimer = setInterval(async () => {
         try { const next = await request('/runtime/tapnow'); if (current === generation) { state = next; render(); } } catch { /* final request reports preparation errors */ }
       }, 800);
       try {
         if (action === 'refresh') state = await request('/runtime/tapnow');
         else {
           const choice = activeChoice();
-          const body = ['install', 'connect'].includes(action) ? { edition, provider: choice?.id, model } : action === 'check' ? {} : { edition };
+          const body = ['configure', 'install', 'connect'].includes(action) ? { edition, provider: choice?.id, model } : action === 'check' ? {} : { edition };
           const next = await post(action, body);
           if (current === generation) state = next;
         }

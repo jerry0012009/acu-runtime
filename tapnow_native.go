@@ -69,14 +69,16 @@ func tapnowAPIBase(raw string) (string, error) {
 }
 
 type tapnowGrant struct {
-	ID        string
-	Provider  string
-	Model     string
-	Phase     string
-	Version   string
-	Error     string
-	Expires   time.Time
-	Confirmed time.Time
+	ID              string
+	Provider        string
+	Model           string
+	Phase           string
+	Version         string
+	Error           string
+	Expires         time.Time
+	Confirmed       time.Time
+	RequiredVersion string
+	ReloadRequired  bool
 }
 
 type tapnowNativeSession struct {
@@ -154,7 +156,9 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		host.json(w, 409, map[string]string{"error": "请在 ACU Runtime 桌面应用中接入"})
 		return
 	}
-	install := r.URL.Path == "/runtime/tapnow/install"
+	install := r.URL.Path == "/runtime/tapnow/install" || r.URL.Path == "/runtime/tapnow/configure"
+	requiredVersion := ""
+	reloadRequired := false
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Minute)
 	defer cancel()
 	s.Lock()
@@ -164,6 +168,10 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		return
 	}
 	s.busy = true
+	// A failed new configuration must not leave an earlier success visible.
+	if install {
+		delete(s.grants, edition)
+	}
 	s.preparing, s.phase, s.message, s.cancel = edition, "checking", "", cancel
 	if s.nativeToken == "" {
 		s.nativeToken = secret()
@@ -211,6 +219,13 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 			err = errors.New("插件发布清单无效")
 		}
 		if err == nil {
+			root, dirErr := s.directory()
+			if dirErr != nil {
+				fail(dirErr)
+				return
+			}
+			requiredVersion = catalog.Packages[edition].Version
+			reloadRequired = readTapnowManifest(filepath.Join(root, edition)) != requiredVersion
 			s.Lock()
 			s.phase = "downloading"
 			s.Unlock()
@@ -239,6 +254,9 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 			return
 		}
 	}
+	if requiredVersion == "" && err == nil && tapnowPreparedIdentity(filepath.Join(root, edition), edition) {
+		requiredVersion = readTapnowManifest(filepath.Join(root, edition))
+	}
 	if ctx.Err() != nil {
 		fail(ctx.Err())
 		return
@@ -260,7 +278,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		host.json(w, 400, map[string]string{"error": "本机连接组件未准备完成，请重试"})
 		return
 	}
-	grant := &tapnowGrant{ID: secret(), Provider: provider, Model: model, Phase: "waiting", Expires: time.Now().Add(5 * time.Minute)}
+	grant := &tapnowGrant{ID: secret(), Provider: provider, Model: model, Phase: "waiting", RequiredVersion: requiredVersion, ReloadRequired: reloadRequired, Expires: time.Now().Add(5 * time.Minute)}
 	s.Lock()
 	if ctx.Err() != nil {
 		s.Unlock()
@@ -273,7 +291,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 	s.grants[edition] = grant
 	s.Unlock()
 	address := "chrome-extension://" + tapnowID(edition) + "/connect.html"
-	if install {
+	if install && reloadRequired {
 		address = "chrome://extensions/"
 		if s.open != nil {
 			err = s.open(ctx, filepath.Join(root, edition))
@@ -364,6 +382,11 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 409, tapnowNativeReply{Error: "请先在 ACU Runtime 点击接入；授权五分钟内有效"})
 		return
 	}
+	if g.RequiredVersion != "" && msg.Version != g.RequiredVersion {
+		s.Unlock()
+		host.json(w, 409, tapnowNativeReply{Error: "请先在 Chrome 加载或重新加载插件至 " + g.RequiredVersion + "，再继续配置 API Key"})
+		return
+	}
 	if msg.Action == "ack" {
 		if g.ID == msg.Grant && g.Phase == "configured" && msg.Success && g.Version == msg.Version {
 			s.Unlock()
@@ -382,6 +405,7 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if msg.Success {
 			g.Phase = "configured"
+			g.ReloadRequired = false
 			g.Confirmed = time.Now()
 			g.Error = ""
 		} else {

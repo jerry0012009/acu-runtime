@@ -1,5 +1,21 @@
 # TapNow ZIP Agent Candidate
 
+## Pending One-Click Configuration Fix
+
+The primary command now calls `/runtime/tapnow/configure`: every attempt fetches
+the latest catalog, verifies/prepares the chosen plugin ZIP, and replaces Companion's
+local API credential, endpoint and model with the selected ACU provider's values.
+Existing team rules/image choices and backup data are retained. Backup receives no
+credential. An unchanged prepared version opens its connection page directly;
+a new version opens Chrome's extension page for load/reload confirmation.
+The grant requires the exact prepared version before disclosing a Key or accepting
+success. Old running code cannot claim a current-version configuration. Failed
+new configuration clears the old in-memory success indicator. The guide's Continue
+action only resumes an already prepared version; it does not repeat the download.
+This fix is not included in the already published 0.1.80 installer until released
+as a subsequent version. Old manually loaded extensions with a different ID are
+not overwritten; load the managed directory and explicitly disable the old copy.
+
 Status: Runtime 0.1.80 release preparation, with user-authorized first public
 distribution for device testing. Publication is not complete until the GitHub
 release assets exist and all required CI jobs pass. ZIP-based

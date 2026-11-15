@@ -62,6 +62,11 @@ async function main() {
     browser=await chromium.launchPersistentContext(path.join(root,'profile'),{channel:'chromium',headless:true,env,args:['--no-sandbox',`--disable-extensions-except=${extensionPaths.join(',')}`,`--load-extension=${extensionPaths.join(',')}`]});
     const page=await browser.newPage();let requests=0;
     await browser.route('https://**/*',route=>{requests++;return route.abort();});
+    await page.goto(`chrome-extension://${identities.companion}/popup.html`);
+    await page.evaluate(async()=>{
+      await chrome.storage.local.set({apiKey:'sk-old-key-to-replace',companionTrialDefaultsVersion:1,runtimeConnection:null});
+      await chrome.storage.sync.set({requiredTerms:['preserve-user-rule'],llmModel:'old-model'});
+    });
     for(const edition of ['companion','backup']){
       await request('/runtime/tapnow/connect',{edition,...(edition==='companion'?{provider:'acu',model:'acu-auto'}:{})});
       await page.goto(`chrome-extension://${identities[edition]}/connect.html`);
@@ -74,6 +79,7 @@ async function main() {
       const data=await page.evaluate(async()=>({local:await chrome.storage.local.get(null),sync:await chrome.storage.sync.get(null)}));
       if(edition==='companion'){
         assert.equal(data.local.apiKey,'sk-browser-native-fixture');assert.equal(data.local.runtimeConnection.settings.llmBaseUrl,'https://acu.best/v1');assert.equal(data.sync.apiKey,undefined);
+        assert.deepEqual(data.sync.requiredTerms,['preserve-user-rule']);
       }else assert.equal(data.local.apiKey,undefined);
       const videoRefused=await page.evaluate(async()=>chrome.runtime.sendNativeMessage('com.acucompute.tapnow',{
         action:'video-frames',version:chrome.runtime.getManifest().version,url:'http://127.0.0.1/private.mov'
