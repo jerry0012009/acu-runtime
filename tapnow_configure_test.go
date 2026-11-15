@@ -60,7 +60,7 @@ func TestTapnowConfigureAlwaysRefreshesAndRequiresPreparedVersion(t *testing.T) 
 		}
 	}
 	configure()
-	if opened != "chrome://extensions/" {
+	if opened != "about:blank" {
 		t.Fatal(opened)
 	}
 	if g := host.tapnow.grants["companion"]; g.RequiredVersion != "0.1.23" || !g.ReloadRequired {

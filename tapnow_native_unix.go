@@ -42,11 +42,14 @@ func registerTapnowHost() error {
 
 func openTapnowChrome(ctx context.Context, address string) error {
 	if runtime.GOOS == "darwin" {
-		return exec.CommandContext(ctx, "/usr/bin/open", "-a", "Google Chrome", address).Run()
+		// Launch Services treats chrome:// as an external protocol and Chrome
+		// filters it. Supply only a normal launch target via application args.
+		args := append([]string{"-a", "Google Chrome", "--args"}, tapnowChromeLaunchArgs(address)...)
+		return exec.CommandContext(ctx, "/usr/bin/open", args...).Run()
 	}
 	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"} {
 		if exe, err := exec.LookPath(name); err == nil {
-			cmd := exec.Command(exe, address)
+			cmd := exec.Command(exe, tapnowChromeLaunchArgs(address)...)
 			if err := cmd.Start(); err != nil {
 				return err
 			}

@@ -58,7 +58,7 @@ func TestTapnowReopenBrowserIsReadOnlyAndSessionProtected(t *testing.T) {
 		t.Fatal(w.Code, opened)
 	}
 	w = tapnowRequest(host, "POST", "/runtime/tapnow/browser", `{"edition":"backup"}`, host.token)
-	if w.Code != 200 || opened != "chrome://extensions/" || host.tapnow.grants != nil {
+	if w.Code != 200 || opened != "about:blank" || host.tapnow.grants != nil || !strings.Contains(w.Body.String(), `"manualNavigationRequired":true`) {
 		t.Fatal(w.Code, opened)
 	}
 }

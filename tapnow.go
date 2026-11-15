@@ -350,15 +350,15 @@ func (host *server) tapnowAPI(w http.ResponseWriter, r *http.Request) {
 		if !host.desktop {
 			err = errors.New("请在桌面应用中打开 Chrome")
 		} else if s.openStore != nil {
-			err = s.openStore(ctx, "chrome://extensions/")
+			err = s.openStore(ctx, "about:blank")
 		} else {
-			err = openTapnowChrome(ctx, "chrome://extensions/")
+			err = openTapnowChrome(ctx, "about:blank")
 		}
 		if err != nil {
 			host.json(w, 400, map[string]string{"error": "无法打开 Chrome，请在浏览器地址栏打开 chrome://extensions/"})
 			return
 		}
-		host.json(w, 200, s.snapshot())
+		host.json(w, 200, map[string]any{"state": s.snapshot(), "address": "chrome://extensions/", "manualNavigationRequired": true})
 		return
 	}
 	if r.URL.Path != "/runtime/tapnow/check" && r.URL.Path != "/runtime/tapnow/prepare" && r.URL.Path != "/runtime/tapnow/open" {
