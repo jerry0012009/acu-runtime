@@ -95,7 +95,7 @@ async function main() {
     assert.equal(requests,0,'connection must not call cloud or inference');
     // Check managed credentials survive extension reload; no inferred success.
     await page.goto(`chrome-extension://${identities.companion}/popup.html`);
-    await page.locator('#llmBaseUrl').waitFor();
+    await page.locator('#llmBaseUrl').waitFor({state:'attached'});
     assert.equal(await page.locator('#llmBaseUrl').inputValue(),'https://console.acucompute.com/v1');
     fs.writeFileSync(done,'ok');
     await new Promise((resolve,reject)=>{if(child.exitCode!==null)return child.exitCode===0?resolve():reject(Error(text));child.once('exit',code=>code===0?resolve():reject(Error(text)));});
