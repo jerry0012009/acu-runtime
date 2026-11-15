@@ -1,4 +1,4 @@
-Release preparation: **0.1.82** combines TapNow one-click latest-plugin preparation and replacement of the selected API configuration with removal of the video trial prompt and non-persistent picker. Retains native tools, team preferences and Magpie v0.1.4096. Publication is complete only when the GitHub release is stable and all platform assets are present.
+Release preparation: **0.1.83** prepares saved preferences and team vectors in the background after login restoration, with bounded retries and account isolation. Retains TapNow one-click configuration, native tools and Magpie v0.1.4096. Publication is complete only when the GitHub release is stable and all platform assets are present.
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 

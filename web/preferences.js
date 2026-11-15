@@ -15,8 +15,10 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     return `<div class="preference-spaces" role="tablist" aria-label="偏好空间"><button class="button secondary" role="tab" aria-selected="${!teamKey}" data-pref-space="">我的偏好</button>${teams().map(space => `<button class="button secondary" role="tab" aria-selected="${teamKey===space.key}" data-pref-space="${esc(space.key)}">${esc(space.key)}</button>`).join('')}</div>`;
   }
   const saving = new Set();
+  let warmPolls = 0;
   let zoom=1;
   function clear() {
+    warmPolls = 0;
     teamKey = '';
     state.settingsSaving = false; state.settingsSaved = false;
     drafts.clear(); saving.clear();
@@ -27,7 +29,8 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const identity = ui.status?.account?.loggedIn ? ui.status.account.identity : '';
     if (identity === state.identity) return;
     clear(); state.identity = identity;
-    if (ui.page === 'preferences') { render(); load(); }
+    if (ui.page === 'preferences') render();
+    if (identity) void load();
   }
   async function load(force = false) {
     if (!state.identity || state.revoked || state.busy || state.settingsSaving || (!force && Date.now() - state.loaded < preferenceCacheMs)) return;
@@ -42,6 +45,7 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
         if (name === 'settings' && state.settingsSaving) return;
         state.data[name] = name === 'profile' && !data.profile && ['queued','generating','error'].includes(data.status) && state.data.profile?.profile ? { ...data, profile: state.data.profile.profile, generatedAt: state.data.profile.generatedAt } : data;
         if (name === 'teams' && (!data || data.version !== 1 || !Array.isArray(data.spaces))) state.data.teams = {version:1,spaces:[]};
+        update();
       } catch (error) {
         if (generation !== state.generation || error.name === 'AbortError') return;
         if (name === 'teams' && error.status !== 401) { state.data.teams = {version:1,spaces:[]}; return; }
@@ -57,10 +61,12 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
       const retrySoon = retry && state.retries <= 3;
       state.busy = false; state.loaded = retrySoon ? 0 : Date.now();
       clearTimeout(state.refreshTimer);
-      const pending = teams().some(space => ['queued','generating'].includes(space.view?.status));
+      const pending = ['queued','generating'].includes(state.data.profile?.status) || teams().some(space => ['queued','generating'].includes(space.view?.status));
+      const pollWarmup = pending && ui.page !== 'preferences' && warmPolls < 3;
+      if (pollWarmup) warmPolls++;
       if (teamKey && !activeTeam()) {teamKey=''; graph?.reset();}
       update();
-      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences') load(true); }, retrySoon ? state.retryDelay : pending ? 10000 : teams().length ? 60000 : preferenceCacheMs + 10);
+      state.refreshTimer = setTimeout(() => { if (ui.page === 'preferences' || retrySoon || pollWarmup) void load(true); }, retrySoon ? state.retryDelay : pending ? 10000 : teams().length ? 60000 : preferenceCacheMs + 10);
       state.retryDelay = retry ? Math.min(state.retryDelay * 2, 30000) : 1500;
 
     }

@@ -1,4 +1,6 @@
-# ACU Runtime 0.1.82
+# ACU Runtime 0.1.83
+
+恢复 ACU 登录后即在后台准备个人偏好、GYZ 向量、学习设置与来源记录，不再等到点击「我的偏好」才开始读取。读取不阻塞工作台；分批结果就绪后即可显示，切换账户会取消旧请求并清空缓存。图谱生成中的后台补查与登录续期重试均有上限，不增加模型调用或自动修改学习设置。
 
 TapNow 主入口统一为「一键配置」：每次都检查发布目录并下载、校验最新插件，再将副驾驶配置替换为当前选择的 ACU API Key、地址、协议和模型。保留团队规则、提示词、图片发送选择与本地备份数据。备份插件只更新插件，不接收 Key。
 
@@ -162,9 +164,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.82-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.82-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.82-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.83-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.83-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.83-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
