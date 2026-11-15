@@ -19,9 +19,17 @@ and desktop capability checks passed. Companion 92 tests, zero-vulnerability
 audit, both ZIP builds/identity/entry checks and publication succeeded. Existing
 Chromium credential/native-host smoke passed without cloud inference.
 
-Runtime 0.1.90 publication still requires its three desktop release jobs,
-packaged kernel/tool compatibility checks and all expected assets. User device
-acceptance covers first Chrome Load Unpacked/reload, real MOV inputs and model
-review quality. No private live-canvas/paid-model acceptance, exhaustive video
+Runtime 0.1.90 published at 2026-11-15 12:11:29 UTC from
+`524dcaaef40eb445ad9e92356203e0433d2d470f`, workflow
+[43711527439](https://github.com/jerry0012009/acu-runtime/actions/runs/43711527439).
+Windows x64 and macOS arm64/amd64 jobs, packaged kernel/tool compatibility,
+native clipboard, released TapNow ZIP/native connection checks and publication
+all passed. The release contains five desktop packages, INSTALL.md and
+SHA256SUMS.txt. Later closeout changes are documentation only.
+
+The user subsequently reported successful TapNow installation on their device;
+this is user-reported acceptance, not an independently observed device session.
+Real MOV inputs and model review quality still need device acceptance.
+No private live-canvas/paid-model acceptance, exhaustive video
 defect detection or audio analysis is claimed. Missing/omitted video evidence is
 reported; existing results are not bound to edited prompts without provenance.
