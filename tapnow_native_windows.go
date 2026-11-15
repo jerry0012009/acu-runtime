@@ -60,7 +60,7 @@ func openTapnowChrome(_ context.Context, address string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(exe, address)
+	cmd := exec.Command(exe, tapnowChromeLaunchArgs(address)...)
 	hideProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return err

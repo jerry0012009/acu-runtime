@@ -204,7 +204,7 @@ func TestTapnowZIPInstallPreparesOnlyChosenEditionAndOpensChrome(t *testing.T) {
 	host.tapnow.open = func(_ context.Context, path string) error { openedDir = path; return nil }
 	host.tapnow.openStore = func(_ context.Context, address string) error { openedChrome = address; return nil }
 	w := tapnowRequest(host, "POST", "/runtime/tapnow/install", `{"edition":"backup"}`, host.token)
-	if w.Code != 200 || openedChrome != "chrome://extensions/" || openedDir != filepath.Join(host.tapnow.root, "backup") {
+	if w.Code != 200 || openedChrome != "about:blank" || openedDir != filepath.Join(host.tapnow.root, "backup") {
 		t.Fatal(w.Code, w.Body.String(), openedDir, openedChrome)
 	}
 	if host.tapnow.grants["backup"] == nil || host.tapnow.grants["companion"] != nil {

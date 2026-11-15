@@ -273,7 +273,12 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 	s.Unlock()
 	address := "chrome-extension://" + tapnowID(edition) + "/connect.html"
 	if install && reloadRequired {
-		address = "chrome://extensions/"
+		// Chrome filters privileged internal URLs passed by external launchers.
+		// Launch a normal page and let the guide direct address-bar navigation.
+		address = "about:blank"
+		s.Lock()
+		s.message = "插件文件已准备。请在 Chrome 地址栏输入 chrome://extensions/ 打开扩展页"
+		s.Unlock()
 		if s.open != nil {
 			err = s.open(ctx, filepath.Join(root, edition))
 		} else {

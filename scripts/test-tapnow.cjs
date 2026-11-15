@@ -30,7 +30,8 @@ async function main() {
       else if(url.pathname==='/runtime/tapnow/connect') {phase='waiting';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/cancel') {phase='unknown';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/check') {checks++;result=tapnowState();}
-      else if(['/runtime/tapnow/browser','/runtime/tapnow/open'].includes(url.pathname)) result=tapnowState();
+      else if(url.pathname==='/runtime/tapnow/browser') result={state:tapnowState(),address:'chrome://extensions/',manualNavigationRequired:true};
+      else if(url.pathname==='/runtime/tapnow/open') result=tapnowState();
       else if(url.pathname==='/runtime/tapnow') result=tapnowState();
       await route.fulfill({json:result});
     });
@@ -45,8 +46,19 @@ async function main() {
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
     await page.getByText('文件已就绪，等待 Chrome 加载', {exact:false}).waitFor();
+    assert.equal(await page.locator('[data-tapnow-address]').inputValue(),'chrome://extensions/');
+    assert.equal(await page.getByRole('button',{name:'打开 Chrome 扩展页',exact:true}).count(),0);
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.fixtureCopied=text;}}}));
     await page.locator('[data-tapnow="browser"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/browser'));
+    assert.equal(await page.evaluate(()=>window.fixtureCopied),'chrome://extensions/');
+    await page.evaluate(()=>{
+      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('denied');}}});
+      document.execCommand=()=>false;
+    });
+    await page.locator('[data-tapnow="copy-address"]').click();
+    assert.equal(await page.locator('#toast').innerText(),'复制失败，请选中上方地址复制');
+    assert.equal(await page.locator('[data-tapnow-address]').inputValue(),'chrome://extensions/');
     await page.locator('[data-tapnow="open"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/open'));
     await page.locator('[data-tapnow="cancel"][data-edition="companion"]').click();
@@ -67,6 +79,7 @@ async function main() {
     await page.locator('.tapnow-state').filter({hasText:'配置已确认'}).waitFor();
     assert.equal(await page.locator('.tapnow-install-guide').count(),0);
     await page.locator('[data-tapnow="check"]').click();
+    await page.waitForFunction(()=>!document.querySelector('[data-tapnow="check"]').disabled);
     assert.equal(checks,1);
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
     await page.getByText('文件已就绪，等待 Chrome 加载').waitFor();

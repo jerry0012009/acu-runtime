@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.85
+# ACU Runtime 0.1.86
+
+修复 TapNow 安装引导中“打开 Chrome 扩展页”仅启动默认页面的问题。普通 Chrome 会过滤外部命令行传入的 chrome://extensions/；入口现改为“复制地址并打开 Chrome”，先复制扩展页地址，再打开普通 Chrome 窗口。请在 Chrome 地址栏粘贴并回车，不要粘贴到网页搜索框。
+
+引导直接显示可选中的 chrome://extensions/ 地址，并提供单独复制按钮。剪贴板不可用时可手动选择复制，不再把进程启动成功当成扩展页已打开。插件下载、固定目录、GPT-6.1 Sol 推荐及 API Key 自动配置保持不变。
+
+## 保留 0.1.85 的 TapNow 来源与模型修复
 
 修复 TapNow 一键配置误报“此插件暂不支持所选 ACU 地址或模型”：复用 Runtime 已有官方地址校验，支持网页登录保存的 console.acucompute.com、其他 ACU 官方子域和已有 /acu/v1 路径。插件 0.1.24 同步修复配置校验、请求地址和浏览器权限；不替换所选来源域名、不向非官方域发送 Key。
 
@@ -176,9 +182,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.85-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.85-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.85-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.86-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.86-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.86-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
