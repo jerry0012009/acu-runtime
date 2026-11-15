@@ -40,3 +40,14 @@ passed tests/audit/build. Published 0.1.25 ZIPs were downloaded and rehashed:
 Companion 45,361 bytes, `6fdaf136fd757dc6a6016cb9b65f7b281d986f80349c8e564fc6ab2074008783`;
 Backup 189,901 bytes, `e1e39cd3f4e92af4ff3fecb9062f9bd0efd6f22d731653a7f27ad70059ed3cee`.
 Runtime release CI pins those exact hashes for all three native platform jobs.
+
+## Publication
+
+Runtime 0.1.87 published 2026-11-15 11:11:04 UTC from application SHA
+`b7c2182cb923113621c4cc9f460a91fcfe42738d`, workflow 43706698316. Windows x64,
+macOS arm64/amd64 and publish jobs all succeeded. GitHub latest and Console's
+public release resolver returned 0.1.87. Public SHA256SUMS matched the five asset
+digests. Windows Setup.exe SHA-256:
+`4ef35ac6712c02c6da199b0b6174b0f9cb5db3d1711d9a79b6933fdae63fa5ae`.
+Closeout changes afterward are documentation only. No production Router/Console
+deployment, restart or browser security-policy modification was performed.
