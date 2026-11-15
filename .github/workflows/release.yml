@@ -71,6 +71,7 @@ jobs:
           node scripts/test-install-updates.cjs
           node scripts/test-capability-refresh.cjs
           node scripts/test-video-capabilities.cjs
+          node scripts/test-conversation-navigation.cjs
           node scripts/test-recommended-models.cjs
           node scripts/test-work-review.cjs
       - name: Verify released TapNow ZIP identities and native connection

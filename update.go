@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.90"
+const appVersion = "0.1.91"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
