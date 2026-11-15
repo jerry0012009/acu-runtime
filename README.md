@@ -1,5 +1,7 @@
 Current release: **0.1.75** refreshes native image/vision model catalogs when opening Images and Search, so existing users receive newly available models such as GPT Image 2.6. Includes a direct refresh control, preserves selections/drafts and retains cached choices on failure. Bundles official Magpie v0.1.4096.
 
+Development candidate: optional TapNow browser Agent, collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload still require Chrome user confirmation. Native installation acceptance remains required before public Runtime release. See [TAPNOW.md](TAPNOW.md).
+
 # ACU Runtime 0.1.58
 
 Wails 原生应用 + 独立内核服务，不需要浏览器。关闭窗口驻留托盘，再次启动唤醒同一实例。

@@ -35,8 +35,12 @@ jobs:
           node --check web/billing.js
           node --check web/preferences.js
           node --check web/work-review.js
+          node --check web/tapnow.js
           node --check web/preference-starfish.js
           node --test tests/*.test.cjs
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            go run . --tapnow-release-check
+          fi
       - name: Test Go and native desktop
         shell: bash
         run: |

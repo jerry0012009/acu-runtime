@@ -3,6 +3,8 @@ const overlay = document.getElementById('overlay');
 const token = document.querySelector('meta[name="acu-token"]').content;
 const names = { codex: 'Codex', claude: 'Claude Code', workbuddy: 'WorkBuddy', hermes: 'Hermes' };
 const icons = {
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  folder: '<path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
   link: '<path d="M10 13a5 5 0 0 0 7 .2l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7-.2l-3 3a5 5 0 0 0 7 7l2-2"/>',
   models: '<path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/>',
@@ -33,6 +35,7 @@ const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usag
 const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML });
 const preferences = globalThis.createACUPreferences?.({ app, ui, request, navigation, escapeHTML });
 const workReview = globalThis.createACUWorkReview?.({ app, ui, request, navigation, escapeHTML, icon });
+const tapnow = globalThis.createACUTapnow?.({ app, ui, request, render: () => render(), activeChoice, recommendedModels, escapeHTML, icon, toast, token });
 
 
 async function request(path, options = {}) {
@@ -230,11 +233,19 @@ function agentsPage() {
   const restarting = agents.filter(agent => agent.connected && agent.restartRequired);
   const configured = activeChoice() && detected.some(agent => agent.connected && !agent.needsRepair);
   return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${configured ? '已接入，可前往 WorkBuddy 等应用选择 ACU 模型试用。' : activeChoice() ? '点击一键配置，自动接入模型与常用工具。' : '先登录或连接 ACU，再一键配置。'}</p></div><div class="workbench-actions"><button class="text-button workbench-utility" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片与搜索</button><button class="icon-button workbench-utility" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button primary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
-    <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.map(agentCard).join('')}</div>` : ''}
+    <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.filter(agent => agent.detected || !ui.status?.ready).map(agentCard).join('')}</div>` : ''}
+    <details class="optional-agents" data-agent-section="other" ${ui.otherAgentsOpen ? 'open' : ''}><summary>其他 Agent ${icon('chevron')}</summary>${tapnow?.html() || '<div class="optional-agent"><strong>TapNow</strong><span>Chrome 扩展</span></div>'}</details>
+    <details class="optional-agents" data-agent-section="install" ${ui.installAgentsOpen ? 'open' : ''}><summary>安装其他 Agent ${icon('chevron')}</summary><div class="agent-install-options">${['workbuddy','codex'].filter(id => !detected.some(agent => agent.id === id)).map(id => `<div><strong>${id === 'codex' ? 'ChatGPT 桌面端' : 'WorkBuddy'}</strong><span>${id === 'codex' ? '首次下载约 1 GB' : '国内官方下载'}</span><button class="button secondary" data-action="install-agent" data-agent-id="${id}" ${!ui.status?.desktop || !ui.status?.ready || !activeChoice() || ui.applying || ui.agentInstall && !['complete','error'].includes(ui.agentInstall.phase) ? 'disabled' : ''}>安装并配置 ${id === 'codex' ? 'ChatGPT' : 'WorkBuddy'} ${icon('arrow')}</button></div>`).join('') || '<p>已检测到可安装的桌面 Agent</p>'}</div>${agents.filter(agent => !agent.detected && !['workbuddy','codex'].includes(agent.id)).length ? `<div class="agent-grid optional-native-agents">${agents.filter(agent => !agent.detected && !['workbuddy','codex'].includes(agent.id)).map(agentCard).join('')}</div>` : ''}</details>
     ${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片与搜索' : result.id))}</strong><span>${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
     ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && result.id === 'tools') ? '<button class="button secondary" data-action="capabilities">处理未完成工具</button>' : ''}
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
 }
+
+app.addEventListener('toggle', event => {
+  const section = event.target.dataset?.agentSection;
+  if (section === 'other') { ui.otherAgentsOpen = event.target.open; if (event.target.open) tapnow?.load(); }
+  if (section === 'install') ui.installAgentsOpen = event.target.open;
+}, true);
 
 function agentInstallPanel(count) {
   const install = ui.agentInstall;

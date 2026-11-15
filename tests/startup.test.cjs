@@ -879,9 +879,15 @@ test('empty desktop offers domestic install and never installs without a click',
  assert.equal(posts(instance).length,0);
 });
 
-test('installed agents keep their existing flow without an install prompt',async()=>{
+test('installed agents keep their existing flow with optional installation collapsed',async()=>{
  const instance=await setup({ready:true,desktop:true,agents:[codex()]});
- assert(!instance.elements.app.innerHTML.includes('安装并配置 WorkBuddy'));
+ const html=instance.elements.app.innerHTML;
+ assert(!html.includes('class="agent-install-panel"'));
+ assert(html.includes('data-agent-section="install" >'));
+ assert(html.includes('安装并配置 WorkBuddy'));
+ assert(html.includes('data-agent-section="other" >'));
+ assert(html.includes('TapNow'));
+ assert(!instance.run('ui.selected.has("tapnow")'));
  assert.equal(posts(instance).length,0);
 });
 

@@ -107,6 +107,7 @@ type server struct {
 	imageSkillSource func() (string, error)
 	agentInstall     agentInstallState
 	agentVersions    agentVersionCache
+	tapnow           tapnowState
 }
 
 func secret() string {
@@ -648,11 +649,17 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 		return
 	}
 	if strings.HasPrefix(request.URL.Path, "/runtime/") {
+		if request.URL.Path == "/runtime/tapnow/native" {
+			host.tapnowNativeAPI(response, request)
+			return
+		}
 		if request.Method != http.MethodGet && request.Header.Get("X-ACU-Token") != host.token {
 			host.json(response, 403, map[string]string{"error": "invalid local session"})
 			return
 		}
 		switch {
+		case strings.HasPrefix(request.URL.Path, "/runtime/tapnow"):
+			host.tapnowAPI(response, request)
 		case host.desktop && (request.Method == http.MethodGet || request.Method == http.MethodPost) && request.URL.Path == "/runtime/startup":
 			host.startupSettings(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/agents/versions":
@@ -730,9 +737,14 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 }
 
 func main() {
+	if isTapnowNativeInvocation(os.Args) {
+		_ = runTapnowNative(os.Args[1], os.Stdin, os.Stdout)
+		return
+	}
 	address := flag.String("listen", "", "local interface address; a random port in the desktop app")
 	endpoint := flag.String("kernel-url", "", "existing loopback kernel management origin")
 	webMode := flag.Bool("web", !desktopEnabled, "developer browser mode instead of the native desktop window")
+	tapnowReleaseCheck := flag.Bool("tapnow-release-check", false, "validate fixed TapNow ZIP identities")
 	inspectPort := flag.Int("inspect-port", 0, "developer WebView inspection port; disabled by default")
 	background := flag.Bool("background", false, "start in the tray at sign-in")
 	installTo := flag.String("install-to", "", "installer-only destination directory")
@@ -740,6 +752,12 @@ func main() {
 	agentPackagesJSON := flag.Bool("agent-packages-json", false, "print official desktop package metadata")
 	releaseJSON := flag.Bool("kernel-release-json", false, "print the pinned kernel package metadata")
 	flag.Parse()
+	if *tapnowReleaseCheck {
+		if err := checkTapnowRelease(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if *agentPackagesJSON {
 		workbuddy, _ := workBuddyPackage(runtime.GOOS, runtime.GOARCH)
 		chatgpt, _ := chatGPTPackage(runtime.GOOS, runtime.GOARCH)
