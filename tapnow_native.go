@@ -423,7 +423,7 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resume := msg.Grant == g.ID && g.Phase == "saving" && g.Version == msg.Version
-	if msg.Action != "connect" || (!resume && (msg.Grant != "" || g.Phase != "waiting")) {
+	if msg.Action != "connect" || (!resume && g.Phase != "waiting") {
 		s.Unlock()
 		host.json(w, 409, tapnowNativeReply{Error: "没有可领取的接入授权"})
 		return

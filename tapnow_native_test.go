@@ -126,6 +126,12 @@ func TestTapnowNativeResumeLostConfigurationReplyWithSameGrant(t *testing.T) {
 	if nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "").Code != 409 {
 		t.Fatal("foreign resume grant accepted")
 	}
+	// A new explicit Runtime reconnect supersedes an old local pending receipt.
+	tapnowRequest(host, "POST", "/runtime/tapnow/connect", `{"edition":"companion","provider":"acu","model":"acu-auto"}`, host.token)
+	w = nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
+	if w.Code != 200 {
+		t.Fatal("stale receipt blocked a new explicitly authorized connection", w.Body.String())
+	}
 }
 
 func TestTapnowNativeBoundaryAndBackupHasNoKey(t *testing.T) {
