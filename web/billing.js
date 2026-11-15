@@ -1,6 +1,7 @@
 globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }) => {
-  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'name', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
+  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'output_asc', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
   const money = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : '¥' + new Intl.NumberFormat('zh-CN', Number(value) !== 0 && Math.abs(Number(value)) < 0.000001 ? { maximumSignificantDigits: 4 } : { maximumFractionDigits: 6 }).format(Number(value));
+  const priceMoney = value => '¥' + Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 10 });
   const date = value => value ? new Date(value * 1000).toLocaleString('zh-CN') : '尚未刷新';
   const quota = value => value == null || !state.account?.cnyPerQuota ? '—' : money(value * state.account.cnyPerQuota);
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
@@ -112,18 +113,31 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
       return a.model_name.localeCompare(b.model_name);
     });
     return models.map(model => {
-      const tiers = model.payable?.context_tiers;
-      const longOutput = tiers?.longContext?.outputPricePerMillion;
-      const tier = tiers && longOutput != null ? `<small>超过 ${Number(tiers.thresholdTokens).toLocaleString()} tokens：${money(longOutput)}</small>` : '';
-      return `<tr><td><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}</td><td>${money(outputPrice(model))}${model.model_name === 'acu-auto' ? '<small>按实际选中模型计费</small>' : ''}${tier}</td></tr>`;
+      const payable = model.payable || {};
+      const tiers = payable.context_tiers;
+      const dynamic = model.model_name === 'acu-auto';
+      const multiplier = payable.model_multiplier;
+      const validMultiplier = multiplier != null && multiplier !== '' && Number.isFinite(Number(multiplier)) && Number(multiplier) >= 0;
+      const cells = [
+        ['output', '输出价格', outputPrice(model), 'outputPricePerMillion'],
+        ['input', '输入价格', payable.input_cny_per_million, 'inputPricePerMillion'],
+        ['cached', '缓存命中', payable.cached_input_cny_per_million, 'cachedInputPricePerMillion'],
+        ['write', '缓存写入', payable.cache_write_cny_per_million, 'cacheWritePricePerMillion'],
+      ].map(([key, label, value, tierKey]) => {
+        const valid = value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+        const longValue = tiers?.longContext?.[tierKey];
+        const hasTier = Number(tiers?.thresholdTokens) > 0 && longValue != null && longValue !== '' && Number.isFinite(Number(longValue)) && Number(longValue) >= 0;
+        return `<td data-price="${key}" data-label="${label}"><span class="billing-price-value">${valid ? priceMoney(value) : '—'}</span>${hasTier ? `<small>超过 ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} tokens<br>${priceMoney(longValue)}</small>` : ''}</td>`;
+      }).join('');
+      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}</td><td class="billing-price-multiplier" data-label="倍率"><span>${validMultiplier ? esc(Number(multiplier).toLocaleString('zh-CN', { maximumSignificantDigits: 10 })) + '×' : '—'}</span></td>${cells}</tr>`;
     }).join('');
   }
 
   function pricesPage() {
     const rows = priceRows();
-    return `<section class="panel billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option></select></label></div>
+    return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 已含倍率</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option></select></label></div>
       ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}
-      <div class="billing-table-scroll"><table><thead><tr><th>模型</th><th>输出价格</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
+      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">— 表示暂无固定报价 · 更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
   }
 
   function update(source = '') {

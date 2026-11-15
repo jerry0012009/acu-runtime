@@ -1,4 +1,4 @@
-Current release: **0.1.90** adds one-click standard external video MCP setup with self-contained acu-video-mcp 0.1.0 and TapNow Companion 0.1.27. Official Magpie v0.1.4248 stays unmodified. Windows x64 and both macOS release jobs passed and publication completed. See [ACCEPTANCE-0190.md](ACCEPTANCE-0190.md) and [VIDEO-READING.md](VIDEO-READING.md).
+Release candidate: **0.1.95** shows model multipliers and complete input/output/cache prices, with default output-price sorting and responsive layouts. Official Magpie v0.1.4248 stays unmodified. See [ACCEPTANCE-0195.md](ACCEPTANCE-0195.md) for verification and release status.
 
 Retains 0.1.89's sequential TapNow setup, automatic address/directory copying, native clipboard fallback and receipt-confirmed completion. Same-version setup goes directly to connection. Shared workbenches and GPT-6.1 Sol remain included. See [ACCEPTANCE-0188.md](ACCEPTANCE-0188.md) and the [worktree closeout](INTEGRATION-0190.md).
 
