@@ -1,4 +1,4 @@
-Release preparation: **0.1.85** fixes TapNow installation for official login-source API endpoints and recommends GPT-6.1 Sol for Companion. Pairs with plugin 0.1.24. Retains official Magpie v0.1.4248 native video defaults, preference preloading and existing tools. Publication is complete only when the GitHub release is stable and all platform assets are present.
+Current release: **0.1.85** fixes TapNow installation for official login-source API endpoints and recommends GPT-6.1 Sol for Companion. Pairs with plugin 0.1.24. Retains official Magpie v0.1.4248 native video defaults, preference preloading and existing tools. All three native platform release jobs passed; see [ACCEPTANCE-0185.md](ACCEPTANCE-0185.md).
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 

@@ -48,3 +48,14 @@ Chrome profile inspection or actual owner-device installation. Existing plugin
 content/LLM TypeScript diagnostics remain. Browser permission prompts and Reload
 for updated unpacked extensions still apply. No production Router/Console restart
 or configuration change is required.
+
+## Publication
+
+Published Runtime v0.1.85 at 2026-11-15 09:36:14 UTC from application SHA
+`77f60818dbe171d30e9161d196ef3b0361e84654`. Workflow 43699239547 passed Windows
+x64, macOS arm64, macOS amd64 and publication. All platforms exercised the
+console.acucompute.com / GPT-6.1 Sol native connection fixture. GitHub latest and
+Console `/api/acu-runtime/release` both returned 0.1.85. Public SHA256SUMS matched
+all five GitHub installer asset digests. Windows installer SHA-256:
+`496d98291c0f01724765a804161c3d993da4dd7be7e8018ea7cc2063ff84e992`.
+Subsequent closeout changes are documentation only and do not rebuild the release.
