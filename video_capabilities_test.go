@@ -30,6 +30,38 @@ func TestVideoTogglePreservesOtherToolsAndAssignments(t *testing.T) {
 	}
 }
 
+func TestDefaultVideoModelPersistsNativeSettingWithoutChangingTools(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	f.prefs["videoGenModels"] = []map[string]string{{"id": "acu-runtime/grok-imagine-video"}, {"id": "other-provider/video-model"}}
+	f.prefs["videoGenAuto"] = "acu-runtime/grok-imagine-video"
+	for _, model := range []string{"other-provider/video-model", ""} {
+		view, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", ModelsOnly: true, VideoGen: &model})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if view.VideoGen != model || f.prefs["videoGen"] != model {
+			t.Fatalf("native pick not saved: %+v", view)
+		}
+	}
+	if len(f.writes) != 2 || f.writes[0] != "native-setting:videoGen" || f.writes[1] != "native-setting:videoGen" {
+		t.Fatalf("unexpected writes %v", f.writes)
+	}
+}
+
+func TestDefaultVideoValidationPrecedesAllModelWrites(t *testing.T) {
+	for _, supported := range []bool{false, true} {
+		host, f := capabilityTestHost(t)
+		if supported {
+			f.prefs["videoGenModels"] = []map[string]string{{"id": "acu-runtime/video"}}
+		}
+		video, vision := "unknown/video", "off"
+		_, err := host.capabilityApply(context.Background(), capabilityInput{Provider: "acu-runtime", ModelsOnly: true, VideoGen: &video, Vision: &vision})
+		if err == nil || len(f.writes) != 0 {
+			t.Fatalf("invalid video partially saved: %v %v", err, f.writes)
+		}
+	}
+}
+
 func TestVideoToggleRequiresAssignedToolAndSeparateSave(t *testing.T) {
 	for _, mode := range []string{"missing", "paused", "unassigned", "mixed"} {
 		t.Run(mode, func(t *testing.T) {

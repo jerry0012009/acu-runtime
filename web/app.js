@@ -873,8 +873,8 @@ function renderCapabilities() {
     const value = current.draft[field] ?? view[field];
     const options = [...models];
     if (value && value !== 'off' && !options.some(model => model.id === value)) options.unshift({ id: value, name: `${value}（当前来源）` });
-    const auto = view[field === 'vision' ? 'visionAuto' : 'imageGenAuto'];
-    return `<label class="field-label" for="capability-${field}">${label}</label><select id="capability-${field}" data-capability="${field}" ${current.saving ? 'disabled' : ''}><option value="" ${!value ? 'selected' : ''}>自动选择${auto ? ' · '+escapeHTML(auto.split('/').slice(1).join('/')) : ''}</option>${options.map(model => `<option value="${escapeHTML(model.id)}" ${value === model.id ? 'selected' : ''}>${escapeHTML(model.name || model.id)}</option>`).join('')}<option value="off" ${value === 'off' ? 'selected' : ''}>关闭此补充能力</option></select>`;
+    const auto = view[{vision:'visionAuto',imageGen:'imageGenAuto',videoGen:'videoAuto'}[field]];
+    return `<label class="field-label" for="capability-${field}">${label}</label><select id="capability-${field}" data-capability="${field}" ${current.saving ? 'disabled' : ''}><option value="" ${!value ? 'selected' : ''}>自动选择${auto ? ' · '+escapeHTML(auto.split('/').slice(1).join('/')) : ''}</option>${options.map(model => `<option value="${escapeHTML(model.id)}" ${value === model.id ? 'selected' : ''}>${escapeHTML(model.name || model.id)}</option>`).join('')}${field !== 'videoGen' ? `<option value="off" ${value === 'off' ? 'selected' : ''}>关闭此补充能力</option>` : ''}</select>`;
   };
   const agents = (ui.status?.agents || []).filter(agent => agent.detected);
 
@@ -883,14 +883,15 @@ function renderCapabilities() {
     const failure = current.toolFailures?.[agent.id];
     return `<div class="capability-agent-row"><div><strong>${escapeHTML(agent.name)}</strong><span class="capability-status ${!failure && state.count === 3 ? 'complete' : ''}" title="已接入表示工具配置已写入；实际使用取决于模型和应用权限。">${failure ? '需要处理' : state.count === 3 ? '已接入 ✓' : state.count ? '待补齐' : '待接入'}${state.custom ? ' · 自定义设置' : ''}</span>${failure ? `<span class="capability-tool-error">${escapeHTML(failure)}</span>` : ''}</div>${failure ? `<button class="text-button" data-configure-capabilities="${escapeHTML(agent.id)}" ${current.saving ? 'disabled' : ''}>重试</button>` : ''}</div>`;
   }).join('') || '<p>暂未检测到应用，安装后返回工作台重新检测。</p>'}<p class="capability-intro capability-help">首次配置或新增工具后，请重新打开对应应用。</p><div class="capability-check-actions"><span class="capability-intro">检查并补齐各应用的识图、生图和搜索工具，保留已有选择。</span><button class="button primary" data-configure-capabilities="check" ${current.saving || !agents.length ? 'disabled' : ''}>${current.saving === 'tools' ? '正在检查…' : '一键检查并补齐'}</button></div></section><section class="panel capability-advanced-panel"><h2>高级设置</h2><p>更多模型来源、搜索服务和工具权限设置。</p><div class="capability-advanced-actions"><button class="button secondary" data-capability-native="settings" ${current.saving ? 'disabled' : ''}>模型与搜索设置</button><button class="button secondary" data-capability-native="library" ${current.saving ? 'disabled' : ''}>工具与应用分配</button></div></section>` : `<section class="panel capability-model-panel"><p>${current.loading ? '正在读取配置…' : '配置暂未读取，请返回后重试。'}</p></section>`;
-  const displayedBody = body.replace('<h2>常用模型</h2>', `<div class="capability-list-heading"><h2>常用模型</h2><button type="button" class="icon-button" data-refresh-capability-models title="刷新模型" aria-label="刷新模型" ${current.refreshing || current.saving ? 'disabled' : ''}>${icon('refresh', current.refreshing ? 'spinning' : '')}</button></div>`).replace('<section class="panel capability-tools-panel">', `${view ? videoCapabilityPanel(view, current) : ''}<section class="panel capability-tools-panel">`);
+  const displayedBody = body.replace('<h2>常用模型</h2>', `<div class="capability-list-heading"><h2>常用模型</h2><button type="button" class="icon-button" data-refresh-capability-models title="刷新模型" aria-label="刷新模型" ${current.refreshing || current.saving ? 'disabled' : ''}>${icon('refresh', current.refreshing ? 'spinning' : '')}</button></div>`).replace('</div><div class="capability-model-actions">', `${view?.videoDefaultSupported ? select('videoGen', '默认视频模型', view.videoModels || []) : ''}</div><div class="capability-model-actions">`).replace('选择识图和生图模型，各应用共用。', '默认模型由各应用共用。').replace('<section class="panel capability-tools-panel">', `${view ? videoCapabilityPanel(view, current) : ''}<section class="panel capability-tools-panel">`);
   app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><button class="text-button" data-capability-back>← 返回工作台</button><span class="top-status">本机配置</span></header><main class="content capability-page" id="capability-page">${header('', '图片、视频与搜索', '常用模型、应用工具与高级设置，各自管理。')}${current.error ? `<p class="error-banner" role="alert">${escapeHTML(current.error)}</p>` : ''}${current.progress || current.toolSummary ? `<p class="capability-progress" role="status">${escapeHTML(current.progress || current.toolSummary)}</p>` : ''}${displayedBody}</main></div>`;
 }
 
 function videoCapabilityPanel(view, current) {
   const models = view.videoModels || [];
   const state = view.videoBlocked ? '生图已关闭，视频也已停用' : view.videoEnabled ? '已启用' : '未启用';
-  return `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${view.videoAuto ? `<p class="capability-intro">自动模型 · ${escapeHTML(view.videoAuto)}</p>` : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
+  const currentModel = view.videoGenMissing ? view.videoAuto : (view.videoGen || view.videoAuto);
+  return `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${currentModel ? `<p class="capability-intro">${view.videoGen && !view.videoGenMissing ? '默认模型' : '自动模型'} · ${escapeHTML(currentModel)}</p>` : ''}${view.videoGenMissing ? '<p class="capability-tool-error">已选视频模型暂不可用，当前使用自动模型。</p>' : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
 }
 
 async function setVideoEnabled(input) {
@@ -906,7 +907,7 @@ async function setVideoEnabled(input) {
 
 function changeCapabilityModel(target) {
   const current = ui.capabilities;
-  if (!current?.view || current.saving || !['vision', 'imageGen'].includes(target.dataset?.capability)) return;
+  if (!current?.view || current.saving || !['vision', 'imageGen', 'videoGen'].includes(target.dataset?.capability)) return;
   const key = target.dataset.capability;
   if (target.value === current.view[key]) delete current.draft[key];
   else current.draft[key] = target.value;
@@ -923,7 +924,7 @@ function leaveCapabilities(next) {
   if (!current || !Object.keys(current.draft).length) { leave(); return; }
   if (ui.capabilityNext) return;
   ui.capabilityNext = leave;
-  overlay.innerHTML = `<div class="scrim"><section class="modal confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title"><h2 id="leave-title">保存模型修改？</h2><div class="modal-body"><p>识图或生图模型的修改尚未保存。</p></div><div class="modal-actions"><button class="button secondary" data-capability-stay>继续编辑</button><button class="button secondary" data-capability-discard>放弃更改</button><button class="button primary" data-capability-save-leave>保存并继续</button></div></section></div>`;
+  overlay.innerHTML = `<div class="scrim"><section class="modal confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="leave-title"><h2 id="leave-title">保存模型修改？</h2><div class="modal-body"><p>模型修改尚未保存。</p></div><div class="modal-actions"><button class="button secondary" data-capability-stay>继续编辑</button><button class="button secondary" data-capability-discard>放弃更改</button><button class="button primary" data-capability-save-leave>保存并继续</button></div></section></div>`;
   document.body.classList.add('overlay-open');
 }
 

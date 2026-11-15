@@ -1,4 +1,4 @@
-Release preparation: **0.1.83** prepares saved preferences and team vectors in the background after login restoration, with bounded retries and account isolation. Retains TapNow one-click configuration, native tools and Magpie v0.1.4096. Publication is complete only when the GitHub release is stable and all platform assets are present.
+Release preparation: **0.1.84** saves the default video model through official Magpie v0.1.4248 native settings. Explicit Agent/MCP model requests override the default without changing it. Retains preference preloading, TapNow and existing tools. Publication is complete only when the GitHub release is stable and all platform assets are present.
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
@@ -22,7 +22,7 @@ macOS 配置前请先保存并完全退出 ChatGPT / Codex；检测到应用仍�
 
 Windows 依赖 Microsoft Edge WebView2 Runtime。macOS 同时提供 `.app.zip`。应用尚无 Windows 代码签名及 Apple Developer ID 公证；首次打开的系统提示及处理方式见安装说明。macOS 使用 ad-hoc 签名。Windows ARM64 暂未提供安装包。
 
-安装包自带固定官方摘要的 Magpie `v0.1.4096` CLI 内核，优先使用随包内核。Runtime 更新同时更换配套内核，安装器自动注入同次构建清单并实际自检。Windows 默认目录的独立旧内核只在确认路径、进程与空闲状态后迁移；自定义目录保留并提示处理。配置与账户不随更新重写。
+安装包自带固定官方摘要的 Magpie `v0.1.4248` CLI 内核，优先使用随包内核。Runtime 更新同时更换配套内核，安装器自动注入同次构建清单并实际自检。Windows 默认目录的独立旧内核只在确认路径、进程与空闲状态后迁移；自定义目录保留并提示处理。配置与账户不随更新重写。
 
 老用户可以在“设置 → 应用更新”一键检查并更新。Runtime 从 ACU Runtime 正式版读取发布信息；下载与安装包的 SHA-256 相符才继续。确认后安装器等待当前进程退出，一起更新 Runtime 与它管理的备用内核，再自动重启。失败时保留或恢复旧程序和内核；Key、Agent 与本地配置保留。安装器只更新 Runtime 自己的文件；默认目录独立旧内核的迁移在启动阶段执行，新版独立内核文件不降级；连接前调用 Magpie 原生命令关闭自动检查、自动下载和自动重启更新，用户仍可在 Magpie 中手动升级。每个 Runtime 发行版固定经过检查的备用内核版本，详细验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 
