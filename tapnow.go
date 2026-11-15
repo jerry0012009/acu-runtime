@@ -44,6 +44,8 @@ type tapnowEditionView struct {
 	Version          string `json:"version,omitempty"`
 	ConfirmedAt      string `json:"confirmedAt,omitempty"`
 	ConnectionError  string `json:"connectionError,omitempty"`
+	RequiredVersion  string `json:"requiredVersion,omitempty"`
+	ReloadRequired   bool   `json:"reloadRequired"`
 }
 
 type tapnowView struct {
@@ -152,6 +154,7 @@ func (s *tapnowState) snapshot() tapnowView {
 		e.InstallAvailable = tapnowID(edition) != ""
 		e.Connection = "unknown"
 		if g := s.grants[edition]; g != nil {
+			e.RequiredVersion, e.ReloadRequired = g.RequiredVersion, g.ReloadRequired
 			e.Connection, e.Version, e.ConnectionError = g.Phase, g.Version, g.Error
 			if !g.Confirmed.IsZero() {
 				e.ConfirmedAt = g.Confirmed.UTC().Format(time.RFC3339)
@@ -336,7 +339,7 @@ func (host *server) tapnowAPI(w http.ResponseWriter, r *http.Request) {
 		host.tapnowConfig(w, r, input.Provider, input.Model)
 		return
 	}
-	if r.URL.Path == "/runtime/tapnow/connect" || r.URL.Path == "/runtime/tapnow/install" || r.URL.Path == "/runtime/tapnow/cancel" {
+	if r.URL.Path == "/runtime/tapnow/configure" || r.URL.Path == "/runtime/tapnow/connect" || r.URL.Path == "/runtime/tapnow/install" || r.URL.Path == "/runtime/tapnow/cancel" {
 		host.tapnowConnect(w, r, input.Edition, input.Provider, input.Model)
 		return
 	}
