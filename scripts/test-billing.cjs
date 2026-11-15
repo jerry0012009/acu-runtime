@@ -72,15 +72,23 @@ async function main() {
     assert.equal(await page.getByRole('searchbox').inputValue(), 'fixture');
     assert(await page.getByRole('searchbox').evaluate(node => node === document.activeElement), 'refresh preserves search focus');
     delayPrices = false;
-    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','输出价格']);
-    assert.equal(await page.getByText('0.06×', {exact:true}).count(),0);
-    assert((await page.locator('#billing-price-rows td').last().innerText()).startsWith('¥4.044'));
-    await page.getByText(/272,000/).waitFor();
+    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','倍率','输出价格','输入价格','缓存命中','缓存写入']);
+    assert(await page.getByText('0.06×', {exact:true}).isVisible());
+    const solRow = page.locator('#billing-price-rows tr');
+    assert((await solRow.locator('[data-price="output"]').innerText()).startsWith('¥4.044'));
+    assert((await solRow.locator('[data-price="input"]').innerText()).startsWith('¥0.8088'));
+    assert((await solRow.locator('[data-price="cached"]').innerText()).startsWith('¥0.04044'));
+    assert((await solRow.locator('[data-price="write"]').innerText()).startsWith('¥1.011'));
+    assert((await solRow.locator('[data-price="input"]').innerText()).includes('¥1.6176'));
+    assert.equal(await solRow.getByText(/272,000/).count(), 2);
     await page.getByRole('searchbox').fill('');
+    assert.equal(await page.locator('[data-billing-sort]').inputValue(), 'output_asc');
     await page.locator('[data-billing-sort]').selectOption('output_asc');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['free','cheap','测试 Sol','premium','ACU Auto','unknown']);
     await page.locator('[data-billing-sort]').selectOption('output_desc');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','cheap','free','ACU Auto','unknown']);
+    await page.locator('[data-billing-sort]').selectOption('name');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['ACU Auto','cheap','测试 Sol','free','premium','unknown']);
     await page.getByRole('searchbox').fill('sol');
     failPrices = true;
     await page.getByRole('button', { name: '刷新价格' }).click();
@@ -122,8 +130,39 @@ async function main() {
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     assert(await page.getByRole('button', { name: '刷新中…', exact: true }).isVisible());
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    prices.push({ model_name: 'fixture-model-with-a-very-long-unbroken-name-for-responsive-pricing', payable: { model_multiplier: 'invalid', input_cny_per_million: -1, output_cny_per_million: 3, cached_input_cny_per_million: 0.0003042, cache_write_cny_per_million: 0, context_tiers: { thresholdTokens: 100000, longContext: { inputPricePerMillion: 2, outputPricePerMillion: 6, cachedInputPricePerMillion: 0.0006084, cacheWritePricePerMillion: 0 } } } });
+    await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+    await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    const longRow = page.getByRole('row').filter({ hasText: 'fixture-model-with-a-very-long' });
+    assert.equal(await longRow.locator('.billing-price-multiplier').innerText(), '—');
+    assert.equal(await longRow.locator('[data-price="input"] .billing-price-value').innerText(), '—');
+    assert.equal(await longRow.locator('[data-price="cached"] .billing-price-value').innerText(), '¥0.0003042');
+    assert.equal(await longRow.locator('[data-price="write"] .billing-price-value').innerText(), '¥0');
+    assert.equal(await longRow.getByText(/100,000/).count(), 4);
+    for (const theme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: theme });
+      for (const width of [1440, 1280, 920, 600, 390]) {
+        await page.setViewportSize({ width, height: 960 });
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no page overflow at ${width}`);
+        assert.equal(await longRow.locator('[data-price="output"]').evaluate(node => getComputedStyle(node).textAlign), width > 1100 ? 'right' : 'left');
+        const outputBox = await longRow.locator('[data-price="output"]').boundingBox();
+        const inputBox = await longRow.locator('[data-price="input"]').boundingBox();
+        assert(outputBox.x + outputBox.width <= inputBox.x + 1, `price columns do not overlap at ${width}`);
+        assert(await longRow.locator('[data-price="write"]').isVisible());
+        await page.screenshot({ path: path.join(workspace, `.build/billing-prices-${theme}-${width}.png`), fullPage: true });
+      }
+    }
+    if (process.env.ACU_PUBLIC_PRICE_FIXTURE) {
+      prices.splice(0, prices.length, ...JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8')).data);
+      await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+      await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+      for (const width of [1440, 920, 390]) {
+        await page.setViewportSize({ width, height: 960 });
+        await page.screenshot({ path: path.join(workspace, `.build/billing-public-prices-${width}.png`) });
+      }
+    }
     assert.deepEqual(errors, []);
-    console.log('PASS: output-only prices, ascending/descending sort, zero and missing prices, tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');
+    console.log('PASS: complete prices and multipliers, default output sort, zero and missing prices, tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
