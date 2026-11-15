@@ -55,3 +55,16 @@ Plugin source `482dbaa1cba739b05ae47780f48b3392415297f0`, workflow 43710051590
 passed tests/audit/build. Published 0.1.26 ZIPs were downloaded and rehashed:
 Companion 45,259 bytes, `6d5799dd7c09c1dfae4861d6ea3b6aea68c932316bf2de91f04e150a2dc617dc`;
 Backup 189,804 bytes, `624f9edbe96b15439f2ba88a3d5cb82794d1eb8517ebd9009ab82f1094487833`.
+
+## Publication
+
+Published Runtime 0.1.89 at 2026-11-15 12:00:43 UTC from application SHA
+`987ef40b7debae0737405e89691644ff4bfaabcf`, workflow 43710654196. Windows x64,
+macOS arm64/amd64 and publish jobs all succeeded. All three native clipboard
+roundtrip tests passed, including Unicode/spaced paths. Native popup configuration
+and existing login/upgrade/kernel gates passed. GitHub latest and Console's public
+Runtime resolver returned 0.1.89; all five SHA256SUMS entries matched GitHub asset
+digests. Windows installer SHA-256:
+`04da6f37e088f6798f1678833ef1ff0ebfca393c27cbbdee283baf383b70f2b5`.
+Closeout advances after this source are documentation only. No Router/Console
+production deployment or restart was performed.
