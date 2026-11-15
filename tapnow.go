@@ -343,19 +343,54 @@ func (host *server) tapnowAPI(w http.ResponseWriter, r *http.Request) {
 		host.tapnowConnect(w, r, input.Edition, input.Provider, input.Model)
 		return
 	}
-	if r.URL.Path == "/runtime/tapnow/browser" && tapnowEdition(input.Edition) {
+	if (r.URL.Path == "/runtime/tapnow/copy-address" || r.URL.Path == "/runtime/tapnow/copy-path") && tapnowEdition(input.Edition) {
+		if !host.desktop {
+			host.json(w, 409, map[string]string{"error": "请在桌面应用中复制"})
+			return
+		}
+		value := "chrome://extensions/"
+		if r.URL.Path == "/runtime/tapnow/copy-path" {
+			root, err := s.directory()
+			if err != nil {
+				host.json(w, 400, map[string]string{"error": "目录暂不可用"})
+				return
+			}
+			value = filepath.Join(root, input.Edition)
+			if readTapnowManifest(value) == "" {
+				host.json(w, 400, map[string]string{"error": "请先准备插件"})
+				return
+			}
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if err := copyTapnowText(ctx, value); err != nil {
+			host.json(w, 400, map[string]string{"error": "请选中页面中的内容复制"})
+			return
+		}
+		host.json(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	if (r.URL.Path == "/runtime/tapnow/browser" || r.URL.Path == "/runtime/tapnow/canvas") && tapnowEdition(input.Edition) {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		var err error
+		address := "about:blank"
+		if r.URL.Path == "/runtime/tapnow/canvas" {
+			address = "https://app.tapnow.ai/"
+		}
 		if !host.desktop {
 			err = errors.New("请在桌面应用中打开 Chrome")
 		} else if s.openStore != nil {
-			err = s.openStore(ctx, "about:blank")
+			err = s.openStore(ctx, address)
 		} else {
-			err = openTapnowChrome(ctx, "about:blank")
+			err = openTapnowChrome(ctx, address)
 		}
 		if err != nil {
 			host.json(w, 400, map[string]string{"error": "无法打开 Chrome，请在浏览器地址栏打开 chrome://extensions/"})
+			return
+		}
+		if r.URL.Path == "/runtime/tapnow/canvas" {
+			host.json(w, 200, s.snapshot())
 			return
 		}
 		host.json(w, 200, map[string]any{"state": s.snapshot(), "address": "chrome://extensions/", "manualNavigationRequired": true})

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func registerTapnowHost() error {
@@ -38,6 +39,15 @@ func registerTapnowHost() error {
 		}
 	}
 	return nil
+}
+
+func copyTapnowText(ctx context.Context, value string) error {
+	if runtime.GOOS != "darwin" {
+		return errors.New("clipboard unavailable")
+	}
+	cmd := exec.CommandContext(ctx, "/usr/bin/pbcopy")
+	cmd.Stdin = strings.NewReader(value)
+	return cmd.Run()
 }
 
 func openTapnowChrome(ctx context.Context, address string) error {

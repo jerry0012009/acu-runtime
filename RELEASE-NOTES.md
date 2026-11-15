@@ -1,10 +1,14 @@
-# ACU Runtime 0.1.89
+# ACU Runtime 0.1.90
 
 新增本地 MOV/MP4 视频读取的一键配置。使用已发布的独立自包含 acu-video-mcp 0.1.0，用户无需安装 Node 或 FFmpeg，无需额外 Gemini/OpenAI Key。通过 Magpie 标准工具目录分配给 Agent；配套官方 Magpie 不打补丁、不使用 fork，也不改变官方更新来源。
 
 TapNow 副驾驶 0.1.27 检测视频节点及上游视频素材时自动读取带时间戳的采样画面，继续使用已有 ACU 识图审阅。视频 Native Messaging 直接由独立工具提供，Runtime 不执行视频解码或 MCP 后端。音频未分析，采样不等于逐帧完整质检，失败或遗漏会明确说明，不自动修改或重新生成节点。
 
 首次配置会下载并校验独立视频工具，后续不在运行时执行 npm；浏览器首次加载插件、更新重载和 Agent 工具信任仍需用户确认。建议更新后重新执行一次图片、视频与搜索工具检查和 TapNow 一键配置。
+
+## 保留 0.1.89 的顺序设置引导
+
+TapNow 设置按当前步骤显示，自动准备地址与目录复制，并保留本机剪贴板兜底。同版本已准备的插件直接进入连接，确认回执后提供打开 TapNow。保留共享操练场、图片生成和视频生成入口。
 
 ## 保留 0.1.87 的插件弹窗连接
 
@@ -196,9 +200,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.87-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.87-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.87-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.89-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.89-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.89-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

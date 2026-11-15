@@ -15,16 +15,15 @@
 .tapnow-consent{display:flex;gap:9px;align-items:flex-start}.tapnow-consent input{flex:0 0 auto;margin-top:5px}
 .tapnow-note{margin-top:12px}.tapnow-error{color:var(--acu-danger);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .tapnow-install-guide,.tapnow-complete,.tapnow-edition>progress{grid-column:1/-1;min-width:0}
-.tapnow-steps{list-style:none;margin:8px 0 16px;padding:0;display:grid;gap:12px;font-size:13px;line-height:1.7}
-.tapnow-steps li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:start}
-.tapnow-steps .icon,.tapnow-step-number{width:22px;height:22px;box-sizing:border-box;display:grid;place-items:center}
-.tapnow-step-number{border:1px solid var(--acu-line);border-radius:50%;font-size:11px;color:var(--acu-muted)}
-.tapnow-steps .complete .icon,.tapnow-complete .icon{color:var(--acu-success)}
+.tapnow-step-tabs{list-style:none;margin:6px 0 22px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;font-size:12px;color:var(--acu-muted)}
+.tapnow-step-tabs li{display:flex;align-items:center;gap:7px;min-width:0;line-height:1.7}.tapnow-step-tabs span{display:grid;place-items:center;flex:0 0 22px;height:22px;border:1px solid var(--acu-line);border-radius:50%;font-size:11px}
+.tapnow-step-tabs [aria-current]{color:var(--acu-text);font-weight:600}.tapnow-step-tabs [aria-current] span{background:var(--acu-accent-soft);border-color:var(--acu-accent);color:var(--acu-accent-text)}
+.tapnow-install-guide h5{font-size:15px;line-height:1.5;margin:0 0 9px}.tapnow-install-guide>p{font-size:13px;line-height:1.8;margin:0 0 16px;max-width:650px}
+.tapnow-guide-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;font-size:11px;color:var(--acu-muted)}
 .tapnow-directory{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border:1px solid var(--acu-line);border-radius:6px;padding:12px;margin-bottom:14px;min-width:0}
 .tapnow-directory code{min-width:0;line-height:1.8;user-select:text}.tapnow-directory .icon-button{flex:0 0 32px}
 .tapnow-address{width:100%;min-width:0;border:0;background:transparent;color:var(--acu-text);font:13px/1.8 monospace;user-select:text}
 .tapnow-help{font-size:12px;margin-top:16px;color:var(--acu-muted);line-height:1.7}.tapnow-help summary{cursor:pointer}.tapnow-help p{margin:10px 0}
-.tapnow-popup-guide{padding:14px 0;border-bottom:1px solid var(--acu-line);font-size:13px;line-height:1.8}.tapnow-popup-guide strong{font-size:13px}.tapnow-popup-guide p{color:var(--acu-muted);font-size:12px;margin:8px 0;overflow-wrap:anywhere}
 .tapnow-edition progress{width:100%;height:6px;accent-color:var(--acu-accent)}
-.tapnow-complete{display:flex;align-items:flex-start;gap:8px}.tapnow-complete .icon{flex:0 0 18px;margin-top:3px}
+.tapnow-complete{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px}.tapnow-complete>span{display:flex;align-items:center;gap:8px}.tapnow-complete .icon{width:18px;color:var(--acu-success)}
 @media(max-width:600px){.tapnow-edition{grid-template-columns:minmax(0,1fr)}.tapnow-heading{align-items:flex-start}.tapnow-config select{width:100%}.tapnow-actions .button{white-space:normal;max-width:100%}}
