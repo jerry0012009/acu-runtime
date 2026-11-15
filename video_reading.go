@@ -11,7 +11,7 @@ import (
 )
 
 const videoReadingName = "acu-video-reader"
-const videoMCPVersion = "0.2.0"
+const videoMCPVersion = "0.2.3"
 
 func videoMCPPath() (string, error) {
 	d, e := os.UserConfigDir()
@@ -126,7 +126,7 @@ func (host *server) assignVideoReading(ctx context.Context, agents []string) err
 // Only configure the external MCP through the official Library environment.
 // Media processing and model requests remain entirely inside that tool.
 func (host *server) configureVideoAudio(ctx context.Context, provider string) error {
-	config, err := host.tapnowCredential(ctx, provider, "gemini-3.8-flash")
+	config, err := host.tapnowCredential(ctx, provider, "gemini-3.5-flash-lite")
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (host *server) configureVideoAudio(ctx context.Context, provider string) er
 		}
 		env["ACU_AUDIO_API_KEY"] = config.APIKey
 		env["ACU_AUDIO_BASE_URL"] = config.Settings.Base
-		env["ACU_AUDIO_MODEL"] = "gemini-3.8-flash"
+		env["ACU_AUDIO_MODEL"] = "gemini-3.5-flash-lite"
 		stored["env"] = env
 		return host.writeToolLibrary(ctx, "/api/library/servers/save", map[string]any{"old": tool.Name, "server": stored})
 	}

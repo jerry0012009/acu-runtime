@@ -15,10 +15,10 @@ type videoPackage struct{ URL, SHA256 string }
 
 func videoMCPRelease(platform, arch string) (videoPackage, error) {
 	values := map[string]string{
-		"windows-amd64": "af238e0170ca4d58493e387196f8eccda8732f25b0e44333f50322698088eaff",
-		"darwin-amd64":  "dac882fda66fb4e3ba37edb4f9a12fc3d690615828a9b096216b2e5bc7148a47",
-		"darwin-arm64":  "1a758205db5fb9c79e2d19b5a1c72589bcda3a2442fca65a169fa792196ca4ff",
-		"linux-amd64":   "0e61d0529c428f8d4dc5a2be46bc0445247613155b2560fd88a4108dd4ea8f9d"}
+		"windows-amd64": "85d9142e17b27e6e506be43fdfb31f665bb1a9d2d2a0970a491b045c8bbc18c9",
+		"darwin-amd64":  "fbca746c3e6dfe594e20b2d39cc8eb955a32eb65649f0b6f5bef5af4ee951246",
+		"darwin-arm64":  "c8572cebafe035d599f5e0422e7c4e4b256be4e5cda322c9a2db63ea156de537",
+		"linux-amd64":   "d0b98aa28109d7d682941ae916a938df0e0f83286ea436a13144966c6dde2a89"}
 	key := platform + "-" + arch
 	digest, ok := values[key]
 	if !ok {

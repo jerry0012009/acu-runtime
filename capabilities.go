@@ -356,7 +356,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		if err := host.assignVideoReading(ctx, input.Agents); err != nil {
 			return view, fmt.Errorf("其他工具已配置，视频读取需要重试：%w", err)
 		}
-		if slices.Contains(choice.Models, "gemini-3.8-flash") && len(input.Agents) > 0 {
+		if slices.Contains(choice.Models, "gemini-3.5-flash-lite") && len(input.Agents) > 0 {
 			if err := host.configureVideoAudio(ctx, input.Provider); err != nil {
 				return view, fmt.Errorf("视频画面已配置，音频接入需要重试：%w", err)
 			}

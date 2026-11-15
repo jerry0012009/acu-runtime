@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -75,7 +76,7 @@ func TestVideoAudioUsesExistingProviderCredentialAndStandardLibraryEnv(t *testin
 	}
 	tool := f.servers[1]
 	env, ok := tool["env"].(map[string]any)
-	if !ok || env["ACU_AUDIO_API_KEY"] != "private-acu-test-key" || env["ACU_AUDIO_MODEL"] != "gemini-3.8-flash" || env["ACU_AUDIO_BASE_URL"] != "https://acu.best/v1" {
+	if !ok || env["ACU_AUDIO_API_KEY"] != "private-acu-test-key" || env["ACU_AUDIO_MODEL"] != "gemini-3.5-flash-lite" || env["ACU_AUDIO_BASE_URL"] != "https://acu.best/v1" {
 		t.Fatal("audio connection not configured")
 	}
 	if tool["command"] != "/fixture/acu-video-mcp" || f.prefs["vision"] != "" {
@@ -88,5 +89,24 @@ func TestVideoAudioUsesExistingProviderCredentialAndStandardLibraryEnv(t *testin
 	}
 	if strings.Count(strings.Join(f.writes, "\n"), "/api/library/servers/save") != before {
 		t.Fatal("overwrote custom MCP")
+	}
+}
+
+func TestVideoReadingUpgradesOnlyOwnedVersionedDistribution(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	target, err := videoMCPPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host.videoToolPath = func(context.Context) (string, error) { return target, nil }
+	old := filepath.Join(filepath.Dir(filepath.Dir(target)), "0.1.0", filepath.Base(target))
+	f.servers = append(f.servers, map[string]any{"name": videoReadingName, "note": capabilityOwner,
+		"transport": "stdio", "command": old, "args": []string{}, "agents": []string{"workbuddy"},
+		"paused": true, "disabledTools": []string{"video_detail"}})
+	if err := host.assignVideoReading(context.Background(), []string{"codex"}); err != nil {
+		t.Fatal(err)
+	}
+	if f.servers[1]["command"] != target || f.servers[1]["paused"] != true {
+		t.Fatal("owned upgrade lost preferences")
 	}
 }
