@@ -30,3 +30,14 @@ MV3-to-native configuration tests. This is not proof of owner-device OS navigati
 
 Chrome source reference:
 https://github.com/chromium/chromium/blob/157.0.8103.78/chrome/browser/ui/startup/url_util.cc
+
+## Publication
+
+Published at 2026-11-15 10:19:47 UTC from application SHA
+`73758dd504f8a8afdf9441eee0de73cc13839d55`. Workflow 43702492844 passed all
+three platform jobs and automatic publication. GitHub latest and Console's
+public Runtime release resolver returned 0.1.86. Public SHA256SUMS matched all
+five installer asset digests. Windows installer SHA-256:
+`794907461049d7418c0f5bbfed12418e311bf5d6bfed9604c61f3bd212b13921`.
+Closeout changes after this source are documentation only. No production
+Router/Console deployment or restart was performed.

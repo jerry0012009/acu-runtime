@@ -1,4 +1,4 @@
-Release preparation: **0.1.86** corrects the TapNow Chrome launcher guide: copy the extensions address and open Chrome, then paste it into the address bar. Does not falsely claim privileged Chrome internal-page navigation. Retains the 0.1.85 official-source fix, GPT-6.1 Sol recommendation, plugin 0.1.24 and Magpie v0.1.4248. See [ACCEPTANCE-0186.md](ACCEPTANCE-0186.md) for verification.
+Current release: **0.1.86** corrects the TapNow Chrome launcher guide: copy the extensions address and open Chrome, then paste it into the address bar. Does not falsely claim privileged Chrome internal-page navigation. Retains the 0.1.85 official-source fix, GPT-6.1 Sol recommendation, plugin 0.1.24 and Magpie v0.1.4248. All three native platform release jobs passed; see [ACCEPTANCE-0186.md](ACCEPTANCE-0186.md).
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
