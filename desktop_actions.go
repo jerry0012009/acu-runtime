@@ -11,6 +11,7 @@ type desktopAction struct {
 	Action string `json:"action"`
 	Query  string `json:"query,omitempty"`
 	Height int    `json:"height,omitempty"`
+	Page   string `json:"page,omitempty"`
 }
 
 func cleanDesktopQuery(raw string) (string, bool) {
@@ -43,7 +44,7 @@ func (host *server) desktopAction(response http.ResponseWriter, request *http.Re
 		return
 	}
 	query, valid := cleanDesktopQuery(action.Query)
-	if !valid || (action.Action != "main" && action.Action != "panel" && action.Action != "hide" && action.Action != "fit") || (action.Action == "fit" && (action.Height < 1 || action.Height > 100000)) {
+	if !valid || (action.Action != "main" && action.Action != "panel" && action.Action != "hide" && action.Action != "fit" && action.Action != "workbench") || (action.Action == "fit" && (action.Height < 1 || action.Height > 100000)) || (action.Action == "workbench" && action.Page != "playground" && action.Page != "image-playground" && action.Page != "video-playground") {
 		host.json(response, 400, map[string]string{"error": "unsupported desktop action"})
 		return
 	}
