@@ -80,11 +80,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/acu-tapnow/packages" "$RUNNER_TEMP/acu-tapnow/companion/chrome-mv3" "$RUNNER_TEMP/acu-tapnow/backup/chrome-mv3"
-          gh release download v0.1.29 --repo jerry0012009/acu-tapnow --dir "$RUNNER_TEMP/acu-tapnow/packages" --pattern '*-chrome.zip'
+          gh release download v0.1.30 --repo jerry0012009/acu-tapnow --dir "$RUNNER_TEMP/acu-tapnow/packages" --pattern '*-chrome.zip'
           export ACU_TAPNOW_PACKAGES="$RUNNER_TEMP/acu-tapnow/packages"
-          node -e 'const fs=require("fs"),path=require("path"),crypto=require("crypto");for(const [n,h] of [["tapnow-companion-0.1.29-chrome.zip","e27202cb32b7d5cb690001d66aa606ba83a1786ff6fe9c5c919e53e0b23c1ee7"],["tapnow-backup-0.1.29-chrome.zip","62ab766b0d84b02e22a61c4a6f838d4f6e39763244dd750a21cbb003c94c6c66"]]){if(crypto.createHash("sha256").update(fs.readFileSync(path.join(process.env.ACU_TAPNOW_PACKAGES,n))).digest("hex")!==h)throw Error("ZIP digest mismatch: "+n)}'
-          unzip -q "$RUNNER_TEMP/acu-tapnow/packages/tapnow-companion-0.1.29-chrome.zip" -d "$RUNNER_TEMP/acu-tapnow/companion/chrome-mv3"
-          unzip -q "$RUNNER_TEMP/acu-tapnow/packages/tapnow-backup-0.1.29-chrome.zip" -d "$RUNNER_TEMP/acu-tapnow/backup/chrome-mv3"
+          node -e 'const fs=require("fs"),path=require("path"),crypto=require("crypto");for(const [n,h] of [["tapnow-companion-0.1.30-chrome.zip","d9e9dbfe3f8bdaedb81b6f63367ccd3ef7bd34c09c3984f7896a58f380ccdf8d"],["tapnow-backup-0.1.30-chrome.zip","742fb65582b31edc1fe602ab557d367b6e59c0472517a6ffb35d718d649b092f"]]){if(crypto.createHash("sha256").update(fs.readFileSync(path.join(process.env.ACU_TAPNOW_PACKAGES,n))).digest("hex")!==h)throw Error("ZIP digest mismatch: "+n)}'
+          unzip -q "$RUNNER_TEMP/acu-tapnow/packages/tapnow-companion-0.1.30-chrome.zip" -d "$RUNNER_TEMP/acu-tapnow/companion/chrome-mv3"
+          unzip -q "$RUNNER_TEMP/acu-tapnow/packages/tapnow-backup-0.1.30-chrome.zip" -d "$RUNNER_TEMP/acu-tapnow/backup/chrome-mv3"
           export ACU_PLAYWRIGHT="$RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
           export TAPNOW_TEST_ROOT="$RUNNER_TEMP/acu-tapnow"
           node scripts/test-tapnow-native.cjs

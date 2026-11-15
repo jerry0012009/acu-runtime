@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -12,6 +13,82 @@ import (
 
 const videoReadingName = "acu-video-reader"
 const videoMCPVersion = "0.2.3"
+
+func (host *server) setVideoReadingEnabled(ctx context.Context, provider string, agents []string, enabled bool) error {
+	if enabled {
+		if len(agents) == 0 {
+			return errors.New("请先接入一个应用，再配置视频读取")
+		}
+		var state map[string]json.RawMessage
+		var listed []setupAgent
+		var err error
+		state, err = host.kernel.readState(ctx)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(state["agents"], &listed); err != nil {
+			return err
+		}
+		for _, id := range agents {
+			if !slices.ContainsFunc(listed, func(a setupAgent) bool { return a.ID == id && !a.CLIMissing }) || !slices.ContainsFunc(supportedAgents, func(a struct{ ID, Name, Config string }) bool { return a.ID == id }) {
+				return errors.New("所选应用未检测到")
+			}
+		}
+		if err := host.assignVideoReading(ctx, agents); err != nil {
+			return err
+		}
+	}
+	lib, err := host.readToolLibrary(ctx)
+	if err != nil {
+		return err
+	}
+	for _, tool := range lib.Servers {
+		if tool.Name != videoReadingName {
+			continue
+		}
+		if tool.Note != capabilityOwner {
+			return errors.New("已有同名视频工具，未覆盖")
+		}
+		stored := map[string]any{}
+		for key, value := range tool.stored {
+			stored[key] = value
+		}
+		for _, key := range []string{"problems", "signIn", "icon"} {
+			delete(stored, key)
+		}
+		stored["paused"] = !enabled
+		if enabled {
+			stored["hidden"] = false
+			var disabled []string
+			body, _ := json.Marshal(stored["disabledTools"])
+			if string(body) != "null" && json.Unmarshal(body, &disabled) != nil {
+				return errors.New("视频工具设置无效")
+			}
+			stored["disabledTools"] = slices.DeleteFunc(disabled, func(name string) bool { return name == "video_watch" })
+		}
+		if err := host.writeToolLibrary(ctx, "/api/library/servers/save", map[string]any{"old": tool.Name, "server": stored}); err != nil {
+			return err
+		}
+		if enabled {
+			connection := host.connection(ctx)
+			for _, choice := range connection.Choices {
+				if choice.ID == provider && slices.Contains(choice.Models, "gemini-3.5-flash-lite") {
+					return host.configureVideoAudio(ctx, provider)
+				}
+			}
+		}
+		return nil
+	}
+	if !enabled {
+		target, err := videoMCPPath()
+		if err != nil {
+			return err
+		}
+		return host.writeToolLibrary(ctx, "/api/library/servers/save", map[string]any{"old": "", "server": map[string]any{
+			"name": videoReadingName, "note": capabilityOwner, "transport": "stdio", "command": target, "args": []string{}, "agents": []string{}, "paused": true, "local": true}})
+	}
+	return errors.New("视频工具尚未准备")
+}
 
 func videoMCPPath() (string, error) {
 	d, e := os.UserConfigDir()

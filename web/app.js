@@ -106,6 +106,20 @@ async function refresh(rescan = false, quiet = false) {
       if (!ui.status.ready && !ui.status.starting) ui.status = await request('/runtime/kernel/start', { method: 'POST' });
     }
     ui.error = ui.status.error || '';
+    if (ui.status.desktop && ui.status.ready && !ui.applying && !ui.capabilities) {
+      const choice = activeChoice();
+      const agents = (ui.status.agents || []).filter(agent => agent.detected && agent.connected).map(agent => agent.id);
+      const identity = choice && agents.length ? JSON.stringify([choice.id, choice.masked, agents]) : '';
+      if (identity && ui.autoVideoReading !== identity) {
+        ui.autoVideoReading = identity;
+        request(`/runtime/capabilities?provider=${encodeURIComponent(choice.id)}`).then(view => {
+          if (view.videoReadingEnabled === false || (view.videoReadingReady && agents.every(id => view.tools?.some(tool => tool.name === 'acu-video-reader' && tool.agents?.includes(id))))) return;
+          return request('/runtime/capabilities', {method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({provider:choice.id,agents,videoReadingOnly:true,videoReading:true})});
+        }).catch(error => { ui.results = [...ui.results.filter(item => item.id !== 'tools'),
+          {id:'tools',ok:false,message:`视频读取自动配置未完成：${error.message}`}]; render(); });
+      }
+    }
     if (ui.inventory && previousState !== JSON.stringify(ui.status)) {
       const scroll = overlay.querySelector('.recommendation-body')?.scrollTop || 0;
       const expanded = new Set([...(overlay.querySelectorAll?.('[data-flow-key][open]') || [])].map(detail => detail.dataset.flowKey));
@@ -896,7 +910,8 @@ function videoCapabilityPanel(view, current) {
   const models = view.videoModels || [];
   const state = view.videoBlocked ? '生图已关闭，视频也已停用' : view.videoEnabled ? '已启用' : '未启用';
   const currentModel = view.videoGenMissing ? view.videoAuto : (view.videoGen || view.videoAuto);
-  const reading = `<section class="panel capability-video-reading-panel"><div class="capability-list-heading"><h2>视频读取</h2><span class="capability-status">${view.videoReadingReady ? '已配置' : '待准备'}</span></div><p class="capability-intro">MOV / MP4 · 画面采样 · 沿用识图模型</p><button class="button secondary" data-configure-capabilities="check" ${current.saving ? 'disabled' : ''}>${current.saving === 'tools' ? '正在准备视频与通用工具…' : '一键准备并分配'}</button></section>`;
+  const readingEnabled = view.videoReadingEnabled !== false;
+  const reading = `<section class="panel capability-video-reading-panel"><div class="capability-list-heading"><h2>视频读取</h2><label class="switch-row"><span>${current.saving === 'reading' ? '正在配置…' : readingEnabled ? '已启用' : '未启用'}</span><input type="checkbox" data-video-reading-enabled aria-label="启用视频读取" ${readingEnabled ? 'checked' : ''} ${current.saving ? 'disabled' : ''}></label></div><p class="capability-intro">MOV / MP4 · 画面与音频</p>${readingEnabled && !view.videoReadingReady ? '<p class="capability-caption">等待完成本机工具配置</p>' : ''}<button class="button secondary" data-configure-video-reading ${current.saving ? 'disabled' : ''}>${current.saving === 'reading' ? '正在配置…' : view.videoReadingReady ? '重新配置' : '一键配置'}</button></section>`;
   return reading + `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${currentModel ? `<p class="capability-intro">${view.videoGen && !view.videoGenMissing ? '默认模型' : '自动模型'} · ${escapeHTML(currentModel)}</p>` : ''}${view.videoGenMissing ? '<p class="capability-tool-error">已选视频模型暂不可用，当前使用自动模型。</p>' : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
 }
 
@@ -907,6 +922,19 @@ async function setVideoEnabled(input) {
   try {
     current.view = await request('/runtime/capabilities', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({provider:current.provider,videoEnabled:input}) });
     toast('视频工具已保存，重新打开对应应用后生效');
+  } catch (error) { current.error = error.message; }
+  finally { current.saving = ''; if (ui.capabilities === current) renderCapabilities(); }
+}
+
+async function setVideoReadingEnabled(enabled) {
+  const current = ui.capabilities;
+  if (!current || current.saving) return;
+  current.saving = 'reading'; current.error = ''; current.toolSummary = ''; renderCapabilities();
+  try {
+    const agents = (ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id);
+    current.view = await request('/runtime/capabilities', { method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:current.provider,videoReadingOnly:true,videoReading:enabled,agents:enabled ? agents : []}) });
+    current.toolSummary = enabled ? '视频读取已启用；重新打开对应应用后生效。' : '视频读取已停用。';
   } catch (error) { current.error = error.message; }
   finally { current.saving = ''; if (ui.capabilities === current) renderCapabilities(); }
 }
@@ -1235,6 +1263,7 @@ app.addEventListener('click', event => {
   if (event.target.closest('[data-save-capabilities]')) { event.preventDefault?.(); saveCapabilities(); return; }
   const configureTools = event.target.closest('[data-configure-capabilities]');
   if (configureTools) { configureCapabilities(configureTools.dataset.configureCapabilities); return; }
+  if (event.target.closest('[data-configure-video-reading]')) { setVideoReadingEnabled(true); return; }
   const advanced = event.target.closest('[data-capability-native]');
   if (advanced) { openCapabilityAdvanced(advanced.dataset.capabilityNative); return; }
   const native = event.target.closest('[data-native-view]');
@@ -1276,6 +1305,7 @@ app.addEventListener('click', event => {
 app.addEventListener('input', event => { billing?.input(event); preferences?.input(event); });
 app.addEventListener('change', event => {
   if (event.target.dataset?.videoEnabled !== undefined) { setVideoEnabled(event.target.checked); return; }
+  if (event.target.dataset?.videoReadingEnabled !== undefined) { setVideoReadingEnabled(event.target.checked); return; }
   if (preferences?.change(event)) return;
   if(event.target.id === 'startup-enabled'){ const enabled=event.target.checked;ui.startupSaving=true;request('/runtime/startup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})}).then(value=>{ui.startup=value;}).catch(error=>toast(error.message)).finally(()=>{ui.startupSaving=false;render();});return; }
   if (billing?.change(event)) return;

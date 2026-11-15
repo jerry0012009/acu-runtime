@@ -378,7 +378,7 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 	edition := tapnowOriginEdition(msg.Origin)
 	s.Lock()
 	g := s.grants[edition]
-	if edition == "" || g == nil || time.Now().After(g.Expires) {
+	if edition == "" || g == nil || (g.Phase != "configured" && time.Now().After(g.Expires)) {
 		s.Unlock()
 		host.json(w, 409, tapnowNativeReply{Error: "请先在 ACU Runtime 点击接入；授权五分钟内有效"})
 		return
@@ -422,7 +422,8 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 200, tapnowNativeReply{OK: true, Confirmed: true, Grant: g.ID})
 		return
 	}
-	if msg.Action != "connect" || msg.Grant != "" || g.Phase != "waiting" {
+	resume := msg.Grant == g.ID && g.Phase == "saving" && g.Version == msg.Version
+	if msg.Action != "connect" || (!resume && (msg.Grant != "" || g.Phase != "waiting")) {
 		s.Unlock()
 		host.json(w, 409, tapnowNativeReply{Error: "没有可领取的接入授权"})
 		return

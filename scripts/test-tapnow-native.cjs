@@ -63,7 +63,7 @@ async function main() {
     const page=await browser.newPage();let requests=0;
     await browser.route('https://**/*',route=>{requests++;return route.abort();});
     await page.goto(`chrome-extension://${identities.companion}/popup.html`);
-    await page.waitForFunction(()=>document.getElementById('runtime-status')?.textContent.includes('一键配置'));
+    await page.waitForFunction(()=>document.getElementById('runtime-status')?.textContent.includes('重新连接'));
     for(const candidate of browser.pages()) {
       if(candidate!==page && candidate.url().startsWith('chrome-extension://'))await candidate.close();
     }

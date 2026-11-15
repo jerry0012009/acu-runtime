@@ -104,6 +104,28 @@ func TestTapnowNativeConnectRequiresOneTimeGrantAndReadbackReceipt(t *testing.T)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"confirmed":true`) || strings.Contains(w.Body.String(), "sk-native") {
 		t.Fatal(w.Code, w.Body.String())
 	}
+	host.tapnow.grants["companion"].Expires = time.Now().Add(-time.Minute)
+	if w = nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), `"confirmed":true`) {
+		t.Fatal("completed connection must not expire with unclaimed grants", w.Body.String())
+	}
+}
+
+func TestTapnowNativeResumeLostConfigurationReplyWithSameGrant(t *testing.T) {
+	host := nativeFixtureHost(t)
+	tapnowRequest(host, "POST", "/runtime/tapnow/connect", `{"edition":"companion","provider":"acu","model":"acu-auto"}`, host.token)
+	msg := tapnowNativeMessage{Action: "connect", Origin: "chrome-extension://" + tapnowCompanionID + "/", Version: "0.1.23"}
+	w := nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
+	var reply tapnowNativeReply
+	json.Unmarshal(w.Body.Bytes(), &reply)
+	msg.Grant = reply.Grant
+	w = nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "sk-native-isolated-fixture") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	msg.Grant = secret()
+	if nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "").Code != 409 {
+		t.Fatal("foreign resume grant accepted")
+	}
 }
 
 func TestTapnowNativeBoundaryAndBackupHasNoKey(t *testing.T) {

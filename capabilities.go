@@ -44,6 +44,7 @@ type capabilityLibrary struct {
 }
 type capabilityView struct {
 	VideoReadingReady     bool              `json:"videoReadingReady"`
+	VideoReadingEnabled   bool              `json:"videoReadingEnabled"`
 	Provider              string            `json:"provider"`
 	Vision                string            `json:"vision"`
 	ImageGen              string            `json:"imageGen"`
@@ -67,20 +68,21 @@ type capabilityView struct {
 	Messages              []string          `json:"messages"`
 }
 type capabilityInput struct {
-	Provider     string   `json:"provider"`
-	Agents       []string `json:"agents"`
-	Vision       *string  `json:"vision"`
-	ImageGen     *string  `json:"imageGen"`
-	VideoGen     *string  `json:"videoGen"`
-	SearchURL    *string  `json:"searchURL"`
-	FreeSearch   *bool    `json:"freeSearch"`
-	ModelsOnly   bool     `json:"modelsOnly"`
-	VideoEnabled *bool    `json:"videoEnabled"`
-	VideoReading *bool    `json:"videoReading"`
+	Provider         string   `json:"provider"`
+	Agents           []string `json:"agents"`
+	Vision           *string  `json:"vision"`
+	ImageGen         *string  `json:"imageGen"`
+	VideoGen         *string  `json:"videoGen"`
+	SearchURL        *string  `json:"searchURL"`
+	FreeSearch       *bool    `json:"freeSearch"`
+	ModelsOnly       bool     `json:"modelsOnly"`
+	VideoEnabled     *bool    `json:"videoEnabled"`
+	VideoReading     *bool    `json:"videoReading"`
+	VideoReadingOnly bool     `json:"videoReadingOnly"`
 }
 
 func (host *server) capabilityRead(ctx context.Context, provider string) (capabilityView, map[string]json.RawMessage, capabilityLibrary, error) {
-	view := capabilityView{Provider: provider, VisionModels: []capabilityModel{}, ImageModels: []capabilityModel{}, Tools: []capabilityTool{}, Messages: []string{}}
+	view := capabilityView{Provider: provider, VideoReadingEnabled: true, VisionModels: []capabilityModel{}, ImageModels: []capabilityModel{}, Tools: []capabilityTool{}, Messages: []string{}}
 	var prefs map[string]json.RawMessage
 	var lib capabilityLibrary
 	if err := host.kernel.exchange(ctx, "GET", "/api/settings", nil, &prefs); err != nil {
@@ -110,6 +112,12 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	for _, tool := range lib.Servers {
 		if tool.Note == capabilityOwner {
+			if tool.Name == videoReadingName {
+				view.VideoReadingEnabled = tool.stored["paused"] != true && tool.stored["hidden"] != true
+				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("video_watch")) {
+					view.VideoReadingEnabled = false
+				}
+			}
 			if tool.Name == videoReadingName && tool.stored["hidden"] != true && tool.stored["paused"] != true && len(tool.Agents) > 0 {
 				view.VideoReadingReady = true
 				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("video_watch")) {
@@ -186,6 +194,16 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	}
 	if choice == nil {
 		return view, errors.New("请选择可用的 ACU Key")
+	}
+	if input.VideoReadingOnly {
+		if input.VideoReading == nil || input.ModelsOnly || input.VideoEnabled != nil || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || input.FreeSearch != nil || input.SearchURL != nil {
+			return view, errors.New("请单独保存视频读取设置")
+		}
+		if err := host.setVideoReadingEnabled(ctx, input.Provider, input.Agents, *input.VideoReading); err != nil {
+			return view, err
+		}
+		view, _, _, err = host.capabilityRead(ctx, input.Provider)
+		return view, err
 	}
 	if input.VideoEnabled != nil {
 		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading != nil {
@@ -352,7 +370,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	if err := host.assignImageGuidance(ctx, input.Agents); err != nil {
 		return view, err
 	}
-	if input.VideoReading == nil || *input.VideoReading {
+	if (input.VideoReading == nil && view.VideoReadingEnabled) || (input.VideoReading != nil && *input.VideoReading) {
 		if err := host.assignVideoReading(ctx, input.Agents); err != nil {
 			return view, fmt.Errorf("其他工具已配置，视频读取需要重试：%w", err)
 		}

@@ -765,7 +765,8 @@ test('unified tool check preserves success and retries only the failed agent', a
  let fail=true;
  const instance=await setup({ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async (route,options)=>route.startsWith('/runtime/capabilities') ? options.method==='POST'&&JSON.parse(options.body).agents[0]==='claude'&&fail?{ok:false,body:{error:'工具写入失败'}}:{body:view}:undefined);
  await instance.run('openCapabilities()');
- assert.equal((instance.elements.app.innerHTML.match(/data-configure-capabilities=/g)||[]).length,2);
+ assert.equal((instance.elements.app.innerHTML.match(/data-configure-capabilities=/g)||[]).length,1);
+ assert(instance.elements.app.innerHTML.includes('data-configure-video-reading'));
  await instance.run('configureCapabilities("check")');
  assert.deepEqual(posts(instance).map(call=>JSON.parse(call.body).agents),[['codex'],['claude']]);
  assert(instance.elements.app.innerHTML.includes('已接入 ✓'));
@@ -777,6 +778,19 @@ test('unified tool check preserves success and retries only the failed agent', a
  assert.deepEqual(JSON.parse(posts(instance).at(-1).body).agents,['claude']);
  assert(!instance.elements.app.innerHTML.includes('data-configure-capabilities="claude"'));
  assert(!instance.elements.app.innerHTML.includes('重新配置'));
+});
+
+test('desktop automatically prepares missing video reading once and respects explicit disabled preference',async()=>{
+ for(const enabled of [true,false]){
+  const view={...capabilityFixture(),videoReadingReady:false,videoReadingEnabled:enabled};
+  const instance=await setup({desktop:true,ready:true,agents:[{...codex(),connected:true}]},async(route,options)=>route.startsWith('/runtime/capabilities')?{body:view}:undefined);
+  await new Promise(resolve=>setImmediate(resolve));
+  const writes=()=>posts(instance).filter(call=>call.route==='/runtime/capabilities'&&JSON.parse(call.body).videoReadingOnly);
+  assert.equal(writes().length,enabled?1:0);
+  if(enabled)assert.deepEqual(JSON.parse(writes()[0].body),{provider:'acu-runtime',agents:['codex'],videoReadingOnly:true,videoReading:true});
+  await instance.refresh();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes().length,enabled?1:0,'polling must not repeatedly rewrite tool assignments');
+ }
 });
 
 test('repeated one-click setup preserves connected app model and visibility by default',async()=>{

@@ -110,3 +110,41 @@ func TestVideoReadingUpgradesOnlyOwnedVersionedDistribution(t *testing.T) {
 		t.Fatal("owned upgrade lost preferences")
 	}
 }
+
+func TestVideoReadingToggleIsIndependentAndExplicitOffSurvivesToolRepair(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	ctx := context.Background()
+	view, _, _, err := host.capabilityRead(ctx, "acu-runtime")
+	if err != nil || !view.VideoReadingEnabled || view.VideoReadingReady {
+		t.Fatal("fresh default must be enabled but not falsely ready")
+	}
+	if err := host.setVideoReadingEnabled(ctx, "acu-runtime", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	view, _, _, _ = host.capabilityRead(ctx, "acu-runtime")
+	if view.VideoReadingEnabled {
+		t.Fatal("disable not persisted")
+	}
+	if err := host.setVideoReadingEnabled(ctx, "acu-runtime", []string{"workbuddy"}, true); err != nil {
+		t.Fatal(err)
+	}
+	view, _, _, _ = host.capabilityRead(ctx, "acu-runtime")
+	if !view.VideoReadingEnabled || !view.VideoReadingReady {
+		t.Fatal("reader not enabled")
+	}
+	for _, tool := range f.servers {
+		if tool["name"] == "acu-image" {
+			t.Fatal("standalone video reading created unrelated generation tool")
+		}
+	}
+	if err := host.setVideoReadingEnabled(ctx, "acu-runtime", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := host.assignVideoReading(ctx, []string{"codex"}); err != nil {
+		t.Fatal(err)
+	}
+	view, _, _, _ = host.capabilityRead(ctx, "acu-runtime")
+	if view.VideoReadingEnabled || view.VideoReadingReady {
+		t.Fatal("ordinary assignment re-enabled explicit opt-out")
+	}
+}

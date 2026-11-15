@@ -53,6 +53,8 @@ async function main() {
     assert.equal(installCount,0);
     await other.locator('summary').click();
     await page.locator('#tapnow-model').waitFor();
+    assert((await page.locator('.tapnow-agent').innerText()).includes('资产备份（可选）'));
+    assert.equal(await page.locator('.tapnow-install-guide').count(),0);
     assert.equal(await page.locator('#tapnow-model').inputValue(),'gpt-6.1-sol');
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.fixtureCopied=text;}}}));
