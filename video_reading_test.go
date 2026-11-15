@@ -102,6 +102,8 @@ func TestVideoReadingRealMCP(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	t.Setenv("HOME", dir)
 	t.Setenv("USERPROFILE", dir)
+	t.Setenv("APPDATA", filepath.Join(dir, "config"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(dir, "local"))
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 	installed, err := ensureVideoReading(ctx)

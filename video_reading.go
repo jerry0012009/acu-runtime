@@ -147,12 +147,15 @@ func ensureVideoReading(ctx context.Context) (videoReadingInstall, error) {
 	}
 	node, _ := videoNodePaths(root)
 	if _, err := os.Stat(filepath.Join(root, ".ready")); err == nil {
+		valid := true
 		for _, file := range []string{node, filepath.Join(root, "launch.cjs"), filepath.Join(root, "bin", videoProgram("ffmpeg")), filepath.Join(root, "bin", videoProgram("ffprobe")), filepath.Join(root, "node_modules", "claude-video-vision", "dist", "index.js")} {
 			if info, err := os.Stat(file); err != nil || !info.Mode().IsRegular() {
-				return videoReadingInstall{}, errors.New("视频组件不完整，请重新准备")
+				valid = false
 			}
 		}
-		return videoReadingInstall{node, root}, nil
+		if valid {
+			return videoReadingInstall{node, root}, nil
+		}
 	}
 	url, digest, err := videoNodeRelease(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -221,10 +224,24 @@ func ensureVideoReading(ctx context.Context) (videoReadingInstall, error) {
 	if err := os.WriteFile(filepath.Join(stage, ".ready"), []byte(videoReadingVersion), 0600); err != nil {
 		return videoReadingInstall{}, err
 	}
-	license,err:=assets.ReadFile("web/THIRD-PARTY-NOTICES.txt")
-	if err!=nil {return videoReadingInstall{},err}
-	if err:=os.WriteFile(filepath.Join(stage,"THIRD-PARTY-NOTICES.txt"),license,0600);err!=nil{return videoReadingInstall{},err}
+	license, err := assets.ReadFile("web/THIRD-PARTY-NOTICES.txt")
+	if err != nil {
+		return videoReadingInstall{}, err
+	}
+	if err := os.WriteFile(filepath.Join(stage, "THIRD-PARTY-NOTICES.txt"), license, 0600); err != nil {
+		return videoReadingInstall{}, err
+	}
+	backup := root + ".previous"
+	if _, err := os.Lstat(root); err == nil {
+		if _, err := os.Lstat(backup); !os.IsNotExist(err) {
+			return videoReadingInstall{}, errors.New("视频组件恢复目录已存在，请在支持人员协助下检查")
+		}
+		if err := os.Rename(root, backup); err != nil {
+			return videoReadingInstall{}, err
+		}
+	}
 	if err := os.Rename(stage, root); err != nil {
+		_ = os.Rename(backup, root)
 		return videoReadingInstall{}, err
 	}
 	return videoReadingInstall{node, root}, nil
@@ -251,6 +268,14 @@ func (host *server) assignVideoReading(ctx context.Context, agents []string) err
 		}
 		if tool.Note != capabilityOwner {
 			return errors.New("已有同名视频工具，未覆盖；请在工具目录检查 acu-video-reader")
+		}
+		// Keep user launchers and advanced options, but repair our own missing files.
+		command, _ := tool.stored["command"].(string)
+		self, _ := os.Executable()
+		if command == self {
+			if _, err := host.prepareVideoTools(ctx); err != nil {
+				return err
+			}
 		}
 		ids := slices.Clone(tool.Agents)
 		for _, id := range agents {

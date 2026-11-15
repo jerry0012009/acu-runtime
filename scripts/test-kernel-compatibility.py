@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
         jar.add_cookie_header(probe)
         if probe.has_header("Cookie"):
             headers["Cookie"] = probe.get_header("Cookie")
-        connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=100)
+        connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=480)
         try:
             connection.request("POST" if body is not None else "GET", parsed.path + ("?" + parsed.query if parsed.query else ""), body=data, headers=headers)
             response = connection.getresponse()
@@ -181,7 +181,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             legacy = next(s for s in owned if s["name"] == "acu-free-search")
             assert not legacy.get("agents"), legacy
             owned = [s for s in owned if s["name"] != "acu-free-search"]
-            assert {s["name"] for s in owned} == {"acu-image", "acu-vision", "acu-search"}, owned
+            assert {s["name"] for s in owned} == {"acu-image", "acu-vision", "acu-search", "acu-video-reader"}, owned
             for tool in owned:
                 assert set(tool["agents"]) == set(ids), tool
                 if tool["name"] in ("acu-vision", "acu-image"):
@@ -191,6 +191,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             assert repeated["vision"] == "acu-runtime/gpt-6.1-sol" or repeated["visionAuto"], repeated
             assert repeated["imageGen"] == "" and repeated["imageGenAuto"], repeated
             assert repeated["searchReady"]
+            assert repeated["videoReadingReady"]
             assert {m["id"] for m in repeated["videoModels"]} == {"acu-runtime/grok-imagine-video", "acu-runtime/grok-imagine-video-1.5"}, repeated
             assert not repeated["videoEnabled"], repeated
             enabled = request(rt + "/runtime/capabilities", {"provider":"acu-runtime","videoEnabled":True}, token)
@@ -203,7 +204,8 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             assert changed["vision"] == "off" and config_files() == before
             # Native stdio definitions and ACU names must survive real agent sync.
             for tool in owned:
-                assert tool["transport"] == "stdio" and tool["args"][0] == "mcp", tool
+                assert tool["transport"] == "stdio", tool
+                assert tool["args"][0] == ("--video-reader" if tool["name"] == "acu-video-reader" else "mcp"), tool
                 assert Path(tool["command"]).is_file(), tool
                 proc = subprocess.Popen([tool["command"], *tool["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
                 replies = queue.Queue()
@@ -223,11 +225,12 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 finally:
                     proc.terminate(); proc.wait(timeout=10)
                 for expected in {"acu-image": ["generate_image", "generation_result"],
-                                 "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"]}[tool["name"]]:
+                                 "acu-vision": ["analyze_image"], "acu-search": ["web_search", "web_fetch"],
+                                 "acu-video-reader": ["video_watch", "video_info", "video_detail"]}[tool["name"]]:
                     assert expected in data, (tool["name"], data[:500])
             print(json.dumps({"runtime": status["version"], "kernel": actual_kernel, "fourAgentsConfigured": True,
                 "kernelPolicyCLI": True, "existingCatalogRefresh": True, "repeatNoDuplicates": True, "existingMCPPreserved": True, "legacyMigration": True,
-                "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "threeMCPToolLists": True,
+                "sharedModels": True, "modelOnlySavePreservesAgentFiles": True, "fourMCPToolLists": True,
                 "freshCodexUsesAPIWithoutChatGPTAccount": True}))
         except Exception:
             time.sleep(0.5)

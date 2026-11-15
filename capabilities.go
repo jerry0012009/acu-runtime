@@ -106,6 +106,9 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 		if tool.Note == capabilityOwner {
 			if tool.Name == videoReadingName && tool.stored["paused"] != true && len(tool.Agents) > 0 {
 				view.VideoReadingReady = true
+				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("video_watch")) {
+					view.VideoReadingReady = false
+				}
 			}
 			if tool.Name == "acu-image" {
 				view.VideoEnabled = tool.stored["paused"] != true && len(tool.Agents) > 0
