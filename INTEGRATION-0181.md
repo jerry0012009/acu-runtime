@@ -36,7 +36,7 @@ They remain on the original branch; no history or uncommitted work was removed.
 
 ## Release Scope
 
-Plugin 0.1.23 ZIP bytes and catalog remain unchanged. Runtime 0.1.81 now fetches
+Plugin 0.1.23 ZIP bytes and catalog remain unchanged. Runtime 0.1.82 now fetches
 latest plugin metadata on every primary configuration action, verifies/prepares
 the selected edition and uses the selected ACU Key/model. Successful receipt must
 match the prepared version. Native browser regression seeds an old Key and checks
@@ -52,3 +52,45 @@ Tests: Go/race/vet, frontend units, video-browser tests, TapNow guided-browser t
 and real native-host tests. Platform CI must pass Windows x64 and macOS arm64/amd64
 before publication. Record final source SHA, workflow and asset hashes separately
 from later documentation-only main advances.
+
+## Concurrent Work After The Release Snapshot
+
+After 0.1.82 CI completed, the preference-prewarm task advanced main to `ac7c130`
+and started v0.1.83 workflow 43693425846. That commit is a descendant of the full
+integration and retains all TapNow/video changes. It was reviewed and fast-forwarded
+into this task; five prewarm tests, all 130 frontend tests, Go race checks and
+the eight-layout preference browser suite passed locally. Canonical main and this
+task branch were synchronized to that source without rewriting other worktrees.
+
+The concurrently created `feat/video-reading-mcp` worktree remained dirty and
+actively developing during publication: dependency/launcher files and subsequently
+backend changes had no reviewed commit or completed acceptance. Those files were
+not copied, committed, reset or merged by this task. They are explicitly retained
+as unfinished development, not silently claimed as part of this release. The
+original ten-worktree inventory is a point-in-time snapshot, not a claim that no
+other worktree can appear while agents continue working.
+
+## Publication Complete
+
+Runtime 0.1.82 published at 2026-11-15 08:17:06 UTC from `45a49b7`, workflow
+43692684220. Runtime 0.1.83 then published at 08:30:58 UTC from
+`ac7c1302791c64a478b11e3413f73545923cd239`, workflow 43693425846. Both workflows
+passed Windows x64, macOS arm64/amd64 and their automatic publication jobs.
+GitHub latest and Console `/api/acu-runtime/release` returned 0.1.83 after
+publication. All five installer digests in public SHA256SUMS matched GitHub asset
+digest metadata. No Router/Console restart or deployment was performed.
+
+0.1.83 installer SHA-256:
+
+| Asset | SHA-256 |
+| --- | --- |
+| Windows x64 Setup.exe | `71a730718d20b99027bda4b2ada089bb42c4580194b4b425bbf37d271e92bc66` |
+| macOS arm64 DMG | `709bddc9f396bb0d1d57c2ebf1b982bf25200d67739cd851c7c77f705aeb0784` |
+| macOS amd64 DMG | `e282e5519ee3b6f15e41ad66b7f39ad62ce5a939c2d0817230127a0917b67315` |
+| macOS arm64 app.zip | `f0688be7a647c0784f4f239984377a9f3882a0a4a3ea41ec149bc2a39f363c7c` |
+| macOS amd64 app.zip | `ecfd4213c4cbcb4a5df567af6c76232dca705bc54f7f3f2bae5eb92a9e7b179d` |
+
+Release: https://github.com/jerry0012009/acu-runtime/releases/tag/v0.1.83
+Subsequent changes in this closeout are documentation only, not new application
+bytes. Canonical local main, remote main and the integration task are synchronized
+after recording publication; historical/active worktrees are not force-reset.

@@ -1,6 +1,21 @@
-## Runtime 0.1.72 / Magpie 0.1.4096
+## Runtime 0.1.84 / Magpie 0.1.4248
 
-Current paired kernel is official v0.1.4096. Runtime preserves the native login
+The default video model is the native `videoGen` setting, shared with the kernel
+settings page and CLI. Runtime reads native videoGenModels/videoGenAuto and writes
+only videoGen via the existing native settings command. Candidates include all
+enabled providers, not just ACU. A named MCP/API video model overrides the default;
+key/model permissions remain native. Older kernels expose status but cannot save
+this setting. No kernel fork, new MCP or parallel preference file was added.
+
+Linux isolated checks verified all four Agent writers, another provider's default
+clip-a versus explicit clip-b, unchanged saved default, no Agent-file changes on
+model-only save, and native reset to automatic. Paid MCP acceptance verified a
+saved Grok video 1.5 default and an explicit ordinary Grok override, both producing
+downloadable videos. Platform-native checks are run by the release workflow.
+
+## Historical Runtime 0.1.72 / Magpie 0.1.4096
+
+That paired kernel was official v0.1.4096. Runtime preserves the native login
 policy rather than forcing API-only mode; historical auth.json does not require
 account/read to return an account. ACU display branding changes only provider
 name, not ID. Native MCP definitions remain native stdio servers. See
@@ -157,8 +172,8 @@ Video candidates and the automatic model are read from the pinned native image
 MCP's `tools/list` schema, without a generation request. Enabling video changes
 only `generate_video` in the existing managed server's disabled-tools list via
 the native Library API; other disabled tools, assignments and custom launcher
-options remain intact. The native kernel has no persisted video-default setting,
-so Runtime does not offer a persistent video-default picker. Version 0.1.81
+options remain intact. That paired kernel had no persisted video-default setting,
+so Runtime did not offer a persistent video-default picker. Version 0.1.81
 removes the trial prompt and its model picker; native MCP calls remain unchanged.
 
 Release compatibility fixtures now list video models and exercise an old disabled

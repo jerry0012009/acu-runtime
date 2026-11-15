@@ -29,9 +29,18 @@ def free_port():
 kernel, runtime = [str(Path(p).resolve()) for p in sys.argv[1:3]]
 flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 listed_images = ["gpt-image-2.5-sunburst-2026-09-08"]
+video_submissions = queue.Queue()
 class ModelList(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        assert self.path == '/v1/videos',self.path
+        video_submissions.put(body)
+        payload=json.dumps({'id':'fixture-'+body['model'],'status':'queued','model':body['model']}).encode()
+        self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(payload)
     def do_GET(self):
-        payload = json.dumps({"data": [{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, {"id":"grok-imagine-video","kind":"video"}, {"id":"grok-imagine-video-1.5","kind":"video"}, *[{"id":model,"kind":"image"} for model in listed_images]]}).encode()
+        models=[{"id": "acu-auto"}, {"id": "gpt-6.1-sol", "input_modalities": ["text", "image"]}, {"id":"grok-imagine-video","kind":"video"}, {"id":"grok-imagine-video-1.5","kind":"video"}, *[{"id":model,"kind":"image"} for model in listed_images]]
+        if self.path=='/fixture/models': models=[{'id':'clip-a','kind':'video'},{'id':'clip-b','kind':'video'}]
+        payload = json.dumps({"data":models}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(payload)
     def log_message(self, *args):
         pass
@@ -163,6 +172,26 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             refreshed = request(rt + "/runtime/capabilities/refresh", {"provider":"acu-runtime"}, token)
             assert {"acu-runtime/gpt-image-2.6-sunburst", "acu-runtime/gpt-image-2.6-flare"}.issubset({m["id"] for m in refreshed["imageModels"]}), refreshed
             assert refreshed["imageGen"] == old_image, refreshed
+            assert refreshed["videoDefaultSupported"],refreshed
+            assert {m["id"] for m in refreshed["videoModels"]} == {"acu-runtime/grok-imagine-video","acu-runtime/grok-imagine-video-1.5"}
+            for video_pick in ("acu-runtime/grok-imagine-video-1.5", ""):
+                before=config_files()
+                saved=request(rt+"/runtime/capabilities",{"provider":"acu-runtime","modelsOnly":True,"videoGen":video_pick},token)
+                assert saved["videoGen"]==video_pick and request(origin+"/api/settings").get("videoGen","")==video_pick,saved
+                assert config_files()==before
+            # Native defaults may use another provider; an explicit model wins
+            # without rewriting that saved default or Agent configuration.
+            request(origin+'/api/provider/save',{'id':'video-fixture','name':'Video fixture','new':True,'key':'fixture-key','chat':'http://127.0.0.1:'+str(vendor.server_port)+'/v1','modelsURL':'http://127.0.0.1:'+str(vendor.server_port)+'/fixture/models','models':['clip-a','clip-b']})
+            request(origin+'/api/provider/models',{'id':'video-fixture'})
+            saved=request(rt+'/runtime/capabilities',{'provider':'acu-runtime','modelsOnly':True,'videoGen':'video-fixture/clip-a'},token)
+            assert saved['videoGen']=='video-fixture/clip-a',saved
+            gateway_url='http://'+env['MAGPIE_ADDR']
+            request(gateway_url+'/v1/videos',{'prompt':'fixture','seconds':'2'})
+            assert video_submissions.get(timeout=5)['model']=='clip-a'
+            request(gateway_url+'/v1/videos',{'model':'video-fixture/clip-b','prompt':'fixture','seconds':'2'})
+            assert video_submissions.get(timeout=5)['model']=='clip-b'
+            assert request(origin+'/api/settings')['videoGen']=='video-fixture/clip-a'
+            request(rt+'/runtime/capabilities',{'provider':'acu-runtime','modelsOnly':True,'videoGen':''},token)
             request(rt + "/runtime/capabilities", {"provider":"acu-runtime", "modelsOnly":True, "imageGen":""}, token)
             for name, kind in (("acu-vision", "vision"), ("acu-image", "image")):
                 request(origin + "/api/library/servers/save", {"old":"", "server":{
@@ -192,7 +221,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             assert repeated["imageGen"] == "" and repeated["imageGenAuto"], repeated
             assert repeated["searchReady"]
             assert repeated["videoReadingReady"]
-            assert {m["id"] for m in repeated["videoModels"]} == {"acu-runtime/grok-imagine-video", "acu-runtime/grok-imagine-video-1.5"}, repeated
+            assert {"acu-runtime/grok-imagine-video", "acu-runtime/grok-imagine-video-1.5", "video-fixture/clip-a", "video-fixture/clip-b"}.issubset({m["id"] for m in repeated["videoModels"]}), repeated
             assert not repeated["videoEnabled"], repeated
             enabled = request(rt + "/runtime/capabilities", {"provider":"acu-runtime","videoEnabled":True}, token)
             assert enabled["videoEnabled"], enabled

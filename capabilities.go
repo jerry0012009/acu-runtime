@@ -43,31 +43,35 @@ type capabilityLibrary struct {
 	} `json:"result"`
 }
 type capabilityView struct {
-	Provider             string            `json:"provider"`
-	Vision               string            `json:"vision"`
-	ImageGen             string            `json:"imageGen"`
-	VisionAuto           string            `json:"visionAuto"`
-	ImageGenAuto         string            `json:"imageGenAuto"`
-	VisionModels         []capabilityModel `json:"visionModels"`
-	ImageModels          []capabilityModel `json:"imageModels"`
-	VideoModels          []capabilityModel `json:"videoModels"`
-	VideoAuto            string            `json:"videoAuto"`
-	VideoEnabled         bool              `json:"videoEnabled"`
-	VideoBlocked         bool              `json:"videoBlocked"`
-	VideoError           string            `json:"videoError,omitempty"`
-	VideoReadingReady    bool              `json:"videoReadingReady"`
-	Tools                []capabilityTool  `json:"tools"`
-	SearchReady          bool              `json:"searchReady"`
-	SearchURL            string            `json:"searchURL"`
-	FreeSearchAvailable  bool              `json:"freeSearchAvailable"`
-	FreeSearchConfigured bool              `json:"freeSearchConfigured"`
-	Messages             []string          `json:"messages"`
+	VideoReadingReady bool `json:"videoReadingReady"`
+	Provider              string            `json:"provider"`
+	Vision                string            `json:"vision"`
+	ImageGen              string            `json:"imageGen"`
+	VideoGen              string            `json:"videoGen"`
+	VideoDefaultSupported bool              `json:"videoDefaultSupported"`
+	VideoGenMissing       string            `json:"videoGenMissing,omitempty"`
+	VisionAuto            string            `json:"visionAuto"`
+	ImageGenAuto          string            `json:"imageGenAuto"`
+	VisionModels          []capabilityModel `json:"visionModels"`
+	ImageModels           []capabilityModel `json:"imageModels"`
+	VideoModels           []capabilityModel `json:"videoModels"`
+	VideoAuto             string            `json:"videoAuto"`
+	VideoEnabled          bool              `json:"videoEnabled"`
+	VideoBlocked          bool              `json:"videoBlocked"`
+	VideoError            string            `json:"videoError,omitempty"`
+	Tools                 []capabilityTool  `json:"tools"`
+	SearchReady           bool              `json:"searchReady"`
+	SearchURL             string            `json:"searchURL"`
+	FreeSearchAvailable   bool              `json:"freeSearchAvailable"`
+	FreeSearchConfigured  bool              `json:"freeSearchConfigured"`
+	Messages              []string          `json:"messages"`
 }
 type capabilityInput struct {
 	Provider     string   `json:"provider"`
 	Agents       []string `json:"agents"`
 	Vision       *string  `json:"vision"`
 	ImageGen     *string  `json:"imageGen"`
+	VideoGen     *string  `json:"videoGen"`
 	SearchURL    *string  `json:"searchURL"`
 	FreeSearch   *bool    `json:"freeSearch"`
 	ModelsOnly   bool     `json:"modelsOnly"`
@@ -87,6 +91,8 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	json.Unmarshal(prefs["vision"], &view.Vision)
 	json.Unmarshal(prefs["imageGen"], &view.ImageGen)
+	json.Unmarshal(prefs["videoGen"], &view.VideoGen)
+	json.Unmarshal(prefs["videoGenMissing"], &view.VideoGenMissing)
 	json.Unmarshal(prefs["visionAuto"], &view.VisionAuto)
 	json.Unmarshal(prefs["imageGenAuto"], &view.ImageGenAuto)
 	var images, vision []capabilityModel
@@ -127,7 +133,16 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 		}
 	}
 	view.VideoBlocked = view.ImageGen == "off"
-	view.VideoModels, view.VideoAuto, view.VideoError = host.nativeVideoModels(ctx, provider)
+	if _, ok := prefs["videoGenModels"]; ok {
+		view.VideoDefaultSupported = true
+		view.VideoModels = []capabilityModel{}
+		if err := json.Unmarshal(prefs["videoGenModels"], &view.VideoModels); err != nil {
+			return view, nil, lib, errors.New("无法读取视频模型，请刷新重试")
+		}
+		json.Unmarshal(prefs["videoGenAuto"], &view.VideoAuto)
+	} else {
+		view.VideoModels, view.VideoAuto, view.VideoError = host.nativeVideoModels(ctx, provider)
+	}
 	view.FreeSearchAvailable = true
 	var apis []struct {
 		Vendor, URL string
@@ -173,7 +188,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		return view, errors.New("请选择可用的 ACU Key")
 	}
 	if input.VideoEnabled != nil {
-		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading != nil {
+		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading!=nil {
 			return view, errors.New("请单独保存视频工具设置")
 		}
 		if err := host.setVideoToolEnabled(ctx, lib, *input.VideoEnabled); err != nil {
@@ -185,7 +200,18 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	if input.SearchURL != nil && *input.SearchURL != "" {
 		return view, errors.New("请在高级搜索设置中配置搜索服务")
 	}
-	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil || input.VideoReading != nil) {
+	if input.VideoGen != nil {
+		if !input.ModelsOnly {
+			return view, errors.New("请在模型设置中保存默认视频模型")
+		}
+		if !view.VideoDefaultSupported {
+			return view, errors.New("当前内核不支持默认视频模型，请更新 Runtime")
+		}
+		if *input.VideoGen != "" && !slices.ContainsFunc(view.VideoModels, func(m capabilityModel) bool { return m.ID == *input.VideoGen }) {
+			return view, errors.New("视频模型不可用，请刷新后重新选择")
+		}
+	}
+	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil || input.VideoReading!=nil) {
 		return view, errors.New("模型设置不能同时修改工具或搜索服务")
 	}
 	// Saving shared model picks must never prepare dependencies or rewrite MCP
@@ -195,7 +221,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			pick   *string
 			models []capabilityModel
 			field  string
-		}{{input.Vision, view.VisionModels, "vision"}, {input.ImageGen, view.ImageModels, "imageGen"}}
+		}{{input.Vision, view.VisionModels, "vision"}, {input.ImageGen, view.ImageModels, "imageGen"}, {input.VideoGen, view.VideoModels, "videoGen"}}
 		for _, entry := range entries {
 			if entry.pick == nil {
 				continue

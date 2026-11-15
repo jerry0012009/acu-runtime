@@ -26,7 +26,7 @@ async function main() {
       calls.push(url.pathname);
       let result={};
       if(url.pathname==='/runtime/status') result=status;
-      else if(url.pathname==='/runtime/tapnow/configure') {installCount++;prepared=true;phase='waiting';confirmed=false;result=tapnowState();}
+      else if(url.pathname==='/runtime/tapnow/configure') {assert.equal(route.request().postDataJSON().model,'gpt-6.1-sol');installCount++;prepared=true;phase='waiting';confirmed=false;result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/connect') {phase='waiting';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/cancel') {phase='unknown';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/check') {checks++;result=tapnowState();}
@@ -40,6 +40,8 @@ async function main() {
     assert.equal(await other.getAttribute('open'),null);
     assert.equal(installCount,0);
     await other.locator('summary').click();
+    await page.locator('#tapnow-model').waitFor();
+    assert.equal(await page.locator('#tapnow-model').inputValue(),'gpt-6.1-sol');
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
     await page.getByText('文件已就绪，等待 Chrome 加载', {exact:false}).waitFor();

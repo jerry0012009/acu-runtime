@@ -144,7 +144,7 @@ func TestTapnowReleaseGateAndOfficialBases(t *testing.T) {
 	if checkTapnowRelease() != nil {
 		t.Fatal("fixture IDs rejected")
 	}
-	for _, value := range []string{"https://acu.best", "https://acu.best/v1", "https://api.acucompute.com/v1"} {
+	for _, value := range []string{"https://acu.best", "https://acu.best/v1", "https://api.acucompute.com/v1", "https://console.acucompute.com/v1", "https://acucompute.com/v1/", "https://api.acu.best/acu/v1"} {
 		if _, err := tapnowAPIBase(value); err != nil {
 			t.Fatal(err)
 		}

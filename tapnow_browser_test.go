@@ -27,7 +27,7 @@ func TestTapnowNativeBrowserHarness(t *testing.T) {
 		case "/api/library/video/frames":
 			io.WriteString(w, `{"ok":false,"error":"视频来源不在 TapNow 素材域名内"}`)
 		case "/api/providers":
-			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://acu.best/v1","key":{"set":true,"masked":"***"},"models":[{"id":"acu-auto","on":true}]}]}`)
+			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://console.acucompute.com/v1","key":{"set":true,"masked":"***"},"models":[{"id":"gpt-6.1-sol","on":true}]}]}`)
 		case "/api/provider/models":
 			io.WriteString(w, `{}`)
 		case "/api/provider/key":
