@@ -68,7 +68,7 @@ async function main() {
       await chrome.storage.sync.set({requiredTerms:['preserve-user-rule'],llmModel:'old-model'});
     });
     for(const edition of ['companion','backup']){
-      await request('/runtime/tapnow/connect',{edition,...(edition==='companion'?{provider:'acu',model:'acu-auto'}:{})});
+      await request('/runtime/tapnow/connect',{edition,...(edition==='companion'?{provider:'acu',model:'gpt-6.1-sol'}:{})});
       await page.goto(`chrome-extension://${identities[edition]}/connect.html`);
       try { await page.waitForFunction(()=>/已配置|已就绪/.test(document.getElementById('status').textContent),null,{timeout:15000}); }
       catch(error){
@@ -78,7 +78,7 @@ async function main() {
       }
       const data=await page.evaluate(async()=>({local:await chrome.storage.local.get(null),sync:await chrome.storage.sync.get(null)}));
       if(edition==='companion'){
-        assert.equal(data.local.apiKey,'sk-browser-native-fixture');assert.equal(data.local.runtimeConnection.settings.llmBaseUrl,'https://acu.best/v1');assert.equal(data.sync.apiKey,undefined);
+        assert.equal(data.local.apiKey,'sk-browser-native-fixture');assert.equal(data.local.runtimeConnection.settings.llmBaseUrl,'https://console.acucompute.com/v1');assert.equal(data.local.runtimeConnection.settings.llmModel,'gpt-6.1-sol');assert.equal(data.sync.apiKey,undefined);
         assert.deepEqual(data.sync.requiredTerms,['preserve-user-rule']);
       }else assert.equal(data.local.apiKey,undefined);
       const status=await request('/runtime/tapnow');const view=status.editions.find(e=>e.edition===edition);
@@ -90,7 +90,7 @@ async function main() {
     // Check managed credentials survive extension reload; no inferred success.
     await page.goto(`chrome-extension://${identities.companion}/popup.html`);
     await page.locator('#llmBaseUrl').waitFor();
-    assert.equal(await page.locator('#llmBaseUrl').inputValue(),'https://acu.best/v1');
+    assert.equal(await page.locator('#llmBaseUrl').inputValue(),'https://console.acucompute.com/v1');
     fs.writeFileSync(done,'ok');
     await new Promise((resolve,reject)=>{if(child.exitCode!==null)return child.exitCode===0?resolve():reject(Error(text));child.once('exit',code=>code===0?resolve():reject(Error(text)));});
     console.log('PASS: actual MV3 -> Chrome native host executable -> authenticated Runtime -> local credential readback -> receipt; Backup has no Key; no cloud calls');

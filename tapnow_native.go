@@ -52,20 +52,11 @@ func tapnowOriginEdition(origin string) string {
 }
 
 func tapnowAPIBase(raw string) (string, error) {
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.RawQuery != "" || u.Fragment != "" {
+	base, err := acuBase(raw)
+	if err != nil {
 		return "", errors.New("不支持的 ACU 地址")
 	}
-	if u.Host != "api.acucompute.com" && u.Host != "acu.best" {
-		return "", errors.New("不支持的 ACU 地址")
-	}
-	switch u.Path {
-	case "", "/v1":
-		u.Path = "/v1"
-	default:
-		return "", errors.New("不支持的 ACU 地址")
-	}
-	return u.String(), nil
+	return base + "/v1", nil
 }
 
 type tapnowGrant struct {

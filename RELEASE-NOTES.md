@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.84
+# ACU Runtime 0.1.85
+
+修复 TapNow 一键配置误报“此插件暂不支持所选 ACU 地址或模型”：复用 Runtime 已有官方地址校验，支持网页登录保存的 console.acucompute.com、其他 ACU 官方子域和已有 /acu/v1 路径。插件 0.1.24 同步修复配置校验、请求地址和浏览器权限；不替换所选来源域名、不向非官方域发送 Key。
+
+副驾驶默认推荐 GPT-6.1 Sol（gpt-6.1-sol），不再复用通用 Agent 的 acu-auto 推荐。当前 Key 没有 Sol 时要求手选；用户明确选择的模型保留。Key、模型或 API 地址不符合要求时分别显示具体原因，不在错误中返回密钥。
+
+保留 0.1.84 的原生视频默认模型、0.1.83 的偏好预加载及 TapNow 一键更新/API 配置替换。安装后重新执行 TapNow 一键配置，按引导在 Chrome 加载或重新加载 0.1.24；无需重新登录 ACU 或复制 Key。
 
 默认视频模型现在保存到内核原生设置。可在「图片、视频与搜索」选择默认型号，也可在内核设置中修改同一个值；支持所有已启用来源的视频模型。未指定型号的调用使用默认值，Agent 显式指定其他可用型号时优先使用该型号，不修改默认值。
 
@@ -170,9 +176,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.84-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.84-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.84-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.85-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.85-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.85-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

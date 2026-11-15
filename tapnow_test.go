@@ -211,6 +211,16 @@ func TestTapnowConfigurationExportChecksProviderAndNeverChangesAgents(t *testing
 	if json.Unmarshal(w.Body.Bytes(), &config) != nil || config["kind"] != "acu-tapnow-companion" {
 		t.Fatal(config)
 	}
+	for _, address := range []string{"https://console.acucompute.com/v1", "https://acu.best/v1/", "https://api.acu.best/acu/v1"} {
+		endpoint = address
+		w = tapnowRequest(host, "POST", "/runtime/tapnow/config", `{"provider":"acu","model":"acu-auto"}`, host.token)
+		var result tapnowCredentialConfig
+		json.Unmarshal(w.Body.Bytes(), &result)
+		expected, _ := tapnowAPIBase(address)
+		if w.Code != 200 || result.Settings.Base != expected {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
 	for _, change := range []func(){func() { enabled = false }, func() { enabled = true; endpoint = "https://api.acucompute.com.evil.invalid/v1" }} {
 		change()
 		writes = nil

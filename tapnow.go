@@ -481,10 +481,12 @@ func (host *server) tapnowCredential(ctx context.Context, provider, model string
 		return nil, errors.New("无法读取 ACU 来源")
 	}
 	base, protocol := "", "responses"
+	selected, availableModel := false, false
 	for _, p := range data.Providers {
 		if p.ID != provider || p.Off || !p.Key.Set {
 			continue
 		}
+		selected = true
 		available := false
 		for _, m := range p.Models {
 			if m.ID == model && m.On {
@@ -494,6 +496,7 @@ func (host *server) tapnowCredential(ctx context.Context, provider, model string
 		if !available {
 			continue
 		}
+		availableModel = true
 		for _, endpoint := range []struct{ url, protocol string }{{p.Responses, "responses"}, {p.Chat, "chat_completions"}} {
 			if b, err := tapnowAPIBase(endpoint.url); err == nil {
 				base = b
@@ -503,7 +506,13 @@ func (host *server) tapnowCredential(ctx context.Context, provider, model string
 		}
 	}
 	if base == "" {
-		return nil, errors.New("此插件暂不支持所选 ACU 地址或模型，请选择可用来源")
+		if !selected {
+			return nil, errors.New("所选 ACU Key 已删除或停用，请重新选择")
+		}
+		if !availableModel {
+			return nil, errors.New("所选模型不在当前 ACU Key 的可用清单中，请刷新模型后重试")
+		}
+		return nil, errors.New("所选 ACU 来源缺少可用的 Responses 或 Chat API 地址，请检查连接设置")
 	}
 	var credential struct {
 		Key string `json:"key"`

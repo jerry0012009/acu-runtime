@@ -1,5 +1,5 @@
 (() => {
-  globalThis.createACUTapnow = ({ app, ui, request, render, activeChoice, recommendedModels, escapeHTML: esc, icon, toast }) => {
+  globalThis.createACUTapnow = ({ app, ui, request, render, activeChoice, escapeHTML: esc, icon, toast }) => {
     let state = null, loaded = false, loading = false, operation = '', error = '', model = '', provider = '', timer = null, generation = 0;
     const labels = { companion: '副驾驶', backup: '资产备份' };
     const post = (action, body = {}) => request(`/runtime/tapnow/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -28,7 +28,7 @@
       const choice = activeChoice();
       if (choice?.id !== provider || !choice?.models?.includes(model)) {
         provider = choice?.id || '';
-        model = (choice ? recommendedModels(choice)[0] : '') || choice?.models?.[0] || '';
+        model = choice?.models?.includes('gpt-6.1-sol') ? 'gpt-6.1-sol' : '';
       }
       const editions = state?.editions || [{ edition:'companion' }, { edition:'backup' }];
       const disabled = e => operation || state?.busy || !ui.status?.desktop || e.edition === 'companion' && (!choice || !model);
@@ -40,7 +40,7 @@
           const connection = preparing ? phase : e.connection === 'configured' ? `配置已确认 · 插件 ${esc(e.version || '')}` : e.connection === 'saving' ? '正在保存并验证配置' : e.connection === 'waiting' ? '文件已就绪，等待 Chrome 加载' : e.connection === 'expired' ? '授权已过期，文件保留，可重新接入' : e.connection === 'error' ? esc(e.connectionError || '配置未完成，请重试') : e.prepared ? '文件已保留，尚未确认接入' : '尚未开启';
           return `<div class="tapnow-edition"><div><h4>${labels[e.edition]}</h4><p>${e.edition === 'backup' ? '更新资产备份插件 · 无需 ACU Key' : '更新插件并替换为当前 ACU API Key 与模型'}</p><p class="tapnow-state" role="status">${connection}</p>${e.reloadRequired ? `<p class="tapnow-note">请先在 Chrome 加载或重新加载 ${esc(e.requiredVersion || '')}，再继续配置。</p>` : ''}</div><div class="tapnow-actions">${preparing ? `<button class="text-button" data-tapnow="cancel" data-edition="${e.edition}">取消准备</button>` : waiting(e) ? '' : `<button class="button ${e.edition === 'companion' ? 'primary' : 'secondary'}" data-tapnow="configure" data-edition="${e.edition}" ${disabled(e) ? 'disabled' : ''}>${icon('refresh')}一键配置${e.update ? ` · ${esc(e.latest)}` : ''}</button>`}</div>${preparing ? '<progress aria-label="插件准备进度"></progress>' : guide(e)}${e.connection === 'configured' ? `<p class="tapnow-note tapnow-complete">${icon('check')}配置已确认；在 Chrome 中打开自己的 TapNow 画布${e.edition === 'companion' ? '，刷新后检测节点' : '，选择备份目录'}。</p>` : ''}</div>`;
         }).join('')}</div>
-        ${choice ? `<div class="tapnow-config"><label for="tapnow-model">副驾驶模型</label><select id="tapnow-model" ${operation || state?.busy ? 'disabled' : ''}>${choice.models.map(m => `<option value="${esc(m)}" ${m === model ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div><p class="tapnow-note">点击开启或接入即授权安装准备和所选 Key 的本机配置；节点检测可能发送文字与勾选的图片并产生费用。</p>` : '<p class="tapnow-note">副驾驶需先连接 ACU；资产备份可直接开启。</p>'}</div>`;
+        ${choice ? `<div class="tapnow-config"><label for="tapnow-model">副驾驶模型 · 推荐 GPT-6.1 Sol</label><select id="tapnow-model" ${operation || state?.busy ? 'disabled' : ''}>${!model ? '<option value="" selected disabled>当前 Key 未提供 GPT-6.1 Sol，请选择模型</option>' : ''}${choice.models.map(m => `<option value="${esc(m)}" ${m === model ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div><p class="tapnow-note">点击一键配置即授权安装准备和所选 Key 的本机配置；节点检测可能发送文字与勾选的图片并产生费用。</p>` : '<p class="tapnow-note">副驾驶需先连接 ACU；资产备份可直接开启。</p>'}</div>`;
     }
     app.addEventListener('change', event => { if (event.target.id === 'tapnow-model') model = event.target.value; });
     app.addEventListener('click', async event => {

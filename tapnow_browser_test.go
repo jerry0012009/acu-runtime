@@ -23,7 +23,7 @@ func TestTapnowNativeBrowserHarness(t *testing.T) {
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/providers":
-			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://acu.best/v1","key":{"set":true,"masked":"***"},"models":[{"id":"acu-auto","on":true}]}]}`)
+			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://console.acucompute.com/v1","key":{"set":true,"masked":"***"},"models":[{"id":"gpt-6.1-sol","on":true}]}]}`)
 		case "/api/provider/models":
 			io.WriteString(w, `{}`)
 		case "/api/provider/key":
