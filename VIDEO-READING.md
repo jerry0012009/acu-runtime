@@ -67,6 +67,11 @@ video commands and four MCP tool lists. Runtime tests/race/vet, 132 frontend
 tests and 91 Companion tests passed. Full kernel regression results are recorded
 in the kernel's own acceptance record; prior Runtime-owned results are not reused.
 
+The kernel-wide regression was attempted but did not pass: its Darwin runtime
+overlay test cannot overlay the Go toolchain inside GOMODCACHE. That exact test
+passed with the same toolchain outside the cache. The original full run was
+stopped after the platform-package correction and is not release evidence.
+
 No real private TapNow canvas, paid vision model quality, ProRes/HDR/HEVC matrix,
 Windows/macOS dependency execution, or every Agent's image-tool-result handling
 is inferred from Linux fixtures. Full plugin strict typecheck has pre-existing
