@@ -890,11 +890,7 @@ function renderCapabilities() {
 function videoCapabilityPanel(view, current) {
   const models = view.videoModels || [];
   const state = view.videoBlocked ? '生图已关闭，视频也已停用' : view.videoEnabled ? '已启用' : '未启用';
-  return `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${view.videoAuto ? `<p class="capability-intro">自动模型 · ${escapeHTML(view.videoAuto)}</p>` : ''}${models.length ? `<label class="field-label" for="video-request-model">本次使用的模型</label><select id="video-request-model">${models.map(model => `<option value="${escapeHTML(model.id)}">${escapeHTML(model.name || model.id)}</option>`).join('')}</select><div class="capability-video-request"><label class="field-label" for="video-request">生成请求</label><textarea id="video-request" rows="3" readonly>${escapeHTML(videoRequest(models[0].id))}</textarea><button class="button secondary" data-copy-video-request ${current.saving ? 'disabled' : ''}>复制请求</button></div>` : !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
-}
-
-function videoRequest(model) {
-  return `请调用已配置的 generate_video，使用模型 ${model}，生成一个 2 秒、848x480 的视频：红色小球在白色地面上缓慢滚动，镜头固定。完成后展示视频并说明实际模型。`;
+  return `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${view.videoAuto ? `<p class="capability-intro">自动模型 · ${escapeHTML(view.videoAuto)}</p>` : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
 }
 
 async function setVideoEnabled(input) {
@@ -1221,11 +1217,6 @@ function openNative(view, agent = '', developer = false, tab = '', focus = '', a
 
 
 app.addEventListener('click', event => {
-  if (event.target.closest('[data-copy-video-request]')) {
-    const text = document.getElementById('video-request');
-    if (text) { text.focus(); text.select(); try { if (!document.execCommand('copy')) throw new Error('clipboard'); toast('生成请求已复制'); } catch { toast('请选择请求文本并复制'); } }
-    return;
-  }
   if (ui.applying || ui.accountBusy) return;
   if (preferences?.click(event)) return;
   if (workReview?.click(event)) return;
@@ -1273,7 +1264,6 @@ app.addEventListener('click', event => {
 app.addEventListener('input', event => { billing?.input(event); preferences?.input(event); });
 app.addEventListener('change', event => {
   if (event.target.dataset?.videoEnabled !== undefined) { setVideoEnabled(event.target.checked); return; }
-  if (event.target.id === 'video-request-model') { document.getElementById('video-request').value = videoRequest(event.target.value); return; }
   if (preferences?.change(event)) return;
   if(event.target.id === 'startup-enabled'){ const enabled=event.target.checked;ui.startupSaving=true;request('/runtime/startup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})}).then(value=>{ui.startup=value;}).catch(error=>toast(error.message)).finally(()=>{ui.startupSaving=false;render();});return; }
   if (billing?.change(event)) return;
