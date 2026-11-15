@@ -194,6 +194,7 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 					case "workbench":
 						host.account.mu.Lock()
 						site := host.account.view.Site
+						selected := host.account.view.Selected
 						host.account.mu.Unlock()
 						if site == "" {
 							site = "https://acu.best"
@@ -201,7 +202,11 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 						if _, err := accountSite(site); err != nil {
 							return
 						}
-						app.Window.NewWithOptions(application.WebviewWindowOptions{Name: "acu-workbench-" + secret(), Title: "ACU · 创作工作台", URL: site + "/" + action.Page, Width: 1280, Height: 900, MinWidth: 720, MinHeight: 600, Windows: application.WindowsWindow{Theme: application.SystemDefault}})
+						address := site + "/" + action.Page
+						if selected > 0 {
+							address += fmt.Sprintf("?token_id=%d", selected)
+						}
+						app.Window.NewWithOptions(application.WebviewWindowOptions{Name: "acu-workbench-" + secret(), Title: "ACU对话", URL: address, Width: 1280, Height: 900, MinWidth: 720, MinHeight: 600, Windows: application.WindowsWindow{Theme: application.SystemDefault}})
 					case "panel":
 						tray.ShowWindow()
 					case "hide":

@@ -133,7 +133,7 @@ async function refresh(rescan = false, quiet = false) {
 
 function navigation() {
   return `<aside class="sidebar"><a class="brand" href="#overview" data-page="overview" aria-label="ACU Runtime 首页"><span class="brand-symbol">A</span><span>ACU<span class="brand-sub">RUNTIME</span></span></a>
-    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['work-review', 'clock', '工作回顾'], ['preferences', 'shield', '我的偏好'], ['usage', 'clock', '用量与费用'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}<div class="conversation-nav"><div class="conversation-nav-main"><button class="nav-item" data-action="workbench" data-workbench="playground">${icon('terminal')}<span>ACU对话</span></button><button class="conversation-nav-toggle" data-action="toggle-conversation" aria-label="展开图片生成和视频生成" aria-expanded="${!!ui.conversationOpen}" aria-controls="conversation-subnav">${icon('chevron')}</button></div><ul class="conversation-subnav" id="conversation-subnav" aria-label="ACU对话子栏目" ${ui.conversationOpen ? '' : 'hidden'}>${[['image-playground','图片生成'],['video-playground','视频生成']].map(([page,label])=>`<li><button class="conversation-subitem" data-action="workbench" data-workbench="${page}">${label}</button></li>`).join('')}</ul></div></nav>
+    <nav aria-label="主导航">${[['overview', 'grid', '工作台'], ['conversation', 'terminal', 'ACU对话'], ['work-review', 'clock', '工作回顾'], ['preferences', 'shield', '我的偏好'], ['usage', 'clock', '用量与费用'], ['routing', 'link', '请求记录'], ['settings', 'settings', '设置']].map(([page, glyph, label]) => `<button class="nav-item ${ui.page === page ? 'active' : ''}" data-page="${page}" ${ui.page === page ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav>
     <div class="sidebar-bottom"><span class="sidebar-signature">LESS COST.<br>MORE POSSIBILITY.</span></div></aside>`;
 }
 
@@ -777,6 +777,10 @@ function settingsPage() {
 }
 
 function render() {
+  if (ui.page === 'conversation') {
+    app.innerHTML = `${navigation()}<div class="main-shell"><main class="content"><h1>ACU对话</h1><nav class="conversation-modes" aria-label="ACU对话子栏目">${[['playground','文本模型'],['image-playground','图片生成'],['video-playground','视频生成']].map(([page,label])=>`<button class="button secondary" data-action="workbench" data-workbench="${page}">${label}</button>`).join('')}</nav></main></div>`;
+    return;
+  }
   if (ui.page === 'work-review' && workReview) { workReview.render(); return; }
   if (ui.page === 'preferences' && preferences) { preferences.render(); return; }
   if (ui.page === 'usage' && billing) { billing.render(); return; }
@@ -1238,7 +1242,6 @@ app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control) return;
   const actions = {
-	'toggle-conversation': () => { ui.conversationOpen = !ui.conversationOpen; const submenu = document.getElementById('conversation-subnav'); if (submenu) submenu.hidden = !ui.conversationOpen; control.setAttribute('aria-expanded', String(ui.conversationOpen)); },
 	workbench: () => {
 	  const page=control.dataset.workbench;
 	  if(ui.status?.desktop) request('/runtime/desktop/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'workbench',page})}).catch(error=>toast(error.message));
