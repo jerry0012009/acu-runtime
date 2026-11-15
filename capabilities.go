@@ -356,6 +356,11 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		if err := host.assignVideoReading(ctx, input.Agents); err != nil {
 			return view, fmt.Errorf("其他工具已配置，视频读取需要重试：%w", err)
 		}
+		if slices.Contains(choice.Models, "gemini-3.8-flash") && len(input.Agents) > 0 {
+			if err := host.configureVideoAudio(ctx, input.Provider); err != nil {
+				return view, fmt.Errorf("视频画面已配置，音频接入需要重试：%w", err)
+			}
+		}
 	}
 	if err := host.prepareAgentComponents(input.Agents); err != nil {
 		return view, fmt.Errorf("工具已配置，PDF 组件路径同步失败：%w", err)

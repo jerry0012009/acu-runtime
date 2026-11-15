@@ -36,7 +36,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			f.prefs["imageGenModels"] = []map[string]string{{"id": "acu-runtime/gpt-image-2.5-sunburst-2026-09-08"}, {"id": "acu-runtime/gpt-image-2.6-sunburst"}, {"id": "acu-runtime/gpt-image-2.6-flare"}}
 			io.WriteString(w, `{}`)
 		case "/api/providers":
-			io.WriteString(w, strings.Replace(setupProviders, `"models":[`, `"models":[{"id":"gpt-6.1-sol","on":true,"images":true},`, 1))
+			io.WriteString(w, strings.Replace(setupProviders, `"models":[`, `"models":[{"id":"gemini-3.8-flash","on":true},{"id":"gpt-6.1-sol","on":true,"images":true},`, 1))
 		case "/api/state":
 			io.WriteString(w, `{"agents":[{"id":"codex"},{"id":"claude"},{"id":"hermes"},{"id":"workbuddy"}]}`)
 		case "/api/settings":

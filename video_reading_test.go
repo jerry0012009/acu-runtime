@@ -64,3 +64,29 @@ func TestVideoReadingMigratesOnlyOwnLegacyLauncher(t *testing.T) {
 		t.Fatal(string(data))
 	}
 }
+
+func TestVideoAudioUsesExistingProviderCredentialAndStandardLibraryEnv(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	if err := host.assignVideoReading(context.Background(), []string{"workbuddy"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := host.configureVideoAudio(context.Background(), "acu-runtime"); err != nil {
+		t.Fatal(err)
+	}
+	tool := f.servers[1]
+	env, ok := tool["env"].(map[string]any)
+	if !ok || env["ACU_AUDIO_API_KEY"] != "private-acu-test-key" || env["ACU_AUDIO_MODEL"] != "gemini-3.8-flash" || env["ACU_AUDIO_BASE_URL"] != "https://acu.best/v1" {
+		t.Fatal("audio connection not configured")
+	}
+	if tool["command"] != "/fixture/acu-video-mcp" || f.prefs["vision"] != "" {
+		t.Fatal("replaced media owner or main settings")
+	}
+	tool["command"] = "/custom/video-tool"
+	before := strings.Count(strings.Join(f.writes, "\n"), "/api/library/servers/save")
+	if err := host.configureVideoAudio(context.Background(), "acu-runtime"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(strings.Join(f.writes, "\n"), "/api/library/servers/save") != before {
+		t.Fatal("overwrote custom MCP")
+	}
+}

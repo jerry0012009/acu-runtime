@@ -11,7 +11,7 @@ import (
 )
 
 const videoReadingName = "acu-video-reader"
-const videoMCPVersion = "0.1.0"
+const videoMCPVersion = "0.2.0"
 
 func videoMCPPath() (string, error) {
 	d, e := os.UserConfigDir()
@@ -90,6 +90,7 @@ func (host *server) assignVideoReading(ctx context.Context, agents []string) err
 		args, _ := old.stored["args"].([]any)
 		self, _ := os.Executable()
 		legacy := cmd == self && len(args) == 1 && args[0] == "--video-reader"
+		legacy = legacy || (filepath.Base(cmd) == filepath.Base(target) && filepath.Dir(filepath.Dir(cmd)) == filepath.Dir(filepath.Dir(target)) && cmd != target)
 		if !legacy {
 			if sameAssignments(ids, old.Agents) {
 				return nil
@@ -118,6 +119,60 @@ func (host *server) assignVideoReading(ctx context.Context, agents []string) err
 		return t.Name == videoReadingName && t.stored["command"] == target && sameAssignments(t.Agents, ids)
 	}) {
 		return errors.New("视频工具分配回读失败")
+	}
+	return nil
+}
+
+// Only configure the external MCP through the official Library environment.
+// Media processing and model requests remain entirely inside that tool.
+func (host *server) configureVideoAudio(ctx context.Context, provider string) error {
+	config, err := host.tapnowCredential(ctx, provider, "gemini-3.8-flash")
+	if err != nil {
+		return err
+	}
+	lib, err := host.readToolLibrary(ctx)
+	if err != nil {
+		return err
+	}
+	target, err := videoMCPPath()
+	if err != nil {
+		return err
+	}
+	if host.videoToolPath != nil {
+		target, err = host.videoToolPath(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	for _, tool := range lib.Servers {
+		if tool.Name != videoReadingName || tool.Note != capabilityOwner || tool.stored["command"] != target {
+			continue
+		}
+		stored := map[string]any{}
+		for key, value := range tool.stored {
+			stored[key] = value
+		}
+		for _, key := range []string{"problems", "signIn", "icon"} {
+			delete(stored, key)
+		}
+		env := map[string]string{}
+		if raw, ok := tool.stored["env"].(map[string]any); ok {
+			for key, value := range raw {
+				if text, ok := value.(string); ok {
+					env[key] = text
+				}
+			}
+		}
+		if raw, ok := tool.stored["env"].(map[string]string); ok {
+			for key, value := range raw {
+				env[key] = value
+			}
+		}
+		env["ACU_AUDIO_API_KEY"] = config.APIKey
+		env["ACU_AUDIO_BASE_URL"] = config.Settings.Base
+		env["ACU_AUDIO_MODEL"] = "gemini-3.8-flash"
+		stored["env"] = env
+		return host.writeToolLibrary(ctx, "/api/library/servers/save", map[string]any{"old": tool.Name, "server": stored})
 	}
 	return nil
 }
