@@ -1,4 +1,4 @@
-Release candidate: **0.1.80** adds optional TapNow ZIP plugins with guided Chrome loading and automatic local Key/model setup. Retains native video tools, recent model recommendations, team creative vectors and Magpie v0.1.4096. Publication is complete only when the corresponding GitHub release assets are available.
+Current release: **0.1.80** adds optional TapNow ZIP plugins with guided Chrome loading and automatic local Key/model setup. Retains native video tools, recent model recommendations, team creative vectors and Magpie v0.1.4096. Windows x64 and both macOS architectures are published; see [ACCEPTANCE-0180.md](ACCEPTANCE-0180.md).
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
