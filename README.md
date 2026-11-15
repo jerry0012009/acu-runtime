@@ -1,4 +1,4 @@
-Current release: **0.1.81** removes the video trial prompt, copy-request button and non-persistent model picker from configuration. Retains the video tool switch, automatic model status, native MCP generation and the TapNow integration from [0.1.80](ACCEPTANCE-0180.md).
+Release preparation: **0.1.81** combines TapNow one-click latest-plugin preparation and replacement of the selected API configuration with removal of the video trial prompt and non-persistent picker. Retains native tools, team preferences and Magpie v0.1.4096. Publication is complete only when the GitHub release is stable and all platform assets are present.
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
