@@ -1,4 +1,8 @@
-# Runtime 0.1.81 Integration
+# Runtime 0.1.82 Integration
+
+The integrated release was advanced to 0.1.82 because another task created
+v0.1.81 at video-only source 4f7f51a during integration. That existing tag is not
+rewritten. This file retains its initial planning filename for traceability.
 
 User authorized publication plus review/integration of the latest Runtime worktrees.
 Scope is the Runtime repository; no Router/Console production deployment or
