@@ -43,6 +43,7 @@ type capabilityLibrary struct {
 	} `json:"result"`
 }
 type capabilityView struct {
+	VideoReadingReady     bool              `json:"videoReadingReady"`
 	Provider              string            `json:"provider"`
 	Vision                string            `json:"vision"`
 	ImageGen              string            `json:"imageGen"`
@@ -75,6 +76,7 @@ type capabilityInput struct {
 	FreeSearch   *bool    `json:"freeSearch"`
 	ModelsOnly   bool     `json:"modelsOnly"`
 	VideoEnabled *bool    `json:"videoEnabled"`
+	VideoReading *bool    `json:"videoReading"`
 }
 
 func (host *server) capabilityRead(ctx context.Context, provider string) (capabilityView, map[string]json.RawMessage, capabilityLibrary, error) {
@@ -108,6 +110,12 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	for _, tool := range lib.Servers {
 		if tool.Note == capabilityOwner {
+			if tool.Name == videoReadingName && tool.stored["hidden"] != true && tool.stored["paused"] != true && len(tool.Agents) > 0 {
+				view.VideoReadingReady = true
+				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("video_watch")) {
+					view.VideoReadingReady = false
+				}
+			}
 			if tool.Name == "acu-image" {
 				view.VideoEnabled = tool.stored["paused"] != true && len(tool.Agents) > 0
 				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("generate_video")) {
@@ -180,7 +188,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		return view, errors.New("请选择可用的 ACU Key")
 	}
 	if input.VideoEnabled != nil {
-		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil {
+		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading != nil {
 			return view, errors.New("请单独保存视频工具设置")
 		}
 		if err := host.setVideoToolEnabled(ctx, lib, *input.VideoEnabled); err != nil {
@@ -203,7 +211,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			return view, errors.New("视频模型不可用，请刷新后重新选择")
 		}
 	}
-	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil) {
+	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil || input.VideoReading != nil) {
 		return view, errors.New("模型设置不能同时修改工具或搜索服务")
 	}
 	// Saving shared model picks must never prepare dependencies or rewrite MCP
@@ -275,6 +283,13 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			}
 		}
 	}
+	if len(input.Agents) > 0 && (input.VideoReading == nil || *input.VideoReading) {
+		for _, tool := range lib.Servers {
+			if tool.Name == videoReadingName && tool.Note != capabilityOwner {
+				return view, errors.New("已有同名视频工具 acu-video-reader，未覆盖")
+			}
+		}
+	}
 	if len(input.Agents) > 0 {
 		// Some kernels expose supported candidates but no automatic pick.
 		// Use their first candidate, never a model-name capability table.
@@ -336,6 +351,11 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 	}
 	if err := host.assignImageGuidance(ctx, input.Agents); err != nil {
 		return view, err
+	}
+	if input.VideoReading == nil || *input.VideoReading {
+		if err := host.assignVideoReading(ctx, input.Agents); err != nil {
+			return view, fmt.Errorf("其他工具已配置，视频读取需要重试：%w", err)
+		}
 	}
 	if err := host.prepareAgentComponents(input.Agents); err != nil {
 		return view, fmt.Errorf("工具已配置，PDF 组件路径同步失败：%w", err)

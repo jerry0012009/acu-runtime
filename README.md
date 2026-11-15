@@ -1,5 +1,7 @@
 Current release: **0.1.89** replaces TapNow's warning-heavy installation text with sequential setup actions, automatic address/directory copying, native clipboard fallback and a completion action. Same-version setup goes directly to connection. Pairs with plugin 0.1.26; retains shared workbench entries, GPT-6.1 Sol and Magpie v0.1.4248. All three native platform release jobs passed; see [ACCEPTANCE-0188.md](ACCEPTANCE-0188.md).
 
+Release candidate: **0.1.90** adds one-click standard external video MCP setup with self-contained acu-video-mcp 0.1.0 and TapNow Companion 0.1.27. Official Magpie v0.1.4248 stays unmodified. Retains guided TapNow setup and shared workbenches. Publication is complete only after all native platform jobs and release assets pass. See [VIDEO-READING.md](VIDEO-READING.md).
+
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
 # ACU Runtime 0.1.58

@@ -1,5 +1,11 @@
 ACU Runtime — third-party notices
 
+Optional video reading uses the independent acu-video-mcp 0.1.0 distribution.
+Source: https://github.com/jerry0012009/acu-video-mcp
+Runtime acquires the verified tool executable, not Node/npm/FFmpeg packages.
+The tool retains bundled upstream component licenses and provenance in its cache.
+Magpie remains the unchanged official distribution.
+
 Magpie
 Source: https://github.com/yetone/magpie
 Pinned kernel release and isolated UI integration: v0.1.4096

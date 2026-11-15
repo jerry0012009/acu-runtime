@@ -84,6 +84,7 @@ type tapnowNativeMessage struct {
 	Grant   string `json:"grant,omitempty"`
 	Version string `json:"version"`
 	Success bool   `json:"success,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
 
 type tapnowNativeReply struct {
@@ -149,7 +150,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 	install := r.URL.Path == "/runtime/tapnow/install" || r.URL.Path == "/runtime/tapnow/configure"
 	requiredVersion := ""
 	reloadRequired := false
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Minute)
 	defer cancel()
 	s.Lock()
 	if s.busy {
@@ -235,6 +236,15 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		}
 	}
 	root, err := s.directory()
+	if err == nil && edition == "companion" {
+		s.Lock()
+		s.phase = "preparing-video"
+		s.Unlock()
+		if videoErr := host.prepareVideoTools(ctx); videoErr != nil {
+			fail(videoErr)
+			return
+		}
+	}
 	if requiredVersion == "" && err == nil && tapnowPreparedIdentity(filepath.Join(root, edition), edition) {
 		requiredVersion = readTapnowManifest(filepath.Join(root, edition))
 	}
@@ -485,7 +495,7 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	var msg tapnowNativeMessage
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
-	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || (msg.Action != "connect" && msg.Action != "ack") {
+	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || !releaseVersionPattern.MatchString(msg.Version) || (msg.Action != "connect" && msg.Action != "ack") {
 		return fail("invalid native message")
 	}
 	root, err := (&tapnowState{}).directory()
@@ -508,7 +518,8 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	msg.Origin = origin
 	body, _ = json.Marshal(msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	timeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", session.Origin+"/runtime/tapnow/native", bytes.NewReader(body))
 	if err != nil {
@@ -516,7 +527,7 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-ACU-Tapnow-Token", session.Token)
-	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}
 	res, err := client.Do(req)
 	if err != nil {
 		return fail("ACU Runtime 暂不可连接，请重新接入")

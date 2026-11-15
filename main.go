@@ -105,6 +105,7 @@ type server struct {
 	capabilityMu     sync.Mutex
 	setKernelSetting func(context.Context, string, string) error
 	imageSkillSource func() (string, error)
+	videoToolPath    func(context.Context) (string, error)
 	agentInstall     agentInstallState
 	agentVersions    agentVersionCache
 	tapnow           tapnowState

@@ -33,6 +33,7 @@ func TestTapnowNativeBrowserHarness(t *testing.T) {
 		}
 	}))
 	host.desktop = true
+	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	host.tapnow.register = func() error { return nil }
 	host.tapnow.openStore = func(context.Context, string) error { return nil }
 	host.token = "isolated-native-browser-session"

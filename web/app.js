@@ -198,6 +198,7 @@ function agentRecommendation(agent, choice, selectedModel, settings) {
     ['联网搜索', `应用发起搜索后，沿用现有处理规则。补充来源：${search[0]}。`, search[1]],
     ['生图', `沿用现有生图工具；补充生图：${imageGen[0]}。本次不新增 MCP。`, imageGen[1]],
     ['生视频', '使用媒体工具生成并保存视频。', '可在媒体设置中检查'],
+    ['读视频', '读取本地 MOV / MP4 画面，沿用识图模型。', '一键准备'],
   ];
   return { nativeModels, availableModels, recommendedModel, model, capabilities, ...copy };
 }
@@ -891,7 +892,8 @@ function videoCapabilityPanel(view, current) {
   const models = view.videoModels || [];
   const state = view.videoBlocked ? '生图已关闭，视频也已停用' : view.videoEnabled ? '已启用' : '未启用';
   const currentModel = view.videoGenMissing ? view.videoAuto : (view.videoGen || view.videoAuto);
-  return `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${currentModel ? `<p class="capability-intro">${view.videoGen && !view.videoGenMissing ? '默认模型' : '自动模型'} · ${escapeHTML(currentModel)}</p>` : ''}${view.videoGenMissing ? '<p class="capability-tool-error">已选视频模型暂不可用，当前使用自动模型。</p>' : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
+  const reading = `<section class="panel capability-video-reading-panel"><div class="capability-list-heading"><h2>视频读取</h2><span class="capability-status">${view.videoReadingReady ? '已配置' : '待准备'}</span></div><p class="capability-intro">MOV / MP4 · 画面采样 · 沿用识图模型</p><button class="button secondary" data-configure-capabilities="check" ${current.saving ? 'disabled' : ''}>${current.saving === 'tools' ? '正在准备视频与通用工具…' : '一键准备并分配'}</button></section>`;
+  return reading + `<section class="panel capability-video-panel"><div class="capability-list-heading"><h2>视频生成</h2><label class="switch-row"><span>${state}</span><input type="checkbox" data-video-enabled aria-label="启用视频生成" ${view.videoEnabled ? 'checked' : ''} ${current.saving || view.videoBlocked ? 'disabled' : ''}></label></div>${view.videoError ? `<p class="capability-tool-error">${escapeHTML(view.videoError)}</p>` : ''}${currentModel ? `<p class="capability-intro">${view.videoGen && !view.videoGenMissing ? '默认模型' : '自动模型'} · ${escapeHTML(currentModel)}</p>` : ''}${view.videoGenMissing ? '<p class="capability-tool-error">已选视频模型暂不可用，当前使用自动模型。</p>' : ''}${!models.length && !view.videoError ? '<p class="capability-intro">当前来源暂无视频模型，请刷新模型。</p>' : ''}</section>`;
 }
 
 async function setVideoEnabled(input) {

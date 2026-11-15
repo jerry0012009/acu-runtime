@@ -47,11 +47,11 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		case "/api/library":
 			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers})
 		case "/api/library/market/servers":
-			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"}]}`)
+			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"},{"id":"magpie-video","name":"magpie-video"}]}`)
 		case "/api/library/market/server":
 			var in struct{ ID string }
 			json.NewDecoder(r.Body).Decode(&in)
-			kind := map[string]string{"magpie-vision": "vision", "magpie-image": "image", "magpie-web-search": "search"}[in.ID]
+			kind := map[string]string{"magpie-vision": "vision", "magpie-image": "image", "magpie-web-search": "search", "magpie-video": "video"}[in.ID]
 			f.servers = append(f.servers, map[string]any{"name": in.ID, "transport": "stdio", "command": "/native/magpie", "args": []string{"mcp", kind}, "agents": []string{}})
 			io.WriteString(w, `{}`)
 		case "/api/library/servers/agents":
@@ -134,6 +134,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		return nil
 	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
+	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	return host, f
 }
 
@@ -177,7 +178,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Vision != "" || view.ImageGen != "" || len(f.servers) != 4 {
+	if view.Vision != "" || view.ImageGen != "" || len(f.servers) != 5 {
 		t.Fatalf("recommendations missing: %+v", view)
 	}
 	f.prefs["vision"] = "off"
@@ -188,7 +189,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	if _, err = host.capabilityApply(context.Background(), in); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.servers) != 4 || f.prefs["vision"] != "off" || f.prefs["imageGen"] != "native/user-choice" || f.prefs["theme"] != "dark" || f.servers[2]["hub"] != "direct" {
+	if len(f.servers) != 5 || f.prefs["vision"] != "off" || f.prefs["imageGen"] != "native/user-choice" || f.prefs["theme"] != "dark" || f.servers[2]["hub"] != "direct" {
 		t.Fatal("overwrote existing choices")
 	}
 	b, _ := json.Marshal(f.servers[2])

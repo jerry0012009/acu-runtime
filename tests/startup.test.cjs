@@ -765,7 +765,7 @@ test('unified tool check preserves success and retries only the failed agent', a
  let fail=true;
  const instance=await setup({ready:true,agents:[codex(),{id:'claude',name:'Claude Code',detected:true}]},async (route,options)=>route.startsWith('/runtime/capabilities') ? options.method==='POST'&&JSON.parse(options.body).agents[0]==='claude'&&fail?{ok:false,body:{error:'工具写入失败'}}:{body:view}:undefined);
  await instance.run('openCapabilities()');
- assert.equal((instance.elements.app.innerHTML.match(/data-configure-capabilities=/g)||[]).length,1);
+ assert.equal((instance.elements.app.innerHTML.match(/data-configure-capabilities=/g)||[]).length,2);
  await instance.run('configureCapabilities("check")');
  assert.deepEqual(posts(instance).map(call=>JSON.parse(call.body).agents),[['codex'],['claude']]);
  assert(instance.elements.app.innerHTML.includes('已接入 ✓'));

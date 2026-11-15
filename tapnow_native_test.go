@@ -43,6 +43,7 @@ func nativeFixtureHost(t *testing.T) *server {
 		}
 	}))
 	host.desktop = true
+	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	host.tapnow.root = t.TempDir()
 	host.tapnow.register = func() error { return nil }
 	host.tapnow.openStore = func(context.Context, string) error { return nil }

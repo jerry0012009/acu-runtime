@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -28,6 +30,17 @@ func imageSkillSource() (string, error) {
 		}
 	} else if err != nil {
 		return "", err
+	} else {
+		old, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		// Upgrade the unchanged previous bundled skill; never overwrite edits.
+		if fmt.Sprintf("%x", sha256.Sum256(old)) == "5e61ff25ac9921755cad8570501da96217ad63e54a6fb4759021ba631d9ffafe" {
+			if err := os.WriteFile(path, text, 0600); err != nil {
+				return "", err
+			}
+		}
 	}
 	return dir, nil
 }
