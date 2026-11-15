@@ -1,4 +1,12 @@
-# ACU Runtime 0.1.87
+# ACU Runtime 0.1.89
+
+新增本地 MOV/MP4 视频读取的一键配置。使用已发布的独立自包含 acu-video-mcp 0.1.0，用户无需安装 Node 或 FFmpeg，无需额外 Gemini/OpenAI Key。通过 Magpie 标准工具目录分配给 Agent；配套官方 Magpie 不打补丁、不使用 fork，也不改变官方更新来源。
+
+TapNow 副驾驶 0.1.27 检测视频节点及上游视频素材时自动读取带时间戳的采样画面，继续使用已有 ACU 识图审阅。视频 Native Messaging 直接由独立工具提供，Runtime 不执行视频解码或 MCP 后端。音频未分析，采样不等于逐帧完整质检，失败或遗漏会明确说明，不自动修改或重新生成节点。
+
+首次配置会下载并校验独立视频工具，后续不在运行时执行 npm；浏览器首次加载插件、更新重载和 Agent 工具信任仍需用户确认。建议更新后重新执行一次图片、视频与搜索工具检查和 TapNow 一键配置。
+
+## 保留 0.1.87 的插件弹窗连接
 
 修复 TapNow 重新接入时从外部打开 chrome-extension:// 插件页、可能出现 ERR_BLOCKED_BY_CLIENT 的流程。Runtime 不再启动插件内部地址；已加载插件请从 Chrome 右上角扩展菜单打开 TapNow 弹窗，弹窗尝试连接本机 Runtime，失败可点击“连接 ACU Runtime”重试。副驾驶和备份均有此入口，无需复制 Key。
 

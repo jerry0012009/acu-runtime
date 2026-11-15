@@ -239,7 +239,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 else:
                     assert tool["args"][0] == "mcp", tool
                 assert Path(tool["command"]).is_file(), tool
-                proc = subprocess.Popen([tool["command"], *tool["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
+                proc = subprocess.Popen([tool["command"], *tool.get("args",[])], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
                 replies = queue.Queue()
                 threading.Thread(target=lambda: [replies.put(line) for line in proc.stdout], daemon=True).start()
                 def rpc(message):
