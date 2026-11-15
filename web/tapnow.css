@@ -24,6 +24,7 @@
 .tapnow-directory code{min-width:0;line-height:1.8;user-select:text}.tapnow-directory .icon-button{flex:0 0 32px}
 .tapnow-address{width:100%;min-width:0;border:0;background:transparent;color:var(--acu-text);font:13px/1.8 monospace;user-select:text}
 .tapnow-help{font-size:12px;margin-top:16px;color:var(--acu-muted);line-height:1.7}.tapnow-help summary{cursor:pointer}.tapnow-help p{margin:10px 0}
+.tapnow-popup-guide{padding:14px 0;border-bottom:1px solid var(--acu-line);font-size:13px;line-height:1.8}.tapnow-popup-guide strong{font-size:13px}.tapnow-popup-guide p{color:var(--acu-muted);font-size:12px;margin:8px 0;overflow-wrap:anywhere}
 .tapnow-edition progress{width:100%;height:6px;accent-color:var(--acu-accent)}
 .tapnow-complete{display:flex;align-items:flex-start;gap:8px}.tapnow-complete .icon{flex:0 0 18px;margin-top:3px}
 @media(max-width:600px){.tapnow-edition{grid-template-columns:minmax(0,1fr)}.tapnow-heading{align-items:flex-start}.tapnow-config select{width:100%}.tapnow-actions .button{white-space:normal;max-width:100%}}

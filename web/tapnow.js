@@ -43,6 +43,7 @@
       const editions = state?.editions || [{ edition:'companion' }, { edition:'backup' }];
       const disabled = e => operation || state?.busy || !ui.status?.desktop || e.edition === 'companion' && (!choice || !model);
       return `<div class="tapnow-agent" data-agent="tapnow"><div class="tapnow-heading"><div>${icon('globe')}<h3>TapNow</h3><span>Chrome 扩展</span></div><button class="icon-button" data-tapnow="check" title="检查插件更新" aria-label="检查插件更新" ${operation || state?.busy ? 'disabled' : ''}>${icon('refresh')}</button></div>
+        ${state?.editions?.some(waiting) ? '<div class="tapnow-popup-guide" role="status"><strong>已加载后：从 Chrome 右上角扩展菜单打开 TapNow</strong><p>打开插件弹窗后自动连接；未自动完成时点击“连接 ACU Runtime”。不要在地址栏访问插件 ID。若出现 ERR_BLOCKED_BY_CLIENT，请关闭错误页，在 chrome://extensions/ 确认该插件已启用且没有加载错误；工作/学校浏览器可能受组织策略限制。</p></div>' : ''}
         ${error ? `<p class="tapnow-error" role="alert">${esc(error)} <button class="text-button" data-tapnow="refresh">重试读取状态</button></p>` : ''}${state?.message && !error ? `<p class="tapnow-note" role="status">${esc(state.message)}</p>` : ''}${loading ? '<p role="status">正在读取插件状态</p>' : ''}
         <div class="tapnow-editions">${editions.map(e => {
           const preparing = state?.preparing === e.edition || operation === `configure:${e.edition}` || operation === `install:${e.edition}`;

@@ -63,18 +63,24 @@ async function main() {
     const page=await browser.newPage();let requests=0;
     await browser.route('https://**/*',route=>{requests++;return route.abort();});
     await page.goto(`chrome-extension://${identities.companion}/popup.html`);
+    await page.waitForFunction(()=>document.getElementById('runtime-status')?.textContent.includes('尚未确认连接'));
+    for(const candidate of browser.pages()) {
+      if(candidate!==page && candidate.url().startsWith('chrome-extension://'))await candidate.close();
+    }
     await page.evaluate(async()=>{
       await chrome.storage.local.set({apiKey:'sk-old-key-to-replace',companionTrialDefaultsVersion:1,runtimeConnection:null});
       await chrome.storage.sync.set({requiredTerms:['preserve-user-rule'],llmModel:'old-model'});
     });
     for(const edition of ['companion','backup']){
       await request('/runtime/tapnow/connect',{edition,...(edition==='companion'?{provider:'acu',model:'gpt-6.1-sol'}:{})});
-      await page.goto(`chrome-extension://${identities[edition]}/connect.html`);
-      try { await page.waitForFunction(()=>/已配置|已就绪/.test(document.getElementById('status').textContent),null,{timeout:15000}); }
+      // Navigate inside the extension test context, like opening its Chrome action.
+      // Production Runtime never launches chrome-extension URLs externally.
+      await page.goto(`chrome-extension://${identities[edition]}/popup.html`);
+      try { await page.waitForFunction(()=>/Runtime 已确认|备份插件已连接/.test(document.getElementById('runtime-status').textContent),null,{timeout:15000}); }
       catch(error){
         const diagnostic=await page.evaluate(async()=>{try{return await chrome.runtime.sendNativeMessage('com.acucompute.tapnow',{action:'connect',version:chrome.runtime.getManifest().version})}catch(e){return {error:e.message}}});
         const local=await page.evaluate(async()=>{const d=await chrome.storage.local.get(null);return {hasKey:!!d.apiKey,managed:d.runtimeConnection,pending:d.runtimePendingReceipt}});
-        throw Error(`${edition}: ${await page.locator('#status').innerText()} / ${JSON.stringify(diagnostic)} / ${JSON.stringify(await request('/runtime/tapnow'))} / ${JSON.stringify(local)}`);
+        throw Error(`${edition}: ${await page.locator('#runtime-status').innerText()} / ${JSON.stringify(diagnostic)} / ${JSON.stringify(await request('/runtime/tapnow'))} / ${JSON.stringify(local)}`);
       }
       const data=await page.evaluate(async()=>({local:await chrome.storage.local.get(null),sync:await chrome.storage.sync.get(null)}));
       if(edition==='companion'){

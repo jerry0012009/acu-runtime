@@ -79,3 +79,16 @@ func TestTapnowCancelWaitingGrantRejectsLaterReceipt(t *testing.T) {
 		t.Fatal(w.Code, strings.TrimSpace(string(body)))
 	}
 }
+
+func TestTapnowConnectNeverLaunchesExtensionPage(t *testing.T) {
+	host := nativeFixtureHost(t)
+	opened := ""
+	host.tapnow.openStore = func(_ context.Context, address string) error { opened = address; return nil }
+	w := tapnowRequest(host, "POST", "/runtime/tapnow/connect", `{"edition":"backup"}`, host.token)
+	if w.Code != 200 || opened != "https://app.tapnow.ai/" || strings.Contains(w.Body.String(), "chrome-extension://") {
+		t.Fatal(w.Code, opened, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "连接 ACU Runtime") {
+		t.Fatal("missing popup handoff instruction")
+	}
+}
