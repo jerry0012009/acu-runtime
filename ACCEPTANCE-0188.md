@@ -1,4 +1,9 @@
-# Runtime 0.1.88 Guided Setup
+# Runtime 0.1.89 Guided Setup
+
+Originally prepared as 0.1.88; another task created that tag for shared workbench
+entries during verification. Those changes were merged and retained, and this
+combined release advances to 0.1.89 without rewriting the existing tag. The
+record keeps its original filename for traceability.
 
 User successfully installed the previous version through their own understanding,
 not the product guidance. Requested actionable instructions and maximum application

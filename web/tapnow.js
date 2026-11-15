@@ -42,7 +42,7 @@
       } else if (step === 'load') {
         content = `<h5>在扩展页加载插件</h5><p>打开右上角“开发者模式”，点击左上角“加载已解压的扩展程序”。在目录选择窗口粘贴下方目录并确认。</p>${copyField(e,'path',e.path || '')}<div class="tapnow-actions">${button('open','复制目录并打开文件夹',false)}${button('step-connect','已加载，继续')}</div><p class="tapnow-note">已安装此插件：点击插件卡片上的重新加载按钮。</p>`;
       } else {
-        content = `<h5>${e.connection === 'saving' ? '正在连接' : '连接 TapNow 插件'}</h5><p>${e.connection === 'saving' ? '正在保存 Key 和模型，请稍候。' : `点击 Chrome 右上角拼图图标，打开“TapNow ${e.edition === 'companion' ? 'Companion' : 'Backup'}”，再点击“连接 ACU Runtime”。`}</p><div class="tapnow-actions">${button('connect','重新连接',false)}<button class="text-button" data-tapnow="step-load" data-edition="${e.edition}">还未加载插件</button></div>`;
+        content = `<h5>${e.connection === 'saving' ? '正在连接' : '连接 TapNow 插件'}</h5><p>${e.connection === 'saving' ? e.edition === 'companion' ? '正在保存 Key 和模型，请稍候。' : '正在完成连接，请稍候。' : `点击 Chrome 右上角拼图图标，打开“TapNow ${e.edition === 'companion' ? 'Companion' : 'Backup'}”，再点击“连接 ACU Runtime”。`}</p><div class="tapnow-actions">${button('connect','重新连接',false)}<button class="text-button" data-tapnow="step-load" data-edition="${e.edition}">还未加载插件</button></div>`;
       }
       return `<div class="tapnow-install-guide" aria-label="${labels[e.edition]}安装进度"><ol class="tapnow-step-tabs">${['打开扩展页','加载插件','连接'].map((text,i)=>`<li ${index === i ? 'aria-current="step"' : ''}><span>${i+1}</span>${text}</li>`).join('')}</ol>${content}<div class="tapnow-guide-footer"><span>文件已准备 · ${esc(e.prepared)}</span><button class="text-button" data-tapnow="cancel" data-edition="${e.edition}">取消</button></div></div>`;
     }

@@ -1,8 +1,10 @@
-# ACU Runtime 0.1.88
+# ACU Runtime 0.1.89
 
 TapNow 安装改为逐步设置，每次只显示当前操作，不再默认展示错误码、策略说明或长篇排错文字。一键配置自动检查更新、准备插件与 API Key，并复制扩展页地址、打开 Chrome；点击下一步会自动复制插件目录并打开文件夹。页面明确指出“开发者模式”和“加载已解压的扩展程序”的位置，加载后继续连接。
 
 同版本已准备的插件直接进入连接，不再重复安装步骤。点击“已加载，继续”会刷新连接授权并打开 TapNow；插件回执确认后收起引导，提供“打开 TapNow”。Windows/macOS 新增本机剪贴板兜底，减少手动找地址和目录的操作。插件 0.1.26 的首次连接页、弹窗状态也改为简短的操作指令，保留 GPT-6.1 Sol 推荐、API Key 自动替换及原有设置。
+
+保留 0.1.88 的共享操练场、图片生成和视频生成入口。
 
 ## 保留 0.1.87 的弹窗连接
 
@@ -194,9 +196,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.88-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.88-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.88-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.89-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.89-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.89-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 
