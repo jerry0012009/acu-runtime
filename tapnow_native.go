@@ -91,6 +91,7 @@ type tapnowNativeMessage struct {
 	Grant   string `json:"grant,omitempty"`
 	Version string `json:"version"`
 	Success bool   `json:"success,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
 
 type tapnowNativeReply struct {
@@ -154,7 +155,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		return
 	}
 	install := r.URL.Path == "/runtime/tapnow/install"
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Minute)
 	defer cancel()
 	s.Lock()
 	if s.busy {
@@ -229,6 +230,15 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		}
 	}
 	root, err := s.directory()
+	if err == nil && edition == "companion" {
+		s.Lock()
+		s.phase = "preparing-video"
+		s.Unlock()
+		if _, videoErr := host.prepareVideoTools(ctx); videoErr != nil {
+			fail(videoErr)
+			return
+		}
+	}
 	if ctx.Err() != nil {
 		fail(ctx.Err())
 		return
@@ -436,7 +446,7 @@ func writeNativeFrame(out io.Writer, value any) error {
 	if err != nil {
 		return err
 	}
-	if len(body) > 64<<10 {
+	if len(body) > 900<<10 {
 		return errors.New("native reply too large")
 	}
 	if err = binary.Write(out, binary.LittleEndian, uint32(len(body))); err != nil {
@@ -460,8 +470,13 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	var msg tapnowNativeMessage
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
-	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || (msg.Action != "connect" && msg.Action != "ack") {
+	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || !releaseVersionPattern.MatchString(msg.Version) || (msg.Action != "connect" && msg.Action != "ack" && msg.Action != "video-frames") {
 		return fail("invalid native message")
+	}
+	if msg.Action == "video-frames" {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return writeNativeFrame(out, runTapnowVideo(ctx, origin, msg))
 	}
 	root, err := (&tapnowState{}).directory()
 	if err != nil {

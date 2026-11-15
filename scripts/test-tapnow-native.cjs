@@ -75,6 +75,11 @@ async function main() {
       if(edition==='companion'){
         assert.equal(data.local.apiKey,'sk-browser-native-fixture');assert.equal(data.local.runtimeConnection.settings.llmBaseUrl,'https://acu.best/v1');assert.equal(data.sync.apiKey,undefined);
       }else assert.equal(data.local.apiKey,undefined);
+      const videoRefused=await page.evaluate(async()=>chrome.runtime.sendNativeMessage('com.acucompute.tapnow',{
+        action:'video-frames',version:chrome.runtime.getManifest().version,url:'http://127.0.0.1/private.mov'
+      }));
+      assert.equal(videoRefused.ok,false);
+      assert(videoRefused.error.includes(edition==='backup'?'备份':'域名'));
       const status=await request('/runtime/tapnow');const view=status.editions.find(e=>e.edition===edition);
       assert.equal(view.connection,'configured');assert(view.confirmedAt);
       assert(!JSON.stringify(status).includes('sk-browser-native-fixture'));

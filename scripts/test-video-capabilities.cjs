@@ -10,14 +10,14 @@ fs.mkdirSync(output, { recursive: true });
  try {
   for (const colorScheme of ['light','dark']) for (const width of [390,1440]) {
    const page = await browser.newPage({viewport:{width,height:1000},colorScheme});
-   let enabled = false; const writes = [], errors = [];
+   let enabled = false, reading = false; const writes = [], errors = [];
    page.on('pageerror', error => errors.push(error.message));
-   const view = () => ({provider:'acu-runtime',vision:'off',imageGen:'',visionModels:[],imageModels:[],tools:[{name:'acu-image',agents:['workbuddy']}],searchReady:true,videoEnabled:enabled,videoBlocked:false,videoAuto:'acu-runtime/grok-imagine-video',videoModels:[{id:'acu-runtime/grok-imagine-video',name:'Grok Imagine Video'},{id:'acu-runtime/grok-imagine-video-1.5',name:'Grok Imagine Video 1.5'}]});
+   const view = () => ({provider:'acu-runtime',vision:'off',imageGen:'',visionModels:[],imageModels:[],tools:[{name:'acu-image',agents:['workbuddy']}],searchReady:true,videoReadingReady:reading,videoEnabled:enabled,videoBlocked:false,videoAuto:'acu-runtime/grok-imagine-video',videoModels:[{id:'acu-runtime/grok-imagine-video',name:'Grok Imagine Video'},{id:'acu-runtime/grok-imagine-video-1.5',name:'Grok Imagine Video 1.5'}]});
    await page.route('http://video.test/**', async route => {
     const req = route.request(), u = new URL(req.url());
     if (u.pathname === '/runtime/status') return route.fulfill({json:{ready:true,agents:[{id:'workbuddy',name:'WorkBuddy',detected:true,connected:true}],connection:{known:true,configured:true,provider:'acu-runtime',choices:[{id:'acu-runtime',name:'ACU',models:['acu-auto','kimi-k3.1-pro']}]}}});
     if (u.pathname.startsWith('/runtime/capabilities')) {
-     if (req.method() === 'POST' && !u.pathname.endsWith('refresh')) { const body=req.postDataJSON(); writes.push(body); enabled=body.videoEnabled; }
+     if (req.method() === 'POST' && !u.pathname.endsWith('refresh')) { const body=req.postDataJSON(); writes.push(body); if(body.videoEnabled!==undefined)enabled=body.videoEnabled; if(body.agents)reading=true; }
      return route.fulfill({json:view()});
     }
     if (u.pathname.startsWith('/runtime/')) return route.fulfill({json:{}});
@@ -38,8 +38,13 @@ fs.mkdirSync(output, { recursive: true });
    assert(!(await panel.innerText()).includes('生成请求'));
    assert((await panel.innerText()).includes('acu-runtime/grok-imagine-video'));
    assert.equal(writes.length,1);
+   const reader=page.locator('.capability-video-reading-panel');
+   assert((await reader.innerText()).includes('待准备'));
+   await reader.locator('[data-configure-capabilities]').click();
+   await page.waitForFunction(()=>document.querySelector('.capability-video-reading-panel')?.textContent.includes('已配置'));
+   assert.deepEqual(writes[1],{provider:'acu-runtime',agents:['workbuddy']});
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-   await panel.screenshot({path:path.join(output,`${colorScheme}-${width}.png`)});
+   await page.screenshot({path:path.join(output,`${colorScheme}-${width}.png`),fullPage:true});
    assert.deepEqual(errors,[]);await page.close();
   }
   console.log('PASS: video status and explicit enable without trial prompts or fake model settings, no hidden writes, desktop/mobile themes.');

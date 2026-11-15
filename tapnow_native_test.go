@@ -43,6 +43,9 @@ func nativeFixtureHost(t *testing.T) *server {
 		}
 	}))
 	host.desktop = true
+	host.prepareVideoReading = func(context.Context) (videoReadingInstall, error) {
+		return videoReadingInstall{Node: "fixture", Root: t.TempDir()}, nil
+	}
 	host.tapnow.root = t.TempDir()
 	host.tapnow.register = func() error { return nil }
 	host.tapnow.openStore = func(context.Context, string) error { return nil }

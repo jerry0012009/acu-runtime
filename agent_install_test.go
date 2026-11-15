@@ -145,7 +145,7 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 		case "/api/settings":
 			io.WriteString(w, `{"gateway":"http://127.0.0.1:3425","vision":"existing/vision","imageGen":"off","searchAPIs":[{"vendor":"you","ready":true}]}`)
 		case "/api/library":
-			io.WriteString(w, `{"servers":[{"name":"acu-vision","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-image","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-search","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]}]}`)
+			io.WriteString(w, `{"servers":[{"name":"acu-vision","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-image","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-search","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]},{"name":"acu-video-reader","note":"ACU Runtime recommended tools v1","transport":"stdio","command":"existing","agents":["workbuddy"]}]}`)
 		case "/api/library/servers/save":
 			io.WriteString(w, `{}`)
 		case "/api/library/skills/probe":

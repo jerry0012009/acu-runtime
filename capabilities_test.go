@@ -134,6 +134,9 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		return nil
 	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
+	host.prepareVideoReading = func(context.Context) (videoReadingInstall, error) {
+		return videoReadingInstall{Node: "/fixture/node", Root: "/fixture/video"}, nil
+	}
 	return host, f
 }
 
@@ -177,7 +180,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Vision != "" || view.ImageGen != "" || len(f.servers) != 4 {
+	if view.Vision != "" || view.ImageGen != "" || len(f.servers) != 5 {
 		t.Fatalf("recommendations missing: %+v", view)
 	}
 	f.prefs["vision"] = "off"
@@ -188,7 +191,7 @@ func TestCapabilityKernelDelegationAndIdempotence(t *testing.T) {
 	if _, err = host.capabilityApply(context.Background(), in); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.servers) != 4 || f.prefs["vision"] != "off" || f.prefs["imageGen"] != "native/user-choice" || f.prefs["theme"] != "dark" || f.servers[2]["hub"] != "direct" {
+	if len(f.servers) != 5 || f.prefs["vision"] != "off" || f.prefs["imageGen"] != "native/user-choice" || f.prefs["theme"] != "dark" || f.servers[2]["hub"] != "direct" {
 		t.Fatal("overwrote existing choices")
 	}
 	b, _ := json.Marshal(f.servers[2])

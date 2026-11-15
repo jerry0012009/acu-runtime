@@ -1,0 +1,10 @@
+{
+  "name": "acu-video-reading-dependencies",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "claude-video-vision": "1.4.0",
+    "@ffmpeg-installer/ffmpeg": "1.1.0",
+    "@ffprobe-installer/ffprobe": "2.1.2"
+  }
+}
