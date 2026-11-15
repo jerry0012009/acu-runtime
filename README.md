@@ -1,4 +1,4 @@
-Current release: **0.1.87** removes external chrome-extension page launches and connects TapNow through its installed Chrome popup. Pairs with plugin 0.1.25. Retains official-source support, GPT-6.1 Sol recommendation and Magpie v0.1.4248. All three native platform jobs passed; see [ACCEPTANCE-0187.md](ACCEPTANCE-0187.md).
+Release preparation: **0.1.88** replaces TapNow's warning-heavy installation text with sequential setup actions, automatic address/directory copying, native clipboard fallback and a completion action. Same-version setup goes directly to connection. Pairs with plugin 0.1.26; retains GPT-6.1 Sol and Magpie v0.1.4248. Publication is complete after all platform jobs and assets succeed.
 
 TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 

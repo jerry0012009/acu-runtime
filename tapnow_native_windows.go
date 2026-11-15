@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func registerTapnowHost() error {
@@ -28,6 +29,13 @@ func registerTapnowHost() error {
 	}
 	defer key.Close()
 	return key.SetStringValue("", path)
+}
+
+func copyTapnowText(ctx context.Context, value string) error {
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-Command", `[Console]::InputEncoding=[System.Text.UTF8Encoding]::new($false); $v=[Console]::In.ReadToEnd(); Set-Clipboard -Value $v -ErrorAction Stop`)
+	cmd.Stdin = strings.NewReader(value)
+	hideProcess(cmd)
+	return cmd.Run()
 }
 
 func tapnowChromeExecutable() (string, error) {

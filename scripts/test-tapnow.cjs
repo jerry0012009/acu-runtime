@@ -13,7 +13,7 @@ const status = { ready: true, desktop: true, agents: [
 ], connection:{ known:true, configured:true, provider:'acu', choices:[{id:'acu',name:'ACU',masked:'sk-***fixture',models:['acu-auto','gpt-6.1-sol']}] }, account:{} };
 let installCount = 0, phase = 'unknown', prepared = false, confirmed = false, checks = 0;
 const calls=[];
-const tapnowState = () => ({editions:['companion','backup'].map(edition => ({edition,installAvailable:true,connection:edition==='companion'?(confirmed?'configured':phase):'unknown',prepared:prepared&&edition==='companion'?'0.1.23':undefined,path:'/isolated/ACURuntime/用户 插件目录/'+edition,version:confirmed?'0.1.23':undefined,confirmedAt:confirmed?'2026-11-14T18:00:00Z':undefined}))});
+const tapnowState = () => ({editions:['companion','backup'].map(edition => ({edition,installAvailable:true,connection:edition==='companion'?(confirmed?'configured':phase):'unknown',reloadRequired:installCount===1,prepared:prepared&&edition==='companion'?'0.1.25':undefined,path:'/isolated/ACURuntime/用户 插件目录/'+edition,version:confirmed?'0.1.25':undefined,confirmedAt:confirmed?'2026-11-14T18:00:00Z':undefined}))});
 
 async function main() {
   const browser = await chromium.launch({ headless:true, args:['--no-sandbox'] });
@@ -21,6 +21,15 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.on('pageerror',e=>errors.push(e.message));
+    const screenshotStep = async step => {
+      for(const width of [320,390,768,1440]) for(const theme of ['light','dark']) {
+        await page.setViewportSize({width,height:1000});await page.emulateMedia({colorScheme:theme});
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${step} ${width} ${theme} overflow`);
+        const controls=await page.locator('.tapnow-agent button,.tapnow-agent select').evaluateAll(elements=>elements.map(e=>({sw:e.scrollWidth,cw:e.clientWidth})));
+        assert(controls.every(e=>e.sw<=e.cw+2),`${step} ${width} clipped control`);
+        await page.screenshot({path:path.join(output,`${step}-${width}-${theme}.png`),fullPage:true});
+      }
+    };
     await page.route('**/runtime/**', async route=> {
       const url=new URL(route.request().url());
       calls.push(url.pathname);
@@ -32,6 +41,8 @@ async function main() {
       else if(url.pathname==='/runtime/tapnow/check') {checks++;result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/browser') result={state:tapnowState(),address:'chrome://extensions/',manualNavigationRequired:true};
       else if(url.pathname==='/runtime/tapnow/open') result=tapnowState();
+      else if(url.pathname==='/runtime/tapnow/canvas') result=tapnowState();
+      else if(url.pathname.startsWith('/runtime/tapnow/copy-'))return route.fulfill({status:400,json:{error:'clipboard unavailable'}});
       else if(url.pathname==='/runtime/tapnow') result=tapnowState();
       await route.fulfill({json:result});
     });
@@ -44,11 +55,13 @@ async function main() {
     await page.locator('#tapnow-model').waitFor();
     assert.equal(await page.locator('#tapnow-model').inputValue(),'gpt-6.1-sol');
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.fixtureCopied=text;}}}));
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
-    await page.getByText('文件已就绪，等待 Chrome 加载', {exact:false}).waitFor();
+    await page.getByRole('heading',{name:'打开 Chrome 扩展页',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.fixtureCopied),'chrome://extensions/','configure automatically copies the first-step address');
+    await screenshotStep('step1-chrome');
     assert.equal(await page.locator('[data-tapnow-address]').inputValue(),'chrome://extensions/');
     assert.equal(await page.getByRole('button',{name:'打开 Chrome 扩展页',exact:true}).count(),0);
-    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.fixtureCopied=text;}}}));
     await page.locator('[data-tapnow="browser"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/browser'));
     assert.equal(await page.evaluate(()=>window.fixtureCopied),'chrome://extensions/');
@@ -57,14 +70,22 @@ async function main() {
       document.execCommand=()=>false;
     });
     await page.locator('[data-tapnow="copy-address"]').click();
-    assert.equal(await page.locator('#toast').innerText(),'复制失败，请选中上方地址复制');
+    await page.waitForFunction(()=>document.querySelector('#toast').textContent==='请选中上方内容复制');
     assert.equal(await page.locator('[data-tapnow-address]').inputValue(),'chrome://extensions/');
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.fixtureCopied=text;}}}));
+    await page.locator('[data-tapnow="step-load"][data-edition="companion"]').click();
+    await page.getByRole('heading',{name:'在扩展页加载插件',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.fixtureCopied),'/isolated/ACURuntime/用户 插件目录/companion','next step copies directory without a separate copy command');
+    await screenshotStep('step2-load');
     await page.locator('[data-tapnow="open"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/open'));
     await page.locator('[data-tapnow="cancel"][data-edition="companion"]').click();
-    await page.getByText('文件已保留，尚未确认接入').waitFor();
-    await page.locator('[data-tapnow="connect"][data-edition="companion"]').first().click();
-    await page.getByText('文件已就绪，等待 Chrome 加载').waitFor();
+    await page.locator('.tapnow-state').filter({hasText:'待连接'}).waitFor();
+    await page.locator('[data-tapnow="step-load"][data-edition="companion"]').click();
+    await page.locator('[data-tapnow="step-connect"][data-edition="companion"]').click();
+    await page.getByRole('heading',{name:'连接 TapNow 插件',exact:true}).waitFor();
+    const guideText=await page.locator('.tapnow-agent').innerText();
+    for(const removed of ['ERR_BLOCKED_BY_CLIENT','组织策略','不要在地址栏访问插件','已加载后:'])assert(!guideText.includes(removed),removed);
     assert.equal(installCount,1);
     assert.equal(await other.evaluate(e=>e.open),true,'rerender preserves expansion');
     for(const width of [320,390,768,1440]) for(const theme of ['light','dark']) {
@@ -76,13 +97,15 @@ async function main() {
       await page.screenshot({path:path.join(output,`runtime-${width}-${theme}.png`),fullPage:true});
     }
     confirmed=true;
-    await page.locator('.tapnow-state').filter({hasText:'配置已确认'}).waitFor();
+    await page.locator('.tapnow-state').filter({hasText:'已连接'}).waitFor();
     assert.equal(await page.locator('.tapnow-install-guide').count(),0);
+    await page.locator('[data-tapnow="canvas"]').click();assert(calls.includes('/runtime/tapnow/canvas'));
     await page.locator('[data-tapnow="check"]').click();
     await page.waitForFunction(()=>!document.querySelector('[data-tapnow="check"]').disabled);
     assert.equal(checks,1);
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
-    await page.getByText('文件已就绪，等待 Chrome 加载').waitFor();
+    await page.getByRole('heading',{name:'连接 TapNow 插件',exact:true}).waitFor();
+    assert.equal(await page.getByRole('heading',{name:'打开 Chrome 扩展页',exact:true}).count(),0,'same version goes directly to connection');
     assert.equal(installCount,2,'configured plugin must still check/update on the primary action');
     assert.deepEqual(errors,[]);
     console.log('PASS: collapsed opt-in, single-click authorization without extra checkbox, receipt state; 8 viewport/theme screenshots');

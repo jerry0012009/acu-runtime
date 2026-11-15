@@ -63,7 +63,7 @@ async function main() {
     const page=await browser.newPage();let requests=0;
     await browser.route('https://**/*',route=>{requests++;return route.abort();});
     await page.goto(`chrome-extension://${identities.companion}/popup.html`);
-    await page.waitForFunction(()=>document.getElementById('runtime-status')?.textContent.includes('尚未确认连接'));
+    await page.waitForFunction(()=>document.getElementById('runtime-status')?.textContent.includes('一键配置'));
     for(const candidate of browser.pages()) {
       if(candidate!==page && candidate.url().startsWith('chrome-extension://'))await candidate.close();
     }
@@ -76,7 +76,7 @@ async function main() {
       // Navigate inside the extension test context, like opening its Chrome action.
       // Production Runtime never launches chrome-extension URLs externally.
       await page.goto(`chrome-extension://${identities[edition]}/popup.html`);
-      try { await page.waitForFunction(()=>/Runtime 已确认|备份插件已连接/.test(document.getElementById('runtime-status').textContent),null,{timeout:15000}); }
+      try { await page.waitForFunction(()=>document.getElementById('runtime-status').textContent.startsWith('已连接'),null,{timeout:15000}); }
       catch(error){
         const diagnostic=await page.evaluate(async()=>{try{return await chrome.runtime.sendNativeMessage('com.acucompute.tapnow',{action:'connect',version:chrome.runtime.getManifest().version})}catch(e){return {error:e.message}}});
         const local=await page.evaluate(async()=>{const d=await chrome.storage.local.get(null);return {hasKey:!!d.apiKey,managed:d.runtimeConnection,pending:d.runtimePendingReceipt}});
