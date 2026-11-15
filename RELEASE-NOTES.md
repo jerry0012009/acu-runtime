@@ -1,4 +1,16 @@
-# ACU Runtime 0.1.79
+# ACU Runtime 0.1.80
+
+新增可选 TapNow Agent，放在默认折叠的「其他 Agent」。副驾驶和资产备份按需分别开启，不加入默认批量配置。
+
+点击开启后，Runtime 自动下载并校验插件 ZIP、解压到固定目录、打开 Chrome 扩展页和插件目录。首次只需在 Chrome 开启开发者模式并加载该目录；之后 Key、模型与 API 地址自动配置，无需复制 Key 或导入 JSON。收到插件保存并回读的回执后才显示「配置已确认」。无需 Chrome Web Store。
+
+安装页提供三步引导、复制目录、重开入口、取消和继续接入。下载失败不改原版本；取消保留已准备文件。备份无需 ACU Key，也不会收到模型凭据。副驾驶使用当前选择的 ACU 来源和模型，支持 api.acucompute.com 与 acu.best；节点检测可能发送文字和勾选的图片并产生费用，接入本身不发收费请求。
+
+两个插件独立检查更新，更新后需在 Chrome 重新加载。固定插件身份和目录保留新版插件的本机设置；旧版手动安装的其他身份不会自动迁移，请先停用旧副驾驶/备份，避免重复界面。已有 TapNow 画布加载插件后可能需刷新一次。
+
+本版是 TapNow 引导接入首次公开版。自动配置经过隔离 MV3 和本机进程回执验证；真实账号画布、组织浏览器策略、自定义 Chrome 数据目录及首次人工加载仍需用户实机测试。不宣称全自动浏览器安装、始终在线或模型调用已验证。原 Key、其他 Agent 配置及现有 Chrome 窗口不修改、不关闭。
+
+## 保留 0.1.79 的视频与模型推荐
 
 「图片、视频与搜索」新增视频生成区：显示原生内核返回的自动模型和可用视频型号，支持明确启用或停用视频工具。旧配置中被禁用的视频工具可一键恢复，其他工具开关与应用分配保留。
 
@@ -142,9 +154,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.79-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.79-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.79-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.80-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.80-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.80-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

@@ -14,7 +14,7 @@ async function main() {
     GOPATH:execFileSync('go',['env','GOPATH'],{encoding:'utf8'}).trim(),
     GOCACHE:execFileSync('go',['env','GOCACHE'],{encoding:'utf8'}).trim() };
   const output = path.resolve('.build/tapnow-native'); fs.mkdirSync(output,{recursive:true});
-  let browser, child;
+  let browser, child, registered = false;
   try {
     const identities = {};
     const extensionPaths = [];
@@ -30,14 +30,22 @@ async function main() {
       identities[edition]=id;
       extensionPaths.push(target);
     }
-    const executable = path.join(root,'native-host');
+    const executable = path.join(root,process.platform==='win32'?'native-host.exe':'native-host');
     execFileSync('go',['build','-o',executable,'-ldflags',`-X main.tapnowCompanionID=${identities.companion} -X main.tapnowBackupID=${identities.backup}`,'.'],{stdio:'pipe'});
     for(const flavor of ['chromium','google-chrome','google-chrome-for-testing']){
       const hosts=path.join(env.XDG_CONFIG_HOME,flavor,'NativeMessagingHosts');fs.mkdirSync(hosts,{recursive:true});
       fs.writeFileSync(path.join(hosts,'com.acucompute.tapnow.json'),JSON.stringify({name:'com.acucompute.tapnow',description:'isolated native smoke',path:executable,type:'stdio',allowed_origins:Object.values(identities).map(id=>`chrome-extension://${id}/`)}));
     }
     const profileHosts=path.join(root,'profile','NativeMessagingHosts');fs.mkdirSync(profileHosts,{recursive:true});
-    fs.writeFileSync(path.join(profileHosts,'com.acucompute.tapnow.json'),JSON.stringify({name:'com.acucompute.tapnow',description:'isolated native smoke',path:executable,type:'stdio',allowed_origins:Object.values(identities).map(id=>`chrome-extension://${id}/`)}));
+    const manifestFile=path.join(profileHosts,'com.acucompute.tapnow.json');
+    fs.writeFileSync(manifestFile,JSON.stringify({name:'com.acucompute.tapnow',description:'isolated native smoke',path:executable,type:'stdio',allowed_origins:Object.values(identities).map(id=>`chrome-extension://${id}/`)}));
+    if(process.platform==='win32'){
+      assert.equal(process.env.CI,'true','Windows registry smoke only runs on disposable CI runners');
+      const registryKey='HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.acucompute.tapnow';
+      const {spawnSync}=require('node:child_process');
+      assert.notEqual(spawnSync('reg',['query',registryKey]).status,0,'never overwrite an existing native registration');
+      execFileSync('reg',['add',registryKey,'/ve','/t','REG_SZ','/d',manifestFile,'/f']);registered=true;
+    }
     const done=path.join(root,'done');
     child=spawn('go',['test','-run','^TestTapnowNativeBrowserHarness$','-count=1','-v','.'],{env:{...env,ACU_TAPNOW_BROWSER_FIXTURE:'1',ACU_TAPNOW_COMPANION_ID:identities.companion,ACU_TAPNOW_BACKUP_ID:identities.backup,ACU_TAPNOW_SMOKE_DONE:done},stdio:['ignore','pipe','pipe']});
     let text='';child.stdout.on('data',data=>{text+=data.toString()});child.stderr.on('data',data=>{text+=data.toString()});
@@ -82,6 +90,7 @@ async function main() {
     console.log('PASS: actual MV3 -> Chrome native host executable -> authenticated Runtime -> local credential readback -> receipt; Backup has no Key; no cloud calls');
   } finally {
     if(browser)await browser.close();if(child&&child.exitCode===null){child.kill();await new Promise(r=>child.once('exit',r));}
+    if(registered)execFileSync('reg',['delete','HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.acucompute.tapnow','/f']);
     fs.rmSync(root,{recursive:true,force:true});
   }
 }

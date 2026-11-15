@@ -1,6 +1,8 @@
 # TapNow ZIP Agent Candidate
 
-Status: local development candidate, not a published Runtime release. ZIP-based
+Status: Runtime 0.1.80 release preparation, with user-authorized first public
+distribution for device testing. Publication is not complete until the GitHub
+release assets exist and all required CI jobs pass. ZIP-based
 unpacked installation is the selected distribution method. Chrome Web Store
 registration, publisher access and review are **not** prerequisites for this flow.
 
@@ -90,10 +92,12 @@ node scripts/test-tapnow-native.cjs
 
 This is Chromium's isolated load-extension harness, **not** proof that ordinary
 Google Chrome's developer-mode UI or Windows/macOS registration was exercised.
-Before public Runtime release: actual Windows/macOS ZIP Load Unpacked, native
-registration, same-directory update/reload with retained settings, Runtime
-restart, Chrome disabled/blocked behavior, authorized live-canvas compatibility
-and complete release CI. Existing content/LLM TypeScript diagnostics remain.
+Release CI covers Windows/macOS native builds and isolated extension-to-host
+configuration. User device testing after publication covers actual ZIP Load
+Unpacked, same-directory update/reload with retained settings, Runtime restart,
+Chrome disabled/blocked behavior and authorized live-canvas compatibility. These
+remain disclosed acceptance gaps, not prerequisites for the user to download the
+explicitly requested first public version. Existing content/LLM TypeScript diagnostics remain.
 Linux native desktop build here lacks GTK4/WebKitGTK6 development libraries.
 
 Reference: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging

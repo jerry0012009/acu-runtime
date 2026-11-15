@@ -1,6 +1,6 @@
-Current release: **0.1.79** exposes native video model discovery and an explicit video-tool switch, including existing disabled-tool configurations. Adds Kimi K3.1 Pro, Grok 4.7 and Gemini 3.8 Flash recommendations. Retains team creative vectors, model catalog refresh and official Magpie v0.1.4096.
+Release candidate: **0.1.80** adds optional TapNow ZIP plugins with guided Chrome loading and automatic local Key/model setup. Retains native video tools, recent model recommendations, team creative vectors and Magpie v0.1.4096. Publication is complete only when the corresponding GitHub release assets are available.
 
-Development candidate: optional TapNow browser Agent, collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload still require Chrome user confirmation. Native installation acceptance remains required before public Runtime release. See [TAPNOW.md](TAPNOW.md).
+TapNow uses collapsed Other Agents / Install Other Agents, verified ZIP download/extraction, automatic ACU configuration over Chrome Native Messaging, and receipt-confirmed setup. Chrome Web Store is not required. First unpacked loading and update reload require Chrome user confirmation. See [TAPNOW.md](TAPNOW.md) for verification boundaries.
 
 # ACU Runtime 0.1.58
 
