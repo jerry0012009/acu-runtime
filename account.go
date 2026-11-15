@@ -184,7 +184,16 @@ func (kernel *kernelState) exchange(ctx context.Context, method, path string, in
 	if method != http.MethodGet {
 		request.Header.Set("Origin", endpoint.Scheme+"://"+endpoint.Host)
 	}
-	response, err := kernel.client.Do(request)
+	client := kernel.client
+	if path == "/api/library/video/prepare" || path == "/api/library/video/frames" {
+		copy := *kernel.client
+		copy.Timeout = 100 * time.Second
+		if path == "/api/library/video/prepare" {
+			copy.Timeout = 8 * time.Minute
+		}
+		client = &copy
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return errors.New("本机服务暂时不可用，请检查内核状态")
 	}

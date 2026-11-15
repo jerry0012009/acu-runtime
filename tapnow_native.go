@@ -367,6 +367,10 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	edition := tapnowOriginEdition(msg.Origin)
 	if msg.Action == "video-frames" {
+		if edition != "companion" {
+			host.json(w, 403, tapnowVideoReply{Error: "备份插件不支持视频审阅"})
+			return
+		}
 		host.tapnowVideoFrames(w, r, msg)
 		return
 	}

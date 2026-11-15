@@ -132,7 +132,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             processes.append(subprocess.Popen([kernel, "web", "--addr", origin.split("//")[1], "--no-open"],
                 env=env, stdout=log, stderr=log, **flags))
             wait(origin + "/?k=" + env["MAGPIE_WEB_KEY"])
-            expected_kernel = re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text(encoding="utf-8"))[1]
+            expected_kernel = os.environ.get("ACU_TEST_KERNEL_VERSION") or re.search(r'const kernelVersion = "v([^"]+)"', (Path(__file__).resolve().parent.parent / "kernel_install.go").read_text(encoding="utf-8"))[1]
             actual_kernel = json.loads(wait("http://" + env["MAGPIE_ADDR"] + "/"))["version"]
             assert actual_kernel == expected_kernel, (actual_kernel, expected_kernel)
             models = ["acu-auto", "gpt-6.1-sol", "gpt-image-2.5-sunburst-2026-09-08", "grok-imagine-video", "grok-imagine-video-1.5"]
@@ -203,6 +203,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 "args":["--from", "duckduckgo-mcp-server[browser]==0.7.0", "duckduckgo-mcp-server"],
                 "note":"ACU Runtime recommended tools v1", "agents":["hermes"], "local":True}})
             body = {"provider": "acu-runtime", "agents": ids}
+            request(origin + "/api/library/video/prepare", {})
             applied = request(rt + "/runtime/capabilities", body, token)
             repeated = request(rt + "/runtime/capabilities", body, token)
             owned = [s for s in request(origin + "/api/library")["servers"]

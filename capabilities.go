@@ -43,7 +43,7 @@ type capabilityLibrary struct {
 	} `json:"result"`
 }
 type capabilityView struct {
-	VideoReadingReady bool `json:"videoReadingReady"`
+	VideoReadingReady     bool              `json:"videoReadingReady"`
 	Provider              string            `json:"provider"`
 	Vision                string            `json:"vision"`
 	ImageGen              string            `json:"imageGen"`
@@ -110,7 +110,7 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	}
 	for _, tool := range lib.Servers {
 		if tool.Note == capabilityOwner {
-			if tool.Name == videoReadingName && tool.stored["paused"] != true && len(tool.Agents) > 0 {
+			if tool.Name == videoReadingName && tool.stored["hidden"] != true && tool.stored["paused"] != true && len(tool.Agents) > 0 {
 				view.VideoReadingReady = true
 				if disabled, ok := tool.stored["disabledTools"].([]any); ok && slices.Contains(disabled, any("video_watch")) {
 					view.VideoReadingReady = false
@@ -188,7 +188,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 		return view, errors.New("请选择可用的 ACU Key")
 	}
 	if input.VideoEnabled != nil {
-		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading!=nil {
+		if input.ModelsOnly || input.Vision != nil || input.ImageGen != nil || input.VideoGen != nil || len(input.Agents) > 0 || input.FreeSearch != nil || input.SearchURL != nil || input.VideoReading != nil {
 			return view, errors.New("请单独保存视频工具设置")
 		}
 		if err := host.setVideoToolEnabled(ctx, lib, *input.VideoEnabled); err != nil {
@@ -211,7 +211,7 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			return view, errors.New("视频模型不可用，请刷新后重新选择")
 		}
 	}
-	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil || input.VideoReading!=nil) {
+	if input.ModelsOnly && (len(input.Agents) > 0 || input.SearchURL != nil || input.FreeSearch != nil || input.VideoReading != nil) {
 		return view, errors.New("模型设置不能同时修改工具或搜索服务")
 	}
 	// Saving shared model picks must never prepare dependencies or rewrite MCP

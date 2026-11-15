@@ -24,10 +24,17 @@ func (host *server) tapnowVideoFrames(w http.ResponseWriter, r *http.Request, ms
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 95*time.Second)
 	defer cancel()
-	var result tapnowVideoReply
+	var result struct {
+		Schema int              `json:"schema"`
+		Result tapnowVideoReply `json:"result"`
+	}
 	if err := host.kernel.exchange(ctx, "POST", "/api/library/video/frames", map[string]string{"url": msg.URL}, &result); err != nil {
 		host.json(w, 200, tapnowVideoReply{Error: "Magpie 视频读取暂不可用，请检查配套内核"})
 		return
 	}
-	host.json(w, 200, result)
+	if result.Schema != 1 {
+		host.json(w, 200, tapnowVideoReply{Error: "Magpie 视频读取协议不兼容"})
+		return
+	}
+	host.json(w, 200, result.Result)
 }

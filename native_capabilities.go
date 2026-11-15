@@ -92,6 +92,12 @@ func (host *server) assignNativeTool(ctx context.Context, name, kind string, age
 		// User-customized endpoints, launchers and advanced choices remain intact.
 		u, parseErr := url.Parse(old.URL)
 		legacy := parseErr == nil && old.Transport == "http" && u.Scheme == "http" && loopback(u.Hostname()) && u.Path == "/mcp/magpie/"+kind && u.User == nil && u.RawQuery == "" && u.Fragment == "" && !hasCommand
+		if kind == "video" && old.Transport == "stdio" {
+			self, _ := os.Executable()
+			command, _ := old.stored["command"].(string)
+			args, _ := old.stored["args"].([]any)
+			legacy = command == self && len(args) == 1 && args[0] == "--video-reader"
+		}
 		if !legacy {
 			if !sameAssignments(ids, old.Agents) {
 				if err = host.writeToolLibrary(ctx, "/api/library/servers/agents", map[string]any{"name": name, "agents": ids}); err != nil {

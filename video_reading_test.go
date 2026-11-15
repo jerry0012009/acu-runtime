@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,26 @@ func TestUnsupportedKernelNeverInstallsOrLaunchesRuntimeFallback(t *testing.T) {
 	}
 }
 
+func TestVideoReadingMigratesPreviousRuntimeLauncher(t *testing.T) {
+	host, f := capabilityTestHost(t)
+	self, _ := os.Executable()
+	f.servers = append(f.servers, map[string]any{"name": videoReadingName, "note": capabilityOwner, "transport": "stdio", "command": self, "args": []string{"--video-reader"}, "agents": []string{"codex"}, "disabledTools": []string{"video_detail"}})
+	if err := host.assignVideoReading(context.Background(), []string{"claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.servers) != 2 {
+		t.Fatal("stale or duplicate native entry")
+	}
+	tool := f.servers[1]
+	if tool["command"] != "/native/magpie" {
+		t.Fatal(tool)
+	}
+	encoded, _ := json.Marshal(tool)
+	if !strings.Contains(string(encoded), `"disabledTools":["video_detail"]`) || !strings.Contains(string(encoded), `"agents":["codex","claude"]`) {
+		t.Fatal(string(encoded))
+	}
+}
+
 func TestTapnowFramesAreDelegatedToKernelNotFetchedByRuntime(t *testing.T) {
 	fixtureTapnowIDs(t)
 	calls := 0
@@ -63,7 +84,7 @@ func TestTapnowFramesAreDelegatedToKernelNotFetchedByRuntime(t *testing.T) {
 		if in.URL != "https://files.tapnow.media/test.mov" {
 			t.Fatal(in)
 		}
-		io.WriteString(w, `{"ok":true,"content":[{"type":"image","mimeType":"image/jpeg","data":"aGVsbG8="}],"audioAnalyzed":false}`)
+		io.WriteString(w, `{"schema":1,"result":{"ok":true,"content":[{"type":"image","mimeType":"image/jpeg","data":"aGVsbG8="}],"audioAnalyzed":false}}`)
 	}))
 	host.tapnow.nativeToken = strings.Repeat("a", 64)
 	msg := tapnowNativeMessage{Action: "video-frames", Origin: "chrome-extension://" + tapnowCompanionID + "/", Version: "0.1.24", URL: "https://files.tapnow.media/test.mov"}

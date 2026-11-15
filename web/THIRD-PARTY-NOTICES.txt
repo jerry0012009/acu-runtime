@@ -1,27 +1,8 @@
 ACU Runtime — third-party notices
 
-Optional video reading (downloaded only during explicit setup)
-
-claude-video-vision 1.4.0 by Jordan Vasconcelos, MIT
-Source: https://github.com/jordanrendric/claude-video-vision
-The unchanged npm distribution and its LICENSE are retained under the
-current-user ACURuntime/video-reading directory. ACU adds a visual-only
-MCP launcher; it does not replace the upstream decoding implementation.
-
-Node.js 24.22.3, MIT and bundled third-party licenses
-Source: https://nodejs.org/dist/v24.22.3/
-The official distribution's LICENSE is retained in the private node directory.
-
-FFmpeg / FFprobe (platform binaries supplied by @ffmpeg-installer/ffmpeg 1.1.0
-and @ffprobe-installer/ffprobe 2.1.2)
-Sources: https://github.com/ffmpeg-installer/ffmpeg-installer
-         https://github.com/descriptinc/ffprobe-installer
-         https://ffmpeg.org/
-Builds have platform-specific LGPL/GPL terms. Their packages, provenance and
-license/readme files remain beside the downloaded binaries in node_modules.
-These executables are separate processes, not linked into ACU Runtime.
-Source and build links: https://github.com/ffmpeg-installer/ffmpeg-installer#custom-builds
-                       https://github.com/descriptinc/ffprobe-installer
+Optional video reading is provided and managed by the matching Magpie kernel.
+Runtime does not bundle or install Node, FFmpeg, FFprobe or the video MCP.
+The kernel retains its downloaded components' licenses and provenance.
 
 Magpie
 Source: https://github.com/yetone/magpie
