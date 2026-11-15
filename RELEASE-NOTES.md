@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.86
+# ACU Runtime 0.1.87
+
+修复 TapNow 重新接入时从外部打开 chrome-extension:// 插件页、可能出现 ERR_BLOCKED_BY_CLIENT 的流程。Runtime 不再启动插件内部地址；已加载插件请从 Chrome 右上角扩展菜单打开 TapNow 弹窗，弹窗尝试连接本机 Runtime，失败可点击“连接 ACU Runtime”重试。副驾驶和备份均有此入口，无需复制 Key。
+
+配套插件升级至 0.1.25，连接与配置保存直接在插件弹窗内完成，不再要求跳转 connect.html。Runtime 会提示确认插件已加载、启用且无加载错误；不存在、停用、浏览器配置不同或组织策略阻止时不能将页面错误视为已接入。保留地址复制引导、GPT-6.1 Sol 推荐和 API Key 自动替换。更新后在 Chrome 重新加载插件，再从扩展菜单打开插件完成连接。
+
+## 保留 0.1.86 的扩展页地址引导
 
 修复 TapNow 安装引导中“打开 Chrome 扩展页”仅启动默认页面的问题。普通 Chrome 会过滤外部命令行传入的 chrome://extensions/；入口现改为“复制地址并打开 Chrome”，先复制扩展页地址，再打开普通 Chrome 窗口。请在 Chrome 地址栏粘贴并回车，不要粘贴到网页搜索框。
 
@@ -182,9 +188,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.86-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.86-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.86-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.87-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.87-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.87-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

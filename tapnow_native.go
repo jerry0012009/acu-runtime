@@ -281,7 +281,12 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 	}
 	s.grants[edition] = grant
 	s.Unlock()
-	address := "chrome-extension://" + tapnowID(edition) + "/connect.html"
+	// Extension pages may be blocked when launched from an external process,
+	// even with a valid local extension ID. Native connection is extension-owned.
+	address := "https://app.tapnow.ai/"
+	s.Lock()
+	s.message = "请在 Chrome 右上角扩展菜单中打开 TapNow 插件，点击“连接 ACU Runtime”完成配置"
+	s.Unlock()
 	if install && reloadRequired {
 		// Chrome filters privileged internal URLs passed by external launchers.
 		// Launch a normal page and let the guide direct address-bar navigation.

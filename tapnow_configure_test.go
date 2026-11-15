@@ -98,7 +98,7 @@ func TestTapnowConfigureAlwaysRefreshesAndRequiresPreparedVersion(t *testing.T) 
 	// rather than unnecessarily sending the user through directory loading again.
 	calls = nil
 	configure()
-	if len(calls) != 2 || opened != "chrome-extension://"+tapnowCompanionID+"/connect.html" {
+	if len(calls) != 2 || opened != "https://app.tapnow.ai/" {
 		t.Fatal(calls, opened)
 	}
 	// A failed new attempt cannot report a previous confirmed configuration.

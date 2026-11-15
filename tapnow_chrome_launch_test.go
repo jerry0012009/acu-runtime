@@ -12,7 +12,7 @@ func TestTapnowChromeLaunchDoesNotClaimInternalNavigation(t *testing.T) {
 		}
 	}
 	address := "chrome-extension://" + tapnowCompanionID + "/connect.html"
-	if got := tapnowChromeLaunchArgs(address); got[1] != address {
+	if got := tapnowChromeLaunchArgs(address); got[1] != "https://app.tapnow.ai/" {
 		t.Fatal(got)
 	}
 }
