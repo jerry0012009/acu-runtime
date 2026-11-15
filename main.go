@@ -85,30 +85,29 @@ type kernelState struct {
 }
 
 type server struct {
-	kernel              *kernelState
-	token               string
-	host                string
-	web                 http.Handler
-	desktop             bool
-	background          bool
-	kernelProbe         func() (string, error)
-	quitRequests        chan struct{}
-	desktopActions      chan desktopAction
-	lifecycle           context.Context
-	account             accountState
-	accountFile         string
-	accountFileMu       sync.Mutex
-	prices              priceCache
-	loginRequests       chan loginTicket
-	cloudTransport      http.RoundTripper
-	update              updateState
-	capabilityMu        sync.Mutex
-	setKernelSetting    func(context.Context, string, string) error
-	imageSkillSource    func() (string, error)
-	prepareVideoReading func(context.Context) (videoReadingInstall, error)
-	agentInstall        agentInstallState
-	agentVersions       agentVersionCache
-	tapnow              tapnowState
+	kernel           *kernelState
+	token            string
+	host             string
+	web              http.Handler
+	desktop          bool
+	background       bool
+	kernelProbe      func() (string, error)
+	quitRequests     chan struct{}
+	desktopActions   chan desktopAction
+	lifecycle        context.Context
+	account          accountState
+	accountFile      string
+	accountFileMu    sync.Mutex
+	prices           priceCache
+	loginRequests    chan loginTicket
+	cloudTransport   http.RoundTripper
+	update           updateState
+	capabilityMu     sync.Mutex
+	setKernelSetting func(context.Context, string, string) error
+	imageSkillSource func() (string, error)
+	agentInstall     agentInstallState
+	agentVersions    agentVersionCache
+	tapnow           tapnowState
 }
 
 func secret() string {
@@ -738,13 +737,6 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 }
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--video-reader" {
-		if err := runVideoReader(context.Background(), os.Stdin, os.Stdout); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
-	}
 	if isTapnowNativeInvocation(os.Args) {
 		_ = runTapnowNative(os.Args[1], os.Stdin, os.Stdout)
 		return

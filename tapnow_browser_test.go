@@ -22,6 +22,10 @@ func TestTapnowNativeBrowserHarness(t *testing.T) {
 	tapnowBackupID = os.Getenv("ACU_TAPNOW_BACKUP_ID")
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/api/library/video/prepare":
+			io.WriteString(w, `{"schema":1,"ready":true}`)
+		case "/api/library/video/frames":
+			io.WriteString(w, `{"ok":false,"error":"视频来源不在 TapNow 素材域名内"}`)
 		case "/api/providers":
 			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://acu.best/v1","key":{"set":true,"masked":"***"},"models":[{"id":"acu-auto","on":true}]}]}`)
 		case "/api/provider/models":
@@ -33,9 +37,6 @@ func TestTapnowNativeBrowserHarness(t *testing.T) {
 		}
 	}))
 	host.desktop = true
-	host.prepareVideoReading = func(context.Context) (videoReadingInstall, error) {
-		return videoReadingInstall{Node: "fixture", Root: t.TempDir()}, nil
-	}
 	host.tapnow.register = func() error { return nil }
 	host.tapnow.openStore = func(context.Context, string) error { return nil }
 	host.token = "isolated-native-browser-session"

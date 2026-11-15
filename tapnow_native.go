@@ -249,7 +249,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		s.Lock()
 		s.phase = "preparing-video"
 		s.Unlock()
-		if _, videoErr := host.prepareVideoTools(ctx); videoErr != nil {
+		if videoErr := host.prepareVideoTools(ctx); videoErr != nil {
 			fail(videoErr)
 			return
 		}
@@ -375,6 +375,10 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	edition := tapnowOriginEdition(msg.Origin)
+	if msg.Action == "video-frames" {
+		host.tapnowVideoFrames(w, r, msg)
+		return
+	}
 	s.Lock()
 	g := s.grants[edition]
 	if edition == "" || g == nil || time.Now().After(g.Expires) {
@@ -497,11 +501,6 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || !releaseVersionPattern.MatchString(msg.Version) || (msg.Action != "connect" && msg.Action != "ack" && msg.Action != "video-frames") {
 		return fail("invalid native message")
 	}
-	if msg.Action == "video-frames" {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		return writeNativeFrame(out, runTapnowVideo(ctx, origin, msg))
-	}
 	root, err := (&tapnowState{}).directory()
 	if err != nil {
 		return fail("请先打开 ACU Runtime 并点击接入")
@@ -513,7 +512,7 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	payload, err := os.ReadFile(file)
 	var session tapnowNativeSession
-	if err != nil || json.Unmarshal(payload, &session) != nil || !time.Now().Before(session.Expires) || session.Expires.After(time.Now().Add(11*time.Minute)) || !digestPattern.MatchString(session.Token) {
+	if err != nil || json.Unmarshal(payload, &session) != nil || (msg.Action != "video-frames" && !time.Now().Before(session.Expires)) || session.Expires.After(time.Now().Add(11*time.Minute)) || !digestPattern.MatchString(session.Token) {
 		return fail("本机授权已过期，请重新接入")
 	}
 	u, err := url.Parse(session.Origin)
@@ -522,7 +521,11 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	msg.Origin = origin
 	body, _ = json.Marshal(msg)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	timeout := 30 * time.Second
+	if msg.Action == "video-frames" {
+		timeout = 100 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", session.Origin+"/runtime/tapnow/native", bytes.NewReader(body))
 	if err != nil {
@@ -530,14 +533,14 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-ACU-Tapnow-Token", session.Token)
-	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}
 	res, err := client.Do(req)
 	if err != nil {
 		return fail("ACU Runtime 暂不可连接，请重新接入")
 	}
 	defer res.Body.Close()
-	var reply tapnowNativeReply
-	if json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&reply) != nil {
+	var reply json.RawMessage
+	if json.NewDecoder(io.LimitReader(res.Body, 900<<10)).Decode(&reply) != nil {
 		return fail("invalid native reply")
 	}
 	return writeNativeFrame(out, reply)

@@ -205,7 +205,7 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             # Native stdio definitions and ACU names must survive real agent sync.
             for tool in owned:
                 assert tool["transport"] == "stdio", tool
-                assert tool["args"][0] == ("--video-reader" if tool["name"] == "acu-video-reader" else "mcp"), tool
+                assert tool["args"][0] == "mcp", tool
                 assert Path(tool["command"]).is_file(), tool
                 proc = subprocess.Popen([tool["command"], *tool["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
                 replies = queue.Queue()

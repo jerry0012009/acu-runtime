@@ -31,6 +31,8 @@ func nativeFixtureHost(t *testing.T) *server {
 	fixtureTapnowIDs(t)
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/api/library/video/prepare":
+			io.WriteString(w, `{"schema":1,"ready":true}`)
 		case "/api/providers":
 			io.WriteString(w, `{"providers":[{"id":"acu","responses":"https://acu.best/v1","key":{"set":true,"masked":"***"},"models":[{"id":"acu-auto","on":true}]}]}`)
 		case "/api/provider/key":
@@ -43,9 +45,6 @@ func nativeFixtureHost(t *testing.T) *server {
 		}
 	}))
 	host.desktop = true
-	host.prepareVideoReading = func(context.Context) (videoReadingInstall, error) {
-		return videoReadingInstall{Node: "fixture", Root: t.TempDir()}, nil
-	}
 	host.tapnow.root = t.TempDir()
 	host.tapnow.register = func() error { return nil }
 	host.tapnow.openStore = func(context.Context, string) error { return nil }

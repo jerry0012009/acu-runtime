@@ -134,6 +134,8 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 			calls = append(calls, r.URL.Path)
 		}
 		switch r.URL.Path {
+		case "/api/library/video/prepare":
+			io.WriteString(w, `{"schema":1,"ready":true}`)
 		case "/api/providers":
 			io.WriteString(w, setupProviders)
 		case "/api/provider/key":

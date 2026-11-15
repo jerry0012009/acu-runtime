@@ -53,7 +53,7 @@ func (host *server) assignNativeTool(ctx context.Context, name, kind string, age
 	if len(agents) == 0 {
 		return nil
 	}
-	marketID := map[string]string{"vision": "magpie-vision", "image": "magpie-image", "web-search": "magpie-web-search"}[kind]
+	marketID := map[string]string{"vision": "magpie-vision", "image": "magpie-image", "web-search": "magpie-web-search", "video": "magpie-video"}[kind]
 	lib, err := host.readToolLibrary(ctx)
 	if err != nil {
 		return err

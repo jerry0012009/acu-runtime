@@ -52,11 +52,6 @@ jobs:
           ACU_AGENT_INSTALL_SMOKE: '1'
         shell: bash
         run: go test -run '^TestOfficialWorkBuddyInstallSmoke$' -v -timeout 25m .
-      - name: Verify isolated video dependency preparation and actual MOV reading
-        env:
-          ACU_VIDEO_READING_SMOKE: '1'
-        shell: bash
-        run: go test -run '^TestVideoReadingRealMCP$' -v -timeout 7m .
       - name: Verify preference page in both themes and all widths
         shell: bash
         run: |

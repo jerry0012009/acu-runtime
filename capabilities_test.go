@@ -17,6 +17,7 @@ type capabilityFixture struct {
 	fail         bool
 	searchKey    string
 	refreshError bool
+	videoError   bool
 }
 
 func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
@@ -28,6 +29,12 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			f.writes = append(f.writes, r.URL.Path)
 		}
 		switch r.URL.Path {
+		case "/api/library/video/prepare":
+			if f.videoError {
+				http.Error(w, "unsupported", 404)
+				return
+			}
+			io.WriteString(w, `{"schema":1,"ready":true}`)
 		case "/api/provider/models":
 			if f.refreshError {
 				http.Error(w, "network unavailable", 502)
@@ -47,11 +54,11 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		case "/api/library":
 			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers})
 		case "/api/library/market/servers":
-			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"}]}`)
+			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"},{"id":"magpie-video","name":"magpie-video"}]}`)
 		case "/api/library/market/server":
 			var in struct{ ID string }
 			json.NewDecoder(r.Body).Decode(&in)
-			kind := map[string]string{"magpie-vision": "vision", "magpie-image": "image", "magpie-web-search": "search"}[in.ID]
+			kind := map[string]string{"magpie-vision": "vision", "magpie-image": "image", "magpie-web-search": "search", "magpie-video": "video"}[in.ID]
 			f.servers = append(f.servers, map[string]any{"name": in.ID, "transport": "stdio", "command": "/native/magpie", "args": []string{"mcp", kind}, "agents": []string{}})
 			io.WriteString(w, `{}`)
 		case "/api/library/servers/agents":
@@ -134,9 +141,6 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		return nil
 	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
-	host.prepareVideoReading = func(context.Context) (videoReadingInstall, error) {
-		return videoReadingInstall{Node: "/fixture/node", Root: "/fixture/video"}, nil
-	}
 	return host, f
 }
 
