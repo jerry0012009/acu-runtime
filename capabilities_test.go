@@ -17,7 +17,6 @@ type capabilityFixture struct {
 	fail         bool
 	searchKey    string
 	refreshError bool
-	videoError   bool
 }
 
 func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
@@ -29,12 +28,6 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			f.writes = append(f.writes, r.URL.Path)
 		}
 		switch r.URL.Path {
-		case "/api/library/video/prepare":
-			if f.videoError {
-				http.Error(w, "unsupported", 404)
-				return
-			}
-			io.WriteString(w, `{"schema":1,"ready":true}`)
 		case "/api/provider/models":
 			if f.refreshError {
 				http.Error(w, "network unavailable", 502)
@@ -141,6 +134,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		return nil
 	}
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
+	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	return host, f
 }
 

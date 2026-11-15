@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 )
 
-func TestVideoReadingAssignmentUsesKernelAndPreservesCustomization(t *testing.T) {
+func TestVideoReadingUsesStandardExternalMCP(t *testing.T) {
 	host, f := capabilityTestHost(t)
 	for range 2 {
 		if err := host.assignVideoReading(context.Background(), []string{"codex"}); err != nil {
@@ -19,88 +17,50 @@ func TestVideoReadingAssignmentUsesKernelAndPreservesCustomization(t *testing.T)
 		}
 	}
 	if len(f.servers) != 2 {
-		t.Fatal("duplicate server", f.servers)
+		t.Fatal("duplicate tool")
 	}
 	tool := f.servers[1]
-	if tool["command"] != "/native/magpie" {
-		t.Fatal("Runtime became MCP launcher", tool)
+	if tool["command"] != "/fixture/acu-video-mcp" {
+		t.Fatal("not external MCP", tool)
 	}
-	encoded, _ := json.Marshal(tool["args"])
-	if string(encoded) != `["mcp","video"]` {
-		t.Fatal(string(encoded))
+	data, _ := json.Marshal(tool["args"])
+	if string(data) != "[]" {
+		t.Fatal(string(data))
+	}
+	for _, write := range f.writes {
+		if strings.Contains(write, "/video/") {
+			t.Fatal("private kernel API", write)
+		}
 	}
 	tool["command"] = "custom"
-	tool["paused"] = true
+	tool["hidden"] = true
 	tool["disabledTools"] = []string{"video_watch"}
 	if err := host.assignVideoReading(context.Background(), []string{"claude"}); err != nil {
 		t.Fatal(err)
 	}
-	if tool["command"] != "custom" || tool["paused"] != true {
-		t.Fatal("overwrote customization")
+	if tool["command"] != "custom" || tool["hidden"] != true {
+		t.Fatal("customization lost")
 	}
 }
-
-func TestUnsupportedKernelNeverInstallsOrLaunchesRuntimeFallback(t *testing.T) {
+func TestVideoReadingFailureDoesNotAssignUnavailableTool(t *testing.T) {
 	host, f := capabilityTestHost(t)
-	f.videoError = true
-	if err := host.assignVideoReading(context.Background(), []string{"codex"}); err == nil {
-		t.Fatal("false readiness")
+	host.videoToolPath = func(context.Context) (string, error) { return "", errors.New("offline") }
+	if host.assignVideoReading(context.Background(), []string{"codex"}) == nil {
+		t.Fatal("false success")
 	}
-	if len(f.servers) != 1 || len(f.writes) != 1 || f.writes[0] != "/api/library/video/prepare" {
-		t.Fatal(f.writes, f.servers)
+	if len(f.writes) != 0 {
+		t.Fatal(f.writes)
 	}
 }
-
-func TestVideoReadingMigratesPreviousRuntimeLauncher(t *testing.T) {
+func TestVideoReadingMigratesOnlyOwnLegacyLauncher(t *testing.T) {
 	host, f := capabilityTestHost(t)
 	self, _ := os.Executable()
-	f.servers = append(f.servers, map[string]any{"name": videoReadingName, "note": capabilityOwner, "transport": "stdio", "command": self, "args": []string{"--video-reader"}, "agents": []string{"codex"}, "disabledTools": []string{"video_detail"}})
+	f.servers = append(f.servers, map[string]any{"name": videoReadingName, "note": capabilityOwner, "command": self, "transport": "stdio", "args": []string{"--video-reader"}, "agents": []string{"codex"}, "disabledTools": []string{"video_detail"}})
 	if err := host.assignVideoReading(context.Background(), []string{"claude"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.servers) != 2 {
-		t.Fatal("stale or duplicate native entry")
-	}
-	tool := f.servers[1]
-	if tool["command"] != "/native/magpie" {
-		t.Fatal(tool)
-	}
-	encoded, _ := json.Marshal(tool)
-	if !strings.Contains(string(encoded), `"disabledTools":["video_detail"]`) || !strings.Contains(string(encoded), `"agents":["codex","claude"]`) {
-		t.Fatal(string(encoded))
-	}
-}
-
-func TestTapnowFramesAreDelegatedToKernelNotFetchedByRuntime(t *testing.T) {
-	fixtureTapnowIDs(t)
-	calls := 0
-	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if r.URL.Path != "/api/library/video/frames" {
-			t.Fatal(r.URL.Path)
-		}
-		var in struct{ URL string }
-		json.NewDecoder(r.Body).Decode(&in)
-		if in.URL != "https://files.tapnow.media/test.mov" {
-			t.Fatal(in)
-		}
-		io.WriteString(w, `{"schema":1,"result":{"ok":true,"content":[{"type":"image","mimeType":"image/jpeg","data":"aGVsbG8="}],"audioAnalyzed":false}}`)
-	}))
-	host.tapnow.nativeToken = strings.Repeat("a", 64)
-	msg := tapnowNativeMessage{Action: "video-frames", Origin: "chrome-extension://" + tapnowCompanionID + "/", Version: "0.1.24", URL: "https://files.tapnow.media/test.mov"}
-	w := nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"ok":true`) || calls != 1 {
-		t.Fatal(w.Code, w.Body.String(), calls)
-	}
-	msg.Origin = "chrome-extension://" + tapnowBackupID + "/"
-	w = nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
-	if w.Code != 403 || calls != 1 {
-		t.Fatal("backup reached kernel", w.Code, calls)
-	}
-	w = httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/runtime/tapnow/native", strings.NewReader(`{}`))
-	host.tapnowNativeAPI(w, r)
-	if w.Code != 403 || calls != 1 {
-		t.Fatal("browser reached kernel")
+	data, _ := json.Marshal(f.servers[1])
+	if !strings.Contains(string(data), `"command":"/fixture/acu-video-mcp"`) || !strings.Contains(string(data), `"disabledTools":["video_detail"]`) {
+		t.Fatal(string(data))
 	}
 }

@@ -1,79 +1,34 @@
-# Video Reading Integration
+# Standard external video MCP
 
-Development candidate, not a published Runtime or TapNow release.
+Runtime 0.1.88 uses unchanged official Magpie and the independent self-contained
+`jerry0012009/acu-video-mcp` 0.1.0 release. No Magpie source patch, private video
+API, alternate kernel update feed, runtime npm installer or Runtime video decoder.
 
-## Reused implementation
+Explicit one-click setup downloads the platform tool executable to the current
+user's versioned tools directory and verifies the pinned release SHA-256. The
+tool's `--prepare` unpacks its embedded dependencies; `--register-native` registers
+its own `com.acucompute.video` host for Companion only. Runtime writes a normal
+stdio MCP definition through Magpie's existing Library API. Existing assignments,
+custom launchers, hidden state and disabled tools remain. The old unpublished
+Runtime launcher is migrated only when its exact owned command matches.
 
-Video parsing, frame extraction, structure inspection and detail tools come from
-`claude-video-vision@1.4.0` (MIT). Magpie owns dependency installation, visual-only
-defaults and MCP lifecycle. Runtime only presents UI and forwards to kernel APIs.
+The independent executable bundles Node 24.22.3, unchanged upstream
+claude-video-vision 1.4.0, FFmpeg and FFprobe. No user-installed Node/FFmpeg or
+provider key is required for frame extraction. Media parsing and sampling remain
+upstream-owned; the adapter enforces visual-only mode. Frames still require an
+image-capable model/client or verified image interpretation path.
 
-Magpie's explicit preparation API prepares a private Node 24.22.3 distribution, checks its
-pinned SHA-256, installs exact lockfile dependencies using `npm ci --ignore-scripts`,
-checks FFmpeg/FFprobe execution. Runtime assigns the native `magpie mcp video`
-definition as `acu-video-reader` through the existing Library API.
-No system Node, shell profile, model credentials or existing custom MCP is replaced.
-Subsequent setup preserves custom commands, disabled tools, pause state and assignments.
-The unchanged previous bundled image guidance is upgraded to mention video reading;
-user-edited guidance is preserved.
+TapNow uses its own `com.acucompute.video` Native Messaging request directly.
+Runtime and the Magpie window need not proxy media. The independent host accepts
+only the Companion origin, exact HTTPS TapNow media hosts and bounded requests;
+Backup and other origins are refused. Redirects/private DNS addresses are refused,
+downloads are temporary, max 100 MiB/30 minutes, and sample results stay below
+Chrome's 1 MiB reply limit. Audio is not analyzed. Existing output is not assumed
+to match an edited prompt, and suggestions never trigger generation or learning.
 
-The launcher exposes four upstream read tools and forces cloud/local audio
-transcription off. It does not download Whisper or send inference during setup.
-Reading returns images and timestamps, not an automatic text interpretation.
-An image-capable model/client or a separately verified image interpretation path
-is required. Native tool trust prompts and reopening an Agent remain client-owned.
-
-## TapNow
-
-Companion setup also prepares the same dependencies. The existing native host
-accepts a small `video-frames` request only from the Companion extension identity.
-Backup is refused. The Native Host forwards to the authenticated Runtime local
-API, which forwards to Magpie's management API. Runtime and the kernel must be
-running; no video subprocess or download takes place in the Native Host. Video
-forwarding does not reuse or claim another credential grant.
-Unpacked extension identity is not package authentication; trust the verified ZIP
-and the local OS account, as in the existing native connection.
-
-Only exact HTTPS files.tapnow.media/files.tapnow.top URLs are accepted; no cookies
-or TapNow bearer token are sent. Referer is fixed to app.tapnow.ai. Redirects,
-private DNS addresses, oversized downloads and non-video responses are refused.
-Downloaded video is temporary, at most 100 MiB and 30 minutes. Upstream MCP
-provides approximately 12 whole-video samples, 640px wide; native results are
-bounded below Chrome's 1 MiB host-response limit. At most three videos are read
-per review. Omitted/failed material and lack of audio are explicit.
-
-Companion combines samples with its existing image/text review and creative-memory
-service. It distinguishes upstream references from unbound existing output.
-Changed video URLs/roles/node identity invalidate late results. It does not prove
-that existing output belongs to the current edited prompt, auto-regenerate video,
-intercept TapNow generation, or independently train preferences from its own critique.
-
-## Verification
-
-- Runtime Go tests, race tests, vet and Windows test-binary cross-compilation.
-- Runtime frontend tests and light/dark 390px/1440px browser screenshots.
-- The previous Runtime-owned candidate was tested with Magpie 0.1.4096. Those
-  results do not certify the new kernel-owned implementation.
-- The new kernel patch is based on upstream v0.1.4248. It must be built and
-  packaged separately; the currently published official binary lacks these APIs.
-  Runtime refuses missing APIs rather than installing a local fallback.
-- Actual Chromium MV3/native-host configuration roundtrip and denied unsafe video
-  requests, plus plugin unit tests and both extension builds.
-
-Kernel-owned revision acceptance: built `0.1.4248-video-dev` completed isolated
-preparation and 12-frame MOV MCP smoke. Runtime integration with that binary
-passed all four Agent writers, repeat/no-duplicates, old MCP preservation, native
-video commands and four MCP tool lists. Runtime tests/race/vet, 132 frontend
-tests and 91 Companion tests passed. Full kernel regression results are recorded
-in the kernel's own acceptance record; prior Runtime-owned results are not reused.
-
-The kernel-wide regression was attempted but did not pass: its Darwin runtime
-overlay test cannot overlay the Go toolchain inside GOMODCACHE. That exact test
-passed with the same toolchain outside the cache. The original full run was
-stopped after the platform-package correction and is not release evidence.
-
-No real private TapNow canvas, paid vision model quality, ProRes/HDR/HEVC matrix,
-Windows/macOS dependency execution, or every Agent's image-tool-result handling
-is inferred from Linux fixtures. Full plugin strict typecheck has pre-existing
-diagnostics; the new video module's focused strict typecheck passes. Public ZIP/version
-catalog activation and cross-platform Runtime publication are separate release work.
+The independent release's Windows x64, Linux x64 and both Mac architecture native
+CI builds/race tests/vet/MOV self-tests passed before its hashes were activated.
+Runtime/plugin tests, official-kernel configuration and Native Messaging checks
+are tracked in release acceptance. This is not exhaustive video defect detection
+or a claim of paid-model quality acceptance. Chrome's first extension load and
+Agent trust remain user confirmations. Official kernel updates remain independent.

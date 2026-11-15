@@ -134,8 +134,6 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 			calls = append(calls, r.URL.Path)
 		}
 		switch r.URL.Path {
-		case "/api/library/video/prepare":
-			io.WriteString(w, `{"schema":1,"ready":true}`)
 		case "/api/providers":
 			io.WriteString(w, setupProviders)
 		case "/api/provider/key":
@@ -160,6 +158,7 @@ func TestInstalledAgentDelegatesAndPreservesExistingModel(t *testing.T) {
 		}
 	}))
 	host.cloudTransport = modelProbe(t, 200)
+	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
 	if err := host.configureInstalledAgent(context.Background(), "workbuddy", "acu-runtime", "acu-auto"); err != nil {
 		t.Fatal(err)

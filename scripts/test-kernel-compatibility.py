@@ -203,7 +203,6 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
                 "args":["--from", "duckduckgo-mcp-server[browser]==0.7.0", "duckduckgo-mcp-server"],
                 "note":"ACU Runtime recommended tools v1", "agents":["hermes"], "local":True}})
             body = {"provider": "acu-runtime", "agents": ids}
-            request(origin + "/api/library/video/prepare", {})
             applied = request(rt + "/runtime/capabilities", body, token)
             repeated = request(rt + "/runtime/capabilities", body, token)
             owned = [s for s in request(origin + "/api/library")["servers"]
@@ -235,7 +234,10 @@ with tempfile.TemporaryDirectory(prefix="acu-kernel-compat-") as folder:
             # Native stdio definitions and ACU names must survive real agent sync.
             for tool in owned:
                 assert tool["transport"] == "stdio", tool
-                assert tool["args"][0] == "mcp", tool
+                if tool["name"]=="acu-video-reader":
+                    assert not tool.get("args") and "acu-video-mcp" in tool["command"], tool
+                else:
+                    assert tool["args"][0] == "mcp", tool
                 assert Path(tool["command"]).is_file(), tool
                 proc = subprocess.Popen([tool["command"], *tool["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, text=True, env=env, **flags)
                 replies = queue.Queue()

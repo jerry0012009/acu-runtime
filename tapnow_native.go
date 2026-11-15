@@ -376,14 +376,6 @@ func (host *server) tapnowNativeAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	edition := tapnowOriginEdition(msg.Origin)
-	if msg.Action == "video-frames" {
-		if edition != "companion" {
-			host.json(w, 403, tapnowVideoReply{Error: "备份插件不支持视频审阅"})
-			return
-		}
-		host.tapnowVideoFrames(w, r, msg)
-		return
-	}
 	s.Lock()
 	g := s.grants[edition]
 	if edition == "" || g == nil || time.Now().After(g.Expires) {
@@ -479,7 +471,7 @@ func writeNativeFrame(out io.Writer, value any) error {
 	if err != nil {
 		return err
 	}
-	if len(body) > 900<<10 {
+	if len(body) > 64<<10 {
 		return errors.New("native reply too large")
 	}
 	if err = binary.Write(out, binary.LittleEndian, uint32(len(body))); err != nil {
@@ -503,7 +495,7 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	var msg tapnowNativeMessage
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
-	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || !releaseVersionPattern.MatchString(msg.Version) || (msg.Action != "connect" && msg.Action != "ack" && msg.Action != "video-frames") {
+	if dec.Decode(&msg) != nil || dec.Decode(&struct{}{}) != io.EOF || msg.Origin != "" || !releaseVersionPattern.MatchString(msg.Version) || (msg.Action != "connect" && msg.Action != "ack") {
 		return fail("invalid native message")
 	}
 	root, err := (&tapnowState{}).directory()
@@ -517,7 +509,7 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	}
 	payload, err := os.ReadFile(file)
 	var session tapnowNativeSession
-	if err != nil || json.Unmarshal(payload, &session) != nil || (msg.Action != "video-frames" && !time.Now().Before(session.Expires)) || session.Expires.After(time.Now().Add(11*time.Minute)) || !digestPattern.MatchString(session.Token) {
+	if err != nil || json.Unmarshal(payload, &session) != nil || !time.Now().Before(session.Expires) || session.Expires.After(time.Now().Add(11*time.Minute)) || !digestPattern.MatchString(session.Token) {
 		return fail("本机授权已过期，请重新接入")
 	}
 	u, err := url.Parse(session.Origin)
@@ -527,9 +519,6 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 	msg.Origin = origin
 	body, _ = json.Marshal(msg)
 	timeout := 30 * time.Second
-	if msg.Action == "video-frames" {
-		timeout = 100 * time.Second
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", session.Origin+"/runtime/tapnow/native", bytes.NewReader(body))
@@ -544,8 +533,8 @@ func runTapnowNative(origin string, in io.Reader, out io.Writer) error {
 		return fail("ACU Runtime 暂不可连接，请重新接入")
 	}
 	defer res.Body.Close()
-	var reply json.RawMessage
-	if json.NewDecoder(io.LimitReader(res.Body, 900<<10)).Decode(&reply) != nil {
+	var reply tapnowNativeReply
+	if json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&reply) != nil {
 		return fail("invalid native reply")
 	}
 	return writeNativeFrame(out, reply)
