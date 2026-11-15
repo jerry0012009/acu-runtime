@@ -16,6 +16,8 @@ func TestDesktopActionsValidateAndQueue(t *testing.T) {
 		{`{"action":"main","query":"view=usage&tab=requests&provider=example&unexpected=secret"}`, "test-session", 200},
 		{`{"action":"fit","height":640}`, "test-session", 200},
 		{`{"action":"hide"}`, "test-session", 200},
+		{`{"action":"workbench","page":"image-playground"}`, "test-session", 200},
+		{`{"action":"workbench","page":"https://evil.invalid"}`, "test-session", 400},
 		{`{"action":"main"}`, "", 403},
 		{`{"action":"quit"}`, "test-session", 400},
 		{`{"action":"main","query":"view=https%3A%2F%2Fevil.invalid"}`, "test-session", 400},
@@ -32,7 +34,7 @@ func TestDesktopActionsValidateAndQueue(t *testing.T) {
 			t.Fatalf("%s: got %d, want %d", item.body, response.Code, item.status)
 		}
 	}
-	if len(host.desktopActions) != 3 {
+	if len(host.desktopActions) != 4 {
 		t.Fatalf("unexpected action count: %d", len(host.desktopActions))
 	}
 	first := <-host.desktopActions
