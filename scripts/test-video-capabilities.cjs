@@ -33,13 +33,15 @@ fs.mkdirSync(output, { recursive: true });
    await page.locator('[data-video-enabled]').check();
    await page.waitForFunction(()=>document.querySelector('[data-video-enabled]')?.checked&&!document.querySelector('[data-video-enabled]').disabled);
    assert.deepEqual(writes,[{provider:'acu-runtime',videoEnabled:true}]);
-   await page.locator('#video-request-model').selectOption('acu-runtime/grok-imagine-video-1.5');
-   assert((await page.locator('#video-request').inputValue()).includes('acu-runtime/grok-imagine-video-1.5'));
+   assert.equal(await panel.locator('textarea, select, [data-copy-video-request]').count(),0);
+   assert(!(await panel.innerText()).includes('红色小球'));
+   assert(!(await panel.innerText()).includes('生成请求'));
+   assert((await panel.innerText()).includes('acu-runtime/grok-imagine-video'));
    assert.equal(writes.length,1);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await panel.screenshot({path:path.join(output,`${colorScheme}-${width}.png`)});
    assert.deepEqual(errors,[]);await page.close();
   }
-  console.log('PASS: video model discovery, explicit enable, model-specific request, no hidden writes, desktop/mobile themes.');
+  console.log('PASS: video status and explicit enable without trial prompts or fake model settings, no hidden writes, desktop/mobile themes.');
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

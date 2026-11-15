@@ -1,4 +1,8 @@
-# ACU Runtime 0.1.80
+# ACU Runtime 0.1.81
+
+删除视频配置页的试用提示词、复制请求按钮和不保存配置的模型选择器。视频区保留工具开关、自动模型和实际状态。已有 MCP 生视频、任务等待与文件保存不变。
+
+## 保留 0.1.80 的 TapNow 接入
 
 新增可选 TapNow Agent，放在默认折叠的「其他 Agent」。副驾驶和资产备份按需分别开启，不加入默认批量配置。
 
@@ -14,7 +18,7 @@
 
 「图片、视频与搜索」新增视频生成区：显示原生内核返回的自动模型和可用视频型号，支持明确启用或停用视频工具。旧配置中被禁用的视频工具可一键恢复，其他工具开关与应用分配保留。
 
-选择视频型号可复制对应的生成请求，在已接入的 Agent 中发送。沿用 Magpie 原生 generate_video / generation_result 和 ACU 现有任务系统，不新增媒体服务。视频模型来自内核工具清单，不单独维护型号能力表；配套内核目前没有独立持久化默认视频模型，本次选择用于请求指定。
+沿用 Magpie 原生 generate_video / generation_result 和 ACU 现有任务系统，不新增媒体服务。视频模型来自内核工具清单，不单独维护型号能力表。
 
 快捷推荐新增 Kimi K3.1 Pro、Grok 4.7、Gemini 3.8 Flash，仍以当前 Key 的可用清单为准。已有主模型不自动替换。
 
@@ -154,9 +158,9 @@ Windows x64 支持应用内更新。macOS 12+ 提供 Apple Silicon / Intel DMG �
 
 | 设备 | 文件 |
 | --- | --- |
-| Windows 10/11 x64 | ACU-Runtime-0.1.80-windows-amd64-Setup.exe |
-| Mac Apple Silicon | ACU-Runtime-0.1.80-macos-arm64.dmg |
-| Mac Intel | ACU-Runtime-0.1.80-macos-amd64.dmg |
+| Windows 10/11 x64 | ACU-Runtime-0.1.81-windows-amd64-Setup.exe |
+| Mac Apple Silicon | ACU-Runtime-0.1.81-macos-arm64.dmg |
+| Mac Intel | ACU-Runtime-0.1.81-macos-amd64.dmg |
 
 本版 Runtime 没有 Windows 代码签名或 Apple Developer ID 公证；macOS 包使用 ad-hoc 签名。安装包摘要见 SHA256SUMS.txt。
 

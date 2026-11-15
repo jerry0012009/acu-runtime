@@ -158,7 +158,8 @@ MCP's `tools/list` schema, without a generation request. Enabling video changes
 only `generate_video` in the existing managed server's disabled-tools list via
 the native Library API; other disabled tools, assignments and custom launcher
 options remain intact. The native kernel has no persisted video-default setting,
-so the UI's model-specific request explicitly names a model instead.
+so Runtime does not offer a persistent video-default picker. Version 0.1.81
+removes the trial prompt and its model picker; native MCP calls remain unchanged.
 
 Release compatibility fixtures now list video models and exercise an old disabled
 video tool across all four Agent configuration writers. Browser checks cover
