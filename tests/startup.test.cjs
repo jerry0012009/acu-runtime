@@ -542,7 +542,7 @@ test('workbench omits local routing choices but preserves the exact active advan
   assert(html.includes('Sol · ACU'));
   assert(html.includes('Sol · Codex 原生'));
   assert(html.indexOf('label="推荐模型 · ACU"') < html.indexOf('GLM-5.3-Flash · ACU'));
-  assert(html.indexOf('GLM-5.3-Flash · ACU') < html.indexOf('Claude Opus 5.5 · ACU'));
+  assert(html.indexOf('Claude Opus 5.5 · ACU') < html.indexOf('GLM-5.3-Flash · ACU'));
   assert(html.indexOf('推荐模型 · ACU') < html.indexOf('Codex 原生'));
   agent.model = 'special-route';
   html = instance.run('agentModelSelect(ui.status.agents[0])');
@@ -610,6 +610,27 @@ test('Fable 5.2 is recommended ahead of 5.1 and respects the account model list'
   const selected = instance.run('agentModelSelect(ui.status.agents[0])');
   assert(selected.includes('value="acu-runtime/claude-fable-5" selected'));
   assert.equal(posts(instance).length, 0);
+});
+
+test('new frontier Gemini models and Fable 5.2 are recommended in the saved deterministic order', async () => {
+  const instance = await setup({ready:true,agents:[codex()]});
+  const models=['acu-auto','claude-fable-5-2','gpt-6.1-sol','gpt-6-astra','gemini-4-carbon','gemini-4-hydrogen','claude-opus-5-5'];
+  assert.equal(instance.run('recommendedModels({models:'+JSON.stringify(models.slice().reverse())+'}).join(",")'),models.join(','));
+  assert.equal(instance.run('recommendedModels({models:["gemini-4-hydrogen","gpt-6-astra","claude-fable-5-2"]}).join(",")'),'claude-fable-5-2,gpt-6-astra,gemini-4-hydrogen');
+});
+
+test('existing Agent setup reveals available recommended models without replacing saved model', async () => {
+  const native={...codex(),connected:true,wired:true,modelOptions:[
+    {value:'acu-runtime/acu-auto',ref:'acu-runtime/acu-auto'},
+    {value:'acu-runtime/claude-fable-5-2',ref:'acu-runtime/claude-fable-5-2'},
+    {value:'acu-runtime/gemini-4-carbon',ref:'acu-runtime/gemini-4-carbon',hidden:true},
+    {value:'native/model',label:'Native'},
+  ]};
+  const instance=await setup({ready:true,connection:{...connected(),choices:[{id:'acu-runtime',name:'ACU',masked:'fixture',models:['acu-auto','claude-fable-5-2','gemini-4-carbon']}]},agents:[native]},async(route,options)=>route==='/kernel/api/agent-models/codex'&&!options.method?{body:{models:[{id:'acu-runtime/acu-auto'},{id:'acu-runtime/claude-fable-5-2',hidden:true},{id:'acu-runtime/gemini-4-carbon',hidden:true}]}}:undefined);
+  const result=await instance.run('applyRecommendedVisibility("codex","acu-runtime","acu-auto",true)');
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{hidden:[]});
+  assert.equal(instance.run('ui.status.agents[0].model'),native.model);
+  assert.equal(result,undefined);
 });
 
 test('WorkBuddy one-click setup exposes Fable 5.1 and preserves active legacy and unrelated models', async () => {
