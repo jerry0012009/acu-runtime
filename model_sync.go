@@ -1,0 +1,230 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"time"
+)
+
+// Native management runs without a gateway while the owned gateway is paused.
+// Reserving its port prevents a second watcher from changing the desktop route.
+func nativeCatalogManagement(ctx context.Context, executable string, action func(*kernelState) error) error {
+	gateway, _ := url.Parse(gatewayBase())
+	reserved, err := net.Listen("tcp", gateway.Host)
+	if err != nil {
+		return errors.New("内核端口仍在使用，模型列表未修改")
+	}
+	defer reserved.Close()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return err
+	}
+	address := listener.Addr().String()
+	listener.Close()
+	control, err := newKernel("http://" + address)
+	if err != nil {
+		return err
+	}
+	control.key = secret()
+	control.exe = executable
+	defer control.client.CloseIdleConnections()
+	command := exec.CommandContext(ctx, executable, "web", "--addr", address, "--no-open")
+	command.Env = append(os.Environ(), "MAGPIE_WEB_KEY="+control.key)
+	hideProcess(command)
+	if err = command.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = control.exchange(cleanup, "POST", "/api/window/quit", map[string]any{}, nil)
+		select {
+		case <-done:
+		case <-cleanup.Done():
+			_ = command.Process.Kill()
+			<-done
+		}
+	}()
+	for {
+		if err = control.authenticate(ctx); err == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return action(control)
+}
+
+func (host *server) catalogMutation(ctx context.Context, action func(*kernelState) error) error {
+	if !host.desktop || runtime.GOOS != "windows" {
+		return action(host.kernel)
+	}
+	_, err := host.kernel.changeCodexQuietlyWith(ctx, nil, false, func(executable string) error {
+		return nativeCatalogManagement(ctx, executable, action)
+	})
+	return err
+}
+
+func runCatalogCLI(ctx context.Context, executable string, args []string) error {
+	command := exec.CommandContext(ctx, executable, args...)
+	hideProcess(command)
+	return command.Run()
+}
+
+type syncProvider struct {
+	ID        string `json:"id"`
+	Chat      string `json:"chat"`
+	Responses string `json:"responses"`
+	Anthropic string `json:"anthropic"`
+	Off       bool   `json:"off"`
+	Models    []struct {
+		ID string `json:"id"`
+		On bool   `json:"on"`
+	} `json:"models"`
+}
+
+func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Provider string   `json:"provider"`
+		Models   []string `json:"models"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&input) != nil || input.Provider == "" || len(input.Models) > 100 {
+		host.json(w, 400, map[string]string{"error": "无法读取模型同步配置"})
+		return
+	}
+	if host.desktop && runtime.GOOS == "darwin" && !host.allowCodexDesktopChange(w) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	err := host.catalogMutation(ctx, func(k *kernelState) error {
+		var providers struct {
+			Providers []syncProvider `json:"providers"`
+		}
+		if err := k.exchange(ctx, "GET", "/api/providers", nil, &providers); err != nil {
+			return err
+		}
+		found := false
+		for _, p := range providers.Providers {
+			if p.ID != input.Provider || p.Off {
+				continue
+			}
+			for _, address := range []string{p.Chat, p.Responses, p.Anthropic} {
+				if _, err := acuBase(address); err == nil {
+					found = true
+				}
+			}
+		}
+		if !found {
+			return errors.New("请选择已启用的 ACU Key")
+		}
+		var refreshed struct {
+			Provider syncProvider `json:"provider"`
+		}
+		if err := k.exchange(ctx, "POST", "/api/provider/models", map[string]string{"id": input.Provider}, &refreshed); err != nil {
+			return err
+		}
+		wanted := map[string]bool{}
+		for _, id := range input.Models {
+			wanted[id] = true
+		}
+		args := []string{"provider", "models", input.Provider}
+		for _, m := range refreshed.Provider.Models {
+			if !m.On && wanted[m.ID] && m.ID != "" && !strings.ContainsAny(m.ID, "\r\n, ") {
+				args = append(args, "+"+m.ID)
+			}
+		}
+		if len(args) == 3 {
+			return nil
+		}
+		k.mu.Lock()
+		executable := k.exe
+		k.mu.Unlock()
+		if executable == "" {
+			return errors.New("无法找到配套内核")
+		}
+		if err := runCatalogCLI(ctx, executable, args); err != nil {
+			return errors.New("常用模型同步未完成，请重试")
+		}
+		var verified struct {
+			Providers []syncProvider `json:"providers"`
+		}
+		if err := k.exchange(ctx, "GET", "/api/providers", nil, &verified); err != nil {
+			return err
+		}
+		for _, argument := range args[3:] {
+			id, found := strings.TrimPrefix(argument, "+"), false
+			for _, p := range verified.Providers {
+				if p.ID == input.Provider {
+					for _, m := range p.Models {
+						if m.ID == id && m.On {
+							found = true
+						}
+					}
+				}
+			}
+			if !found {
+				return errors.New("常用模型尚未启用，请重试配置")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		host.json(w, 409, map[string]string{"error": err.Error()})
+		return
+	}
+	host.json(w, 200, map[string]bool{"ok": true})
+}
+
+func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Agent  string    `json:"agent"`
+		Hidden []string  `json:"hidden"`
+		Shown  *[]string `json:"shown"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&input) != nil {
+		host.json(w, 400, map[string]string{"error": "无法读取模型列表"})
+		return
+	}
+	allowed := false
+	for _, a := range supportedAgents {
+		if a.ID == input.Agent {
+			allowed = true
+		}
+	}
+	if !allowed {
+		host.json(w, 400, map[string]string{"error": "请选择支持的应用"})
+		return
+	}
+	if input.Agent == "codex" && !host.allowCodexDesktopChange(w) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	var result agentCatalog
+	err := host.catalogMutation(ctx, func(k *kernelState) error {
+		body := map[string]any{"hidden": input.Hidden}
+		if input.Shown != nil {
+			body = map[string]any{"shown": *input.Shown}
+		}
+		return k.exchange(ctx, "POST", "/api/agent-models/"+input.Agent, body, &result)
+	})
+	if err != nil {
+		host.json(w, 409, map[string]string{"error": err.Error()})
+		return
+	}
+	host.json(w, 200, result)
+}

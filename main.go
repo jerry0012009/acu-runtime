@@ -697,6 +697,10 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.configureACU(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/agents/configure":
 			host.configureAgent(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/models/prepare":
+			host.prepareModels(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/agents/models":
+			host.syncAgentModels(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/kernel/start":
 			lifecycle := host.lifecycle
 			if lifecycle == nil {

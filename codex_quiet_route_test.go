@@ -167,6 +167,35 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatal("missing native login field")
 	}
 	assertLogin(state, "")
+	_, err = k.changeCodexQuietlyWith(ctx, nil, false, func(executable string) error {
+		return nativeCatalogManagement(ctx, executable, func(control *kernelState) error {
+			return control.exchange(ctx, "POST", "/api/agent-models/codex", map[string]any{"hidden": []string{"acu-runtime/second-model"}}, nil)
+		})
+	})
+	if err != nil {
+		t.Fatal("quiet native catalog hide", err)
+	}
+	_, err = k.changeCodexQuietlyWith(ctx, nil, false, func(executable string) error {
+		return nativeCatalogManagement(ctx, executable, func(control *kernelState) error {
+			return control.exchange(ctx, "POST", "/api/agent-models/codex", map[string]any{"hidden": []string{}}, nil)
+		})
+	})
+	if err != nil {
+		t.Fatal("quiet native catalog reveal", err)
+	}
+	var syncedCatalog agentCatalog
+	if err = k.exchange(ctx, "GET", "/api/agent-models/codex", nil, &syncedCatalog); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, m := range syncedCatalog.Models {
+		if m.ID == "acu-runtime/second-model" && !m.Hidden {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("new model was not visible after quiet native sync")
+	}
 	for _, mode := range []string{"api", "chatgpt", ""} {
 		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"login", mode}}, false)
 		if err != nil {

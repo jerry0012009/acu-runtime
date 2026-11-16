@@ -34,6 +34,12 @@ fs.mkdirSync(output, { recursive: true });
         const url = new URL(request.url());
         if (url.pathname === '/runtime/status') return route.fulfill({ json: { ready: true, desktop: false, agents: [agent], connection: { known: true, configured: true, provider: choice.id, choices: [choice] } } });
         if (url.pathname === '/kernel/api/provider/models') return route.fulfill({json:{}});
+        if (url.pathname === '/runtime/models/prepare') return route.fulfill({json:{ok:true}});
+        if (url.pathname === '/runtime/agents/models') {
+          const body = request.postDataJSON(); changes.push(body);
+          catalog.models = catalog.models.map(model=>({...model,hidden:body.hidden.includes(model.id)}));
+          return route.fulfill({json:catalog});
+        }
         if (url.pathname === '/runtime/agents/configure') {
           configurations.push(request.postDataJSON());
           return route.fulfill({ json: { agents: [{ id: agentId, wired: true }] } });
@@ -59,13 +65,13 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(await page.locator('#setup-model').inputValue(), 'acu-auto');
       assert(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth));
       await page.screenshot({ path: path.join(output, `${connected ? 'existing' : 'fresh'}-${theme}-${width}.png`), fullPage: true });
-      const visibilitySaved = page.waitForResponse(response => response.url().endsWith('/kernel/api/agent-models/'+agentId) && response.request().method() === 'POST');
+      const visibilitySaved = page.waitForResponse(response => response.url().endsWith('/runtime/agents/models') && response.request().method() === 'POST');
       await page.locator('[data-confirm-setup]').click();
       await visibilitySaved;
       assert.equal(configurations.length, 1);
       assert.equal(configurations[0].model, 'acu-auto');
       assert.equal(configurations[0].preserve === true, connected);
-      assert.deepEqual(changes, [{ hidden: [] }]);
+      assert.deepEqual(changes, [{ agent:agentId, hidden: [] }]);
       assert.deepEqual(errors, []);
       await page.close();
     }

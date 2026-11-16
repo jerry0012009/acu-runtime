@@ -1093,7 +1093,7 @@ async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await requestKernel('/kernel/api/provider/models', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:provider})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1108,7 +1108,7 @@ async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await requestKernel('/kernel/api/provider/models', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:provider})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1166,7 +1166,9 @@ async function applyRecommendedVisibility(agentId, provider, selectedModel, pres
   const body = catalog.only
     ? { shown: models.filter(model => !model.hidden && !(model.own && catalog.ownHidden)).map(model => model.id) }
     : { hidden: models.filter(model => !model.own && model.hidden).map(model => model.id) };
-  await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({agent:agentId,...body}) });
+  const verified = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`);
+  if (!Array.isArray(verified?.models) || models.some(model => !model.hidden && !model.own && !verified.models.some(current => current.id === model.id && !current.hidden))) throw new Error('模型列表尚未同步完成，请重试配置');
 }
 
 async function confirmSetup() {

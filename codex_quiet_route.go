@@ -16,6 +16,10 @@ type codexFieldChange struct{ Field, Value string }
 // and Disconnect even with autoRestart off. Write while our own idle watcher
 // is stopped; a new watcher starts with the complete route as its baseline.
 func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFieldChange, disconnect bool) (result map[string]json.RawMessage, resultErr error) {
+	return k.changeCodexQuietlyWith(ctx, changes, disconnect, nil)
+}
+
+func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []codexFieldChange, disconnect bool, mutation func(string) error) (result map[string]json.RawMessage, resultErr error) {
 	k.routeMu.Lock()
 	defer k.routeMu.Unlock()
 	k.mu.Lock()
@@ -51,7 +55,9 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 			if agent.ID == "codex" {
 				for _, field := range agent.Fields {
 					if field.Key == "model" {
-						probeModel = field.Value
+						if agent.Wired {
+							probeModel = field.Value
+						}
 					}
 				}
 			}
@@ -128,7 +134,7 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 		}
 		if resultErr == nil {
 			result, resultErr = k.readState(recovery)
-			if resultErr == nil {
+			if resultErr == nil && (len(changes) > 0 || disconnect) {
 				resultErr = verifyCodexRouteState(result, changes, disconnect)
 			}
 			if resultErr != nil {
@@ -181,7 +187,9 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 		defer cleanup()
 		return c.Wait()
 	}
-	if disconnect {
+	if mutation != nil {
+		err = mutation(executable)
+	} else if disconnect {
 		err = run("codex", "default")
 	} else {
 		// Let the native default adapt to the account, and retain explicit
@@ -214,8 +222,10 @@ func (k *kernelState) changeCodexQuietly(ctx context.Context, changes []codexFie
 	if validate == nil {
 		validate = validateInstalledCodex
 	}
-	if err = validate(ctx, model); err != nil {
-		return nil, err
+	if model != "" {
+		if err = validate(ctx, model); err != nil {
+			return nil, err
+		}
 	}
 	if err = verifyCodexAuthUnchanged(authPath, authBefore, authErr); err != nil {
 		return nil, err

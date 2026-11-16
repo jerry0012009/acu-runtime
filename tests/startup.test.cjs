@@ -9,6 +9,7 @@ const connected = () => ({ known: true, configured: true, provider: 'acu-runtime
 const codex = () => ({ id: 'codex', name: 'Codex', detected: true, canConnect: true, modelOptions: [{ value: 'acu-runtime/acu-auto', ref: 'acu-runtime/acu-auto', label: 'acu-auto' }, { value: 'acu-runtime/gpt-6.1-sol', ref: 'acu-runtime/gpt-6.1-sol', label: 'gpt-6.1-sol' }, { value: 'chatgpt', label: 'ChatGPT' }] });
 
 async function setup(state, handler) {
+  const synced = new Map();
   const calls = [];
   const timers = [];
   const listeners = { app: {}, overlay: {}, document: {} };
@@ -24,8 +25,16 @@ async function setup(state, handler) {
     setTimeout: (callback, milliseconds) => { timers.push({ callback, milliseconds }); return timers.length; }, clearTimeout() {},
     fetch: async (route, options = {}) => {
       calls.push({ route, method: options.method || 'GET', body: options.body });
+      if (route === '/runtime/agents/models') {
+        const body = JSON.parse(options.body); synced.set(body.agent, body);
+        return {ok:true,json:async()=>({})};
+      }
       const result = await handler?.(route, options);
-      if (result) return { ok: result.ok !== false, status: result.status || 200, json: async () => result.body };
+      if (result) {
+        const sync = synced.get(route.split('/').at(-1));
+        if (route.startsWith('/kernel/api/agent-models/') && sync && result.body?.models) result.body.models = result.body.models.map(m=>({...m,hidden:sync.shown ? !sync.shown.includes(m.id) : sync.hidden.includes(m.id)}));
+        return { ok: result.ok !== false, status: result.status || 200, json: async () => result.body };
+      }
       if (route.startsWith('/kernel/api/agent-models/') && !options.method) return { ok: true, json: async () => inventory() };
       if (route === '/runtime/kernel/start') Object.assign(state, { starting: true, phase: '正在下载内核', downloaded: 50, downloadTotal: 100 });
       return { ok: true, json: async () => ({ agents: [], kernelFound: false, connection: connected(), ...state }) };
@@ -37,7 +46,7 @@ async function setup(state, handler) {
   return { calls, timers, elements, listeners, run: command => vm.runInContext(command, context), select: (id, checked) => change({ dataset: { selectAgent: id }, checked }), change, refresh: () => vm.runInContext('refresh()', context) };
 }
 
-const posts = instance => instance.calls.filter(call => call.method === 'POST' && call.route !== '/kernel/api/provider/models' && call.route !== '/runtime/capabilities/refresh');
+const posts = instance => instance.calls.filter(call => call.method === 'POST' && call.route !== '/kernel/api/provider/models' && call.route !== '/runtime/models/prepare' && call.route !== '/runtime/capabilities/refresh');
 
 const inventory = () => ({ models: [
   { id: 'acu-runtime/acu-auto', name: 'acu-auto', group: 'ACU', inUse: true },
@@ -628,7 +637,7 @@ test('existing Agent setup reveals available recommended models without replacin
   ]};
   const instance=await setup({ready:true,connection:{...connected(),choices:[{id:'acu-runtime',name:'ACU',masked:'fixture',models:['acu-auto','claude-fable-5-2','gemini-4-carbon']}]},agents:[native]},async(route,options)=>route==='/kernel/api/agent-models/codex'&&!options.method?{body:{models:[{id:'acu-runtime/acu-auto'},{id:'acu-runtime/claude-fable-5-2',hidden:true},{id:'acu-runtime/gemini-4-carbon',hidden:true}]}}:undefined);
   const result=await instance.run('applyRecommendedVisibility("codex","acu-runtime","acu-auto",true)');
-  assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{hidden:[]});
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{agent:'codex',hidden:[]});
   assert.equal(instance.run('ui.status.agents[0].model'),native.model);
   assert.equal(result,undefined);
 });
@@ -651,12 +660,12 @@ test('WorkBuddy one-click setup exposes Fable 5.1 and preserves active legacy an
   assert(instance.elements.overlay.innerHTML.includes('claude-fable-5-1'));
   assert(!instance.elements.overlay.innerHTML.includes('claude-fable-5、'));
   await instance.run('confirmSetup()');
-  const visibility = posts(instance).find(call=>call.route==='/kernel/api/agent-models/workbuddy');
+  const visibility = posts(instance).find(call=>call.route==='/runtime/agents/models');
   assert(visibility);
-  assert.deepEqual(JSON.parse(visibility.body), {hidden:[]});
+  assert.deepEqual(JSON.parse(visibility.body), {agent:'workbuddy',hidden:[]});
   catalog.models[2].inUse=true;
   await instance.run('applyRecommendedVisibility("workbuddy","acu-runtime","acu-auto")');
-  assert.deepEqual(JSON.parse(posts(instance).at(-1).body), {hidden:[]});
+  assert.deepEqual(JSON.parse(posts(instance).filter(call=>call.route==='/runtime/agents/models').at(-1).body), {agent:'workbuddy',hidden:[]});
 });
 
 test('repeated WorkBuddy setup reveals current recommendations without replacing existing model visibility', async () => {
@@ -674,8 +683,8 @@ test('repeated WorkBuddy setup reveals current recommendations without replacing
   await instance.run('applyAgents()');await instance.run('confirmSetup()');
   const configure=posts(instance).find(call=>call.route==='/runtime/agents/configure');
   assert.equal(JSON.parse(configure.body).preserve,true);
-  const visibility=posts(instance).find(call=>call.route==='/kernel/api/agent-models/workbuddy');
-  assert.deepEqual(JSON.parse(visibility.body),{shown:['acu-runtime/acu-auto','acu-runtime/claude-fable-5-1','acu-runtime/claude-fable-5','other/visible']});
+  const visibility=posts(instance).find(call=>call.route==='/runtime/agents/models');
+  assert.deepEqual(JSON.parse(visibility.body),{agent:'workbuddy',shown:['acu-runtime/acu-auto','acu-runtime/claude-fable-5-1','acu-runtime/claude-fable-5','other/visible']});
 });
 
 test('desktop settings exposes compatibility update status and the check action', async () => {

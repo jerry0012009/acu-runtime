@@ -25,7 +25,7 @@ func snapshotCodexRoute(executable string) (routeSnapshot, error) {
 	dir := codexConfigDirectory()
 	paths := []string{filepath.Join(dir, "config.toml"), filepath.Join(dir, "magpie-models.json"), filepath.Join(dir, "magpie-desktop-models.json")}
 	for _, base := range kernelConfigDirs(executable) {
-		for _, name := range []string{"stash.json", "applied.json"} {
+		for _, name := range []string{"stash.json", "applied.json", "settings.json", "providers.json"} {
 			paths = append(paths, filepath.Join(base, name))
 		}
 	}

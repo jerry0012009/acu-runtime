@@ -194,6 +194,7 @@ jobs:
           fi
           go build -o dist/compat-runtime .
           python3 scripts/test-kernel-compatibility.py "$kernel" dist/compat-runtime
+          ACU_MODEL_SYNC_KERNEL="$kernel" go test -run '^TestNativeCatalogManagementSync$' -v -timeout 3m .
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
