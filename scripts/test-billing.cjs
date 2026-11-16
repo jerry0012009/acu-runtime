@@ -17,6 +17,9 @@ async function main() {
   const calls = [];
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
   prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
+  prices[1].capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:52.5, observed_at:'2026-11-16', source_url:'https://artificialanalysis.ai/models/fixture-sol', variants:[{name:'Fixture Sol (High)',score:52.5},{name:'Fixture Sol (Medium)',score:48}] };
+  prices.find(model=>model.model_name==='premium').capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:61.8, observed_at:'2026-11-16', source_url:'javascript:alert(1)', variants:[{name:'Premium <test>',score:61.8}] };
+  prices.find(model=>model.model_name==='cheap').capability_benchmark = { score:null };
   await page.route('http://billing.test/**', async route => {
     const url = new URL(route.request().url());
     calls.push(url.pathname + url.search);
@@ -89,6 +92,20 @@ async function main() {
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','cheap','free','ACU Auto','unknown']);
     await page.locator('[data-billing-sort]').selectOption('name');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['ACU Auto','cheap','测试 Sol','free','premium','unknown']);
+    await page.locator('[data-billing-sort]').selectOption('capability_desc');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','ACU Auto','cheap','free','unknown']);
+    const benchmarkDetails = page.locator('.billing-benchmark').filter({hasText:'Fixture Sol (High)'});
+    assert.equal(await benchmarkDetails.getAttribute('open'),null);
+    await benchmarkDetails.locator('summary').click();
+    assert(await benchmarkDetails.getByText('Artificial Analysis Intelligence Index v5.0.1',{exact:true}).isVisible());
+    assert(await benchmarkDetails.getByText('Fixture Sol (Medium)',{exact:true}).isVisible());
+    assert.equal(await benchmarkDetails.getByRole('link',{name:'查看来源'}).getAttribute('href'),'https://artificialanalysis.ai/models/fixture-sol');
+    assert.equal(await page.locator('.billing-benchmark a[href^="javascript:"]').count(),0);
+    assert.equal(await page.locator('.billing-benchmark test').count(),0);
+    await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+    await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-billing-sort]').inputValue(),'capability_desc');
+    await page.locator('[data-billing-sort]').selectOption('name');
     await page.getByRole('searchbox').fill('sol');
     failPrices = true;
     await page.getByRole('button', { name: '刷新价格' }).click();
@@ -143,6 +160,11 @@ async function main() {
       await page.emulateMedia({ colorScheme: theme });
       for (const width of [1440, 1280, 920, 600, 390]) {
         await page.setViewportSize({ width, height: 960 });
+        const reference = page.locator('.billing-benchmark').filter({hasText:'Fixture Sol (High)'});
+        if (await reference.getAttribute('open') === null) await reference.locator('summary').click();
+        const detailsBox = await reference.boundingBox();
+        const modelBox = await reference.locator('..').boundingBox();
+        assert(detailsBox.x + detailsBox.width <= modelBox.x + modelBox.width + 1, `benchmark fits model column at ${width}`);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no page overflow at ${width}`);
         assert.equal(await longRow.locator('[data-price="output"]').evaluate(node => getComputedStyle(node).textAlign), width > 1100 ? 'right' : 'left');
         const outputBox = await longRow.locator('[data-price="output"]').boundingBox();
@@ -156,6 +178,10 @@ async function main() {
       prices.splice(0, prices.length, ...JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8')).data);
       await page.getByRole('button', { name: '刷新价格', exact: true }).click();
       await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+      await page.locator('[data-billing-sort]').selectOption('capability_desc');
+      const sorted = await page.locator('#billing-price-rows tr').evaluateAll(rows => rows.map(row=>row.querySelector('strong').textContent));
+      assert(sorted[0].includes('Fable 5.2') || sorted[0].includes('claude-fable-5-2'));
+      await page.locator('.billing-benchmark summary').first().click();
       for (const width of [1440, 920, 390]) {
         await page.setViewportSize({ width, height: 960 });
         await page.screenshot({ path: path.join(workspace, `.build/billing-public-prices-${width}.png`) });

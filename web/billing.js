@@ -103,8 +103,17 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
       const value = model.payable?.output_cny_per_million;
       return value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
     };
+    const capabilityScore = model => {
+      const value = model.capability_benchmark?.score;
+      return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+    };
     models.sort((a,b) => {
-      if (state.sort !== 'name') {
+      if (state.sort === 'capability_desc') {
+        const left = capabilityScore(a), right = capabilityScore(b);
+        if (left === null && right !== null) return 1;
+        if (right === null && left !== null) return -1;
+        if (left !== null && right !== null && left !== right) return right - left;
+      } else if (state.sort !== 'name') {
         const left = outputPrice(a), right = outputPrice(b);
         if (left === null && right !== null) return 1;
         if (right === null && left !== null) return -1;
@@ -118,6 +127,12 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
       const dynamic = model.model_name === 'acu-auto';
       const multiplier = payable.model_multiplier;
       const validMultiplier = multiplier != null && multiplier !== '' && Number.isFinite(Number(multiplier)) && Number(multiplier) >= 0;
+      const benchmark = model.capability_benchmark;
+      const score = capabilityScore(model);
+      const scoreText = value => Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+      const source = benchmark?.source_url;
+      const sourceLink = typeof source === 'string' && /^https:\/\/artificialanalysis\.ai\/models\/[a-z0-9-]+$/.test(source) ? `<a href="${esc(source)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : '';
+      const reference = score !== null ? `<details class="billing-benchmark"><summary>能力参考 · ${esc(scoreText(score))}</summary><p>${esc(benchmark.benchmark)}</p><ul>${(benchmark.variants || []).filter(item => typeof item.score === 'number' && Number.isFinite(item.score)).map(item => `<li><span>${esc(item.name)}</span><span>${esc(scoreText(item.score))}</span></li>`).join('')}</ul><p>排序取最高公开配置 · ${esc(benchmark.observed_at || '')} ${sourceLink}</p></details>` : state.sort === 'capability_desc' && !dynamic ? '<small>暂无同榜评分</small>' : '';
       const cells = [
         ['output', '输出价格', outputPrice(model), 'outputPricePerMillion'],
         ['input', '输入价格', payable.input_cny_per_million, 'inputPricePerMillion'],
@@ -129,13 +144,13 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
         const hasTier = Number(tiers?.thresholdTokens) > 0 && longValue != null && longValue !== '' && Number.isFinite(Number(longValue)) && Number(longValue) >= 0;
         return `<td data-price="${key}" data-label="${label}"><span class="billing-price-value">${valid ? priceMoney(value) : '—'}</span>${hasTier ? `<small>超过 ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} tokens<br>${priceMoney(longValue)}</small>` : ''}</td>`;
       }).join('');
-      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}</td><td class="billing-price-multiplier" data-label="倍率"><span>${validMultiplier ? esc(Number(multiplier).toLocaleString('zh-CN', { maximumSignificantDigits: 10 })) + '×' : '—'}</span></td>${cells}</tr>`;
+      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}${reference}</td><td class="billing-price-multiplier" data-label="倍率"><span>${validMultiplier ? esc(Number(multiplier).toLocaleString('zh-CN', { maximumSignificantDigits: 10 })) + '×' : '—'}</span></td>${cells}</tr>`;
     }).join('');
   }
 
   function pricesPage() {
     const rows = priceRows();
-    return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 已含倍率</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option></select></label></div>
+    return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 已含倍率</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label></div>
       ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}
       <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">— 表示暂无固定报价 · 更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
   }

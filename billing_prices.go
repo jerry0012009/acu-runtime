@@ -210,5 +210,6 @@ func (host *server) modelPrices(response http.ResponseWriter, request *http.Requ
 	host.prices.Lock()
 	value := host.prices.priceSnapshot
 	host.prices.Unlock()
+	value.Models = attachModelBenchmarks(value.Models)
 	host.json(response, http.StatusOK, value)
 }

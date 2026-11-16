@@ -603,6 +603,11 @@ select[data-agent-model] {
 .billing-price-table .billing-price-model{overflow-wrap:anywhere;padding-right:20px}
 .billing-price-table .billing-price-model strong{font-size:13px;font-weight:600}
 .billing-price-table .billing-price-model small{font-size:11px}
+.billing-price-table .billing-benchmark{min-width:0;max-width:100%;font-size:11px;line-height:1.7}
+.billing-benchmark summary{color:var(--acu-muted)}
+.billing-benchmark ul{list-style:none;padding:0;margin:8px 0}
+.billing-benchmark li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:5px 0}
+.billing-benchmark a{color:var(--acu-text-secondary);text-decoration:underline}
 .billing-price-value{white-space:nowrap}
 .billing-price-table [data-price="output"] .billing-price-value{font-weight:650;color:var(--acu-accent-text)}
 .billing-price-table [data-price="output"],.billing-price-table th:nth-child(3){background:var(--acu-accent-soft)}
