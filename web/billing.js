@@ -1,9 +1,11 @@
-globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }) => {
+globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, icon }) => {
   const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'output_asc', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
   const money = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : '¥' + new Intl.NumberFormat('zh-CN', Number(value) !== 0 && Math.abs(Number(value)) < 0.000001 ? { maximumSignificantDigits: 4 } : { maximumFractionDigits: 6 }).format(Number(value));
   const priceMoney = value => '¥' + Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 10 });
   const date = value => value ? new Date(value * 1000).toLocaleString('zh-CN') : '尚未刷新';
   const quota = value => value == null || !state.account?.cnyPerQuota ? '—' : money(value * state.account.cnyPerQuota);
+  const overviewMoney = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value) > 0 && Number(value) < .01 ? '< ¥0.01' : '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let modelOrder = 'charge', showAllModels = false;
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
   const button = (label, attributes = '') => `<button class="button secondary" ${attributes}>${label}</button>`;
   const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}/${ui.status?.account?.selected || 0}`;
@@ -22,6 +24,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
     state.accountError = '';
     state.accountBusy = false;
     state.page = 1;
+    modelOrder = 'charge'; showAllModels = false;
     if (ui.page === 'usage') { render(); loadAccount(); }
   }
 
@@ -39,7 +42,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
       if (previous && previous.days === days && previous.page === page) {
         if (result.warnings?.balance) result.balanceQuota = previous.balanceQuota;
         if (result.warnings?.currency) result.cnyPerQuota = previous.cnyPerQuota;
-        if (result.warnings?.key) result.key = previous.key;
+        if (result.warnings?.overview) result.overview = previous.overview;
         if (result.warnings?.summary) result.summary = previous.summary;
         if (result.warnings?.logs) { result.logs = previous.logs; result.total = previous.total; }
         if (Object.keys(result.warnings || {}).length) result.updatedAt = previous.updatedAt;
@@ -79,21 +82,38 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
     const login = ui.status?.account;
     if (!login?.loggedIn) return `<section class="panel billing-empty"><h2>${login?.restoring ? '正在恢复登录' : '登录后查看余额与消费'}</h2>${login?.error ? note(login.error) : ''}${button(login?.restoring ? '手动登录' : '登录 ACU', 'data-action="account-login"')}</section>`;
     const data = state.account;
-    const key = data?.key;
     const summary = data?.summary;
     const rows = data?.logs || [];
     const warnings = Object.values(data?.warnings || {});
-    const range = `<label>消费范围 <select data-billing-days ${state.accountBusy ? 'disabled' : ''}>${[1,7,30].map(days => `<option value="${days}" ${days === state.days ? 'selected' : ''}>最近 ${days === 1 ? '24 小时' : days + ' 天'}</option>`).join('')}</select></label>`;
-    return `<div class="billing-toolbar"><div><strong>${esc(login.username || 'ACU 账户')}</strong><p>云端账户全部 Key · 包含其他设备与客户端的消费</p></div><div class="billing-actions">${links()}${button('退出账号', 'data-billing-logout')}</div></div>
+    const overview = data?.overview;
+    const comparison = overview?.comparison;
+    const comparable = comparison?.savedPercent != null && Number.isFinite(Number(comparison.savedPercent)) && Number(comparison.referenceCny) > 0;
+    const saved = Number(comparison?.savedCny), premium = saved < 0;
+    const basis = comparison?.basis === 'official' ? '官方价' : comparison?.basis === 'openrouter' ? 'OpenRouter 参考价' : '平台参考价';
+    const fullComparison = comparable && comparison.count === overview.count;
+    const comparisonTitle = comparable ? `${fullComparison ? '' : '可比用量 · ' }较${basis}${premium ? '多付' : '节省'}` : '费用对比';
+    const percent = comparable ? Math.abs(Number(comparison.savedPercent)).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) : '';
+    const range = `<select aria-label="消费时段" data-billing-days ${state.accountBusy ? 'disabled' : ''}>${[1,7,30].map(days => `<option value="${days}" ${days === state.days ? 'selected' : ''}>最近 ${days === 1 ? '24 小时' : days + ' 天'}</option>`).join('')}</select>`;
+    return `<div class="billing-account" aria-label="ACU 账户概览"><div class="billing-account-heading"><div><span class="billing-eyebrow">ACU 账户</span><h2>${esc(login.username || 'ACU 账户')}</h2><p>账户全部 Key</p></div><div class="billing-account-actions"><a class="button primary" href="${esc(site())}/wallet" target="_blank" rel="noopener noreferrer">充值 ${icon?.('arrow') || ''}</a><a class="text-button" href="${esc(site())}/usage-logs" target="_blank" rel="noopener noreferrer">消费明细 ${icon?.('link') || ''}</a><details class="billing-account-menu"><summary aria-label="账户菜单" title="账户菜单">${icon?.('settings') || '账户'}</summary><div>${button('退出账号', 'data-billing-logout')}</div></details></div></div>
+      <div class="billing-account-period">${range}<button class="billing-icon-button" title="刷新账户" aria-label="刷新账户" data-billing-refresh="account" ${state.accountBusy ? 'disabled' : ''}>${icon?.('refresh') || '刷新'}</button><span>${state.accountBusy ? '更新中…' : data ? esc(date(data.updatedAt)) + ' 更新' : ''}</span></div>
       ${state.accountError ? note('刷新失败：' + state.accountError + (data ? '。下方保留上次数据。' : '')) : ''}
       ${warnings.length ? note('部分数据暂不可用：' + [...new Set(warnings)].join('；')) : ''}
       ${data && data.loggedIn === false ? note(data.message) : ''}
-      <div class="billing-metrics"><section class="panel"><span>账户余额</span><strong>${quota(data?.balanceQuota)}</strong><small>账户可用额度</small></section><section class="panel"><span>${key ? esc(key.name || '上次连接的 Key') : '上次连接的 Key'}</span><strong>${key?.unlimited_quota ? '未设额度上限' : quota(key?.remain_quota)}</strong><small>${key ? `${key.status === 1 ? '已启用' : '已停用'} · ${key.expired_time > 0 ? '到期 ' + esc(date(key.expired_time)) : '无到期限制'}` : '额度暂不可用'} · 与账户余额分别计算</small></section><section class="panel"><span>最近 ${state.days === 1 ? '24 小时' : state.days + ' 天'}云端消费</span><strong>${money(summary?.user_charge_cny)}</strong><small>${summary ? `${summary.exact_charge_count || 0} 条精确扣费 · ${summary.legacy_charge_count || 0} 条历史额度换算` : '从 ACU 云端消费记录读取'}</small></section></div>
-      <section class="panel billing-history"><div class="billing-toolbar"><div><h2>云端消费记录</h2></div><div class="billing-actions">${range}${button(state.accountBusy ? '刷新中…' : '刷新', `data-billing-refresh="account" ${state.accountBusy ? 'disabled' : ''}`)}</div></div>
+      <div class="billing-account-metrics"><section><span>账户余额</span><strong title="${esc(quota(data?.balanceQuota))}">${overviewMoney(data?.balanceQuota != null && data?.cnyPerQuota ? data.balanceQuota * data.cnyPerQuota : null)}</strong><small>当前可用</small></section><section><span>最近 ${state.days === 1 ? '24 小时' : state.days + ' 天'}消费</span><strong>${overviewMoney(overview?.chargeCny ?? summary?.user_charge_cny)}</strong><small>${overview ? Number(overview.count).toLocaleString('zh-CN') + ' 笔消费' : '—'}</small></section><section class="billing-saving ${comparable && !premium ? 'is-saving' : ''}"><span>${esc(comparisonTitle)}</span><div class="billing-saving-value"><strong>${comparable ? overviewMoney(Math.abs(saved)) : '—'}</strong>${comparable ? `<span class="billing-saving-percent">${premium ? '+' : '−'}${esc(percent)}%</span>` : ''}</div>${comparable ? `<details class="billing-comparison"><summary>查看对照</summary><dl><div><dt>${basis}同用量费用</dt><dd>${overviewMoney(comparison.referenceCny)}</dd></div><div><dt>ACU 实际扣费</dt><dd>${overviewMoney(comparison.chargeCny)}</dd></div><div><dt>可比记录</dt><dd>${Number(comparison.count).toLocaleString('zh-CN')} / ${Number(overview.count).toLocaleString('zh-CN')}</dd></div></dl></details>` : '<small>暂无可比账单</small>'}</section></div>
+      ${modelRanking(overview)}
+      <section class="billing-account-history"><div class="billing-toolbar"><div><h2>消费记录</h2></div><div class="billing-actions">${summary?.legacy_charge_count ? `<span class="billing-muted">含 ${Number(summary.legacy_charge_count).toLocaleString('zh-CN')} 笔历史换算</span>` : ''}</div></div>
       ${state.accountBusy && !data ? note('正在读取云端账户与消费记录…') : ''}
       <div class="billing-table-scroll"><table><thead><tr><th>时间</th><th>模型 / Key</th><th>输入 / 输出 tokens</th><th>扣费</th></tr></thead><tbody>${rows.map(row => `<tr><td>${esc(date(row.created_at))}</td><td><strong>${esc(row.model_name)}</strong><small>${esc(row.token_name || '—')}</small></td><td>${Number(row.prompt_tokens || 0).toLocaleString()} / ${Number(row.completion_tokens || 0).toLocaleString()}</td><td><strong>${row.chargeCny != null ? money(row.chargeCny) : quota(row.quota)}</strong><small>${row.chargeCny != null ? '实际扣费' : '历史额度换算'}${row.priceVersion ? ' · ' + esc(row.priceVersion) : ''}</small></td></tr>`).join('')}</tbody></table></div>
       ${!rows.length && data && !data.warnings?.logs ? note('此范围暂无消费记录。') : ''}
-      <div class="billing-toolbar"><span>第 ${state.page} 页${data?.total != null ? ` · 共 ${data.total} 条` : ''} · ${data ? esc(date(data.updatedAt)) : '尚未刷新'}</span><div class="billing-actions">${button('上一页', `data-billing-page="-1" ${state.page <= 1 || state.accountBusy ? 'disabled' : ''}`)}${button('下一页', `data-billing-page="1" ${!data || state.page*20 >= data.total || state.accountBusy ? 'disabled' : ''}`)}</div></div></section>`;
+      <div class="billing-toolbar billing-account-pagination"><span>第 ${state.page} 页${data?.total != null ? ` · 共 ${data.total} 条` : ''}</span><div class="billing-actions">${button('上一页', `data-billing-page="-1" ${state.page <= 1 || state.accountBusy ? 'disabled' : ''}`)}${button('下一页', `data-billing-page="1" ${!data || state.page*20 >= data.total || state.accountBusy ? 'disabled' : ''}`)}</div></div></section></div>`;
+  }
+
+  function modelRanking(overview) {
+    const rows = Array.isArray(overview?.models) ? overview.models.filter(row => typeof row.model === 'string' && Number.isFinite(Number(row.chargeCny)) && Number(row.chargeCny) >= 0 && Number.isFinite(Number(row.count)) && row.count >= 0) : [];
+    rows.sort((a,b) => (modelOrder === 'count' ? b.count - a.count : Number(b.chargeCny) - Number(a.chargeCny)) || a.model.localeCompare(b.model));
+    const visible = showAllModels ? rows : rows.slice(0,5);
+    const total = modelOrder === 'count' ? Number(overview?.count) : Number(overview?.chargeCny);
+    return `<section class="billing-model-ranking" aria-label="主要使用模型"><div class="billing-toolbar"><h2>主要使用模型</h2><div class="billing-rank-modes" role="group" aria-label="模型排行排序"><button data-billing-rank="charge" aria-pressed="${modelOrder === 'charge'}">按消费</button><button data-billing-rank="count" aria-pressed="${modelOrder === 'count'}">按次数</button></div></div>${!rows.length ? note(state.accountBusy ? '正在读取模型用量…' : overview ? '此时段暂无模型消费。' : '模型用量暂不可用。') : `<div class="billing-rank-head"><span>模型</span><span>消费</span><span>次数</span><span>占比</span></div><ol>${visible.map((row,index) => {const share = total > 0 ? Math.max(0,Math.min(100,(modelOrder === 'count' ? row.count : Number(row.chargeCny)) / total * 100)) : 0;return `<li><span class="billing-rank-index">${String(index+1).padStart(2,'0')}</span><div class="billing-rank-model"><strong title="${esc(row.model)}">${esc(row.model)}</strong><div class="billing-rank-track"><span style="width:${share}%"></span></div></div><span>${overviewMoney(row.chargeCny)}</span><span class="billing-rank-count">${Number(row.count).toLocaleString('zh-CN')}</span><span class="billing-rank-share">${share.toLocaleString('zh-CN',{maximumFractionDigits:1})}%</span></li>`;}).join('')}</ol>${rows.length > 5 ? `<button class="text-button billing-model-more" data-billing-models>${showAllModels ? '收起' : '查看全部 ' + rows.length + ' 个模型'} ${icon?.('chevron') || ''}</button>` : ''}`}</section>`;
   }
 
   function priceRows() {
@@ -196,6 +216,9 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc }
     if (refresh) { refresh.dataset.billingRefresh === 'prices' ? loadPrices(true) : loadAccount(); return true; }
     const page = target.closest('[data-billing-page]');
     if (page) { state.page = Math.max(1, state.page + Number(page.dataset.billingPage)); loadAccount(); return true; }
+    const rank = target.closest('[data-billing-rank]');
+    if (rank) { modelOrder = rank.dataset.billingRank === 'count' ? 'count' : 'charge'; render(); return true; }
+    if (target.closest('[data-billing-models]')) { showAllModels = !showAllModels; render(); return true; }
     if (target.closest('[data-billing-logout]')) {
       request('/runtime/account/logout', { method: 'POST' }).then(() => { ui.status.account = {}; syncAccount(); }).catch(error => { state.accountError = error.message; update(); });
       return true;

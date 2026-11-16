@@ -32,7 +32,7 @@ ui.agentUpdates = {};
 if (launchQuery.get('page') === 'overview' || launchQuery.has('native')) ui.page = 'overview';
 let pendingNative = launchQuery.get('native');
 const nativeViews = new Set(['agents', 'providers', 'settings', 'library', 'usage', 'routing', 'plugins', 'masking']);
-const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML });
+const billing = globalThis.createACUBilling?.({ app, ui, request, navigation, escapeHTML, icon });
 const preferences = globalThis.createACUPreferences?.({ app, ui, request, navigation, escapeHTML });
 const workReview = globalThis.createACUWorkReview?.({ app, ui, request, navigation, escapeHTML, icon });
 const tapnow = globalThis.createACUTapnow?.({ app, ui, request, render: () => render(), activeChoice, recommendedModels, escapeHTML, icon, toast, token });

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -46,6 +47,31 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 	}
 	result := map[string]any{"loggedIn": true, "site": view.Site, "username": view.Username, "days": days, "page": page, "updatedAt": time.Now().Unix()}
 	warnings := map[string]string{}
+	var overview struct {
+		Charge string `json:"chargeCny"`
+		Count  int64  `json:"count"`
+		Models []struct {
+			Model  string `json:"model"`
+			Count  int64  `json:"count"`
+			Charge string `json:"chargeCny"`
+		} `json:"models"`
+		Comparison struct {
+			Reference string  `json:"referenceCny"`
+			Charge    string  `json:"chargeCny"`
+			Saved     string  `json:"savedCny"`
+			Percent   *string `json:"savedPercent"`
+			Count     int64   `json:"count"`
+			Basis     string  `json:"basis"`
+		} `json:"comparison"`
+	}
+	var overviewErr error
+	var overviewWait sync.WaitGroup
+	overviewWait.Add(1)
+	go func() {
+		defer overviewWait.Done()
+		overviewErr = host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/user/self/acu-account-overview?days="+strconv.Itoa(days), bearer, &overview)
+	}()
+	defer overviewWait.Wait()
 	var config struct {
 		QuotaPerUnit float64 `json:"quota_per_unit"`
 		FX           float64 `json:"usd_exchange_rate"`
@@ -66,21 +92,6 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 		return
 	} else {
 		result["balanceQuota"] = user.Quota
-	}
-	if view.Selected > 0 {
-		var key struct {
-			ID        int    `json:"id"`
-			Name      string `json:"name"`
-			Remaining *int64 `json:"remain_quota"`
-			Unlimited bool   `json:"unlimited_quota"`
-			Expires   int64  `json:"expired_time"`
-			Status    int    `json:"status"`
-		}
-		if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/token/"+strconv.Itoa(view.Selected), bearer, &key); err != nil {
-			warnings["key"] = err.Error()
-		} else {
-			result["key"] = key
-		}
 	}
 	now := time.Now()
 	start := now.Add(-time.Duration(days) * 24 * time.Hour).Unix()
@@ -134,6 +145,17 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 		result["logs"], result["total"] = rows, logs.Total
 	}
 	// A response begun under an old login must never populate a new account page.
+	overviewWait.Wait()
+	if overviewErr != nil {
+		warnings["overview"] = "账户统计暂不可用"
+	} else {
+		charge, err := strconv.ParseFloat(overview.Charge, 64)
+		if err != nil || charge < 0 || math.IsNaN(charge) || math.IsInf(charge, 0) || overview.Count < 0 {
+			warnings["overview"] = "账户统计格式暂不可用"
+		} else {
+			result["overview"] = overview
+		}
+	}
 	host.account.mu.Lock()
 	valid := host.account.view.LoggedIn && host.account.userID == userID && host.account.bearer == bearer
 	host.account.mu.Unlock()
