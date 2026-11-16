@@ -9,10 +9,18 @@ Local verification: Go tests/race/vet; 142 Node tests; billing browser fixture
 with the production public catalog across desktop/mobile and both themes.
 Price controls, stale-cache recovery, account isolation and history remain intact.
 
-Router/Console reconciliation verified 3,330 acknowledged historical records
+Router/Console reconciliation verified 3,540 acknowledged historical records
 across eight price versions, including exact charges, cache modes, final quota
-and zero-charge unbillable records. All 98 current payable model rates matched
+and zero-charge unbillable records, plus each user consumption-log amount and
+quota. All 98 current payable model rates matched
 the active book. No price-book changes or historic-charge rewrites are included.
 Cloud fixes separately split supplier cash-cost factors from user retail factors.
 
-Publication evidence is recorded after the three-platform workflow completes.
+Release v0.1.111 published at 2026-11-16T18:39:01Z from application revision
+`5dc99a6`. Workflow `43928201434` passed Windows x64, Intel Mac, Apple Silicon
+and publication without skipped release gates. Public release resolver returns
+0.1.111 with three platform mirrors. Cloud Router `6e4e084` and Console/worker
+`25f799b40` releases both completed with terminal-stream/unique-settlement
+acceptance and revoked maintenance sessions. The production Console monitor
+preserved both factors and matched public pricing across 450 comparable
+Profiles. No price-book or historical charge was modified.
