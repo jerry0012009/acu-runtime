@@ -1,5 +1,6 @@
 (() => {
   if (window.parent === window) return;
+  window.acuKernelQuery = location.search;
   const nativeFetch = window.fetch.bind(window);
   const loginOptions = {
     '': { label: '自动兼容（推荐）', note: '保留 ChatGPT 登录，额度不足时自动使用 ACU。' },

@@ -88,6 +88,18 @@ jobs:
           export ACU_PLAYWRIGHT="$RUNNER_TEMP/acu-preference-browser/node_modules/playwright"
           export TAPNOW_TEST_ROOT="$RUNNER_TEMP/acu-tapnow"
           node scripts/test-tapnow-native.cjs
+      - name: Verify TapNow setup hierarchy in both themes and all widths
+        shell: bash
+        env:
+          ACU_TEST_ORIGIN: http://127.0.0.1:18763
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/acu-preference-browser/node_modules/playwright
+        run: |
+          mkdir -p dist
+          go build -o dist/workbench-ui-fixture .
+          dist/workbench-ui-fixture --web --listen=127.0.0.1:18763 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          node scripts/test-tapnow.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

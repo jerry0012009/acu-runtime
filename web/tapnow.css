@@ -7,7 +7,31 @@
 .tapnow-heading,.tapnow-heading>div,.tapnow-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .tapnow-heading{justify-content:space-between}
 .tapnow-heading h3{font-size:17px;margin:0}.tapnow-heading span{font-size:12px;color:var(--acu-muted)}
-.tapnow-editions{margin:16px 0}.tapnow-edition{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;padding:18px 0;border-bottom:1px solid var(--acu-line);min-width:0}
+.tapnow-editions{margin:0}.tapnow-edition{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 18px;padding:18px 0;min-width:0}
+.tapnow-companion{display:block;padding:6px 0 22px}
+.tapnow-companion .tapnow-heading{padding-bottom:10px}
+.tapnow-heading .tapnow-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.tapnow-identity>.icon{width:22px;height:22px;color:var(--acu-accent-text)}
+.tapnow-heading .tapnow-identity h3{font-size:18px;font-weight:650;line-height:1.5}
+.tapnow-companion>.tapnow-state{margin:0 0 16px;font-size:12px;color:var(--acu-text-secondary)}
+.tapnow-companion .tapnow-config{margin:0;gap:12px}
+.tapnow-companion .tapnow-note{font-size:11px;margin:6px 0 0}
+.tapnow-companion .tapnow-install-guide{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--acu-line)}
+.tapnow-backup{border-top:1px solid var(--acu-line);padding:16px 0 0}
+.tapnow-backup>summary{display:flex;align-items:center;justify-content:space-between;gap:16px;list-style:none;cursor:pointer;color:var(--acu-text-secondary)}
+.tapnow-backup>summary::-webkit-details-marker{display:none}
+.tapnow-backup-title{display:block;font-size:13px;font-weight:500}
+.tapnow-backup-title small{font-size:11px;font-weight:400;color:var(--acu-muted);margin-left:8px}
+.tapnow-backup-caption{display:block;font-size:11px;color:var(--acu-muted);margin-top:4px}
+.tapnow-backup[open]>summary>.icon{transform:rotate(90deg)}
+.workbench-tool-entry{border-top:1px solid var(--acu-line);padding-top:8px}
+.workbench-catalog-entry{display:flex;align-items:center;gap:14px;width:100%;padding:16px 0;text-align:left;min-width:0}
+.workbench-catalog-entry>span:nth-child(2){flex:1;min-width:0}
+.workbench-catalog-entry strong{display:block;font-size:14px;font-weight:550}
+.workbench-catalog-entry small{display:block;font-size:12px;color:var(--acu-muted);margin-top:5px;line-height:1.7}
+.workbench-catalog-entry>.icon{color:var(--acu-muted);flex-shrink:0}
+.catalog-entry-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--acu-line);border-radius:6px;color:var(--acu-text-secondary);flex-shrink:0}
+.workbench-catalog-entry:hover .catalog-entry-icon{background:var(--acu-surface-alt);color:var(--acu-accent-text)}
 .tapnow-edition h4{font-size:14px;margin:0 0 7px}.tapnow-edition p,.tapnow-note,.tapnow-consent{font-size:12px;color:var(--acu-muted);line-height:1.7;margin:4px 0}
 .tapnow-edition .tapnow-state{color:var(--acu-text-secondary)}.tapnow-path{grid-column:1/-1;font-size:11px;overflow-wrap:anywhere;white-space:normal;color:var(--acu-muted)}
 .tapnow-config{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0;font-size:12px}
@@ -18,7 +42,7 @@
 .tapnow-step-tabs{list-style:none;margin:6px 0 22px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;font-size:12px;color:var(--acu-muted)}
 .tapnow-step-tabs li{display:flex;align-items:center;gap:7px;min-width:0;line-height:1.7}.tapnow-step-tabs span{display:grid;place-items:center;flex:0 0 22px;height:22px;border:1px solid var(--acu-line);border-radius:50%;font-size:11px}
 .tapnow-step-tabs [aria-current]{color:var(--acu-text);font-weight:600}.tapnow-step-tabs [aria-current] span{background:var(--acu-accent-soft);border-color:var(--acu-accent);color:var(--acu-accent-text)}
-.tapnow-install-guide h5{font-size:15px;line-height:1.5;margin:0 0 9px}.tapnow-install-guide>p{font-size:13px;line-height:1.8;margin:0 0 16px;max-width:650px}
+.tapnow-install-guide h5{font-size:13px;font-weight:550;line-height:1.5;margin:0 0 9px}.tapnow-install-guide>p{font-size:12px;line-height:1.8;margin:0 0 16px;max-width:650px}
 .tapnow-guide-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;font-size:11px;color:var(--acu-muted)}
 .tapnow-directory{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border:1px solid var(--acu-line);border-radius:6px;padding:12px;margin-bottom:14px;min-width:0}
 .tapnow-directory code{min-width:0;line-height:1.8;user-select:text}.tapnow-directory .icon-button{flex:0 0 32px}

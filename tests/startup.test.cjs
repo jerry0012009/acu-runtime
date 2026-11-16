@@ -903,6 +903,9 @@ test('installed agents keep their existing flow with optional installation colla
  assert(html.includes('安装并配置 WorkBuddy'));
  assert(html.includes('data-agent-section="other" >'));
  assert(html.includes('TapNow'));
+ assert(html.includes('data-native-focus="agentsInstall"'));
+ assert(html.includes('data-native-tab="mcp"'));
+ assert(html.includes('安装工具与 MCP'));
  assert(!instance.run('ui.selected.has("tapnow")'));
  assert.equal(posts(instance).length,0);
 });

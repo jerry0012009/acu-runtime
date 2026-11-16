@@ -44,6 +44,8 @@ body[data-acu-agent] #agents:has(.acu-focused-agent) .row.agent:not(.acu-focused
 :root[data-acu-theme="light"] { color-scheme: light; }
 :root[data-acu-theme="dark"] { color-scheme: dark; }
 body.acu-embedded .row.pref:has(#themeSegs) { display: none !important; }
+body.acu-agent-install #view-agents > :not(#agentsInstall) { display:none !important; }
+body.acu-agent-install #agentsInstall { margin-top:0; }
 
 body.acu-embedded.acu-panel { padding: 0 !important; border-radius: 0; }
 body.acu-embedded.acu-panel > header { display: flex !important; padding: 12px 16px; min-height: 48px; box-sizing: border-box; }

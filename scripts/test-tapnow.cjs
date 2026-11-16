@@ -46,14 +46,21 @@ async function main() {
       else if(url.pathname==='/runtime/tapnow') result=tapnowState();
       await route.fulfill({json:result});
     });
+    for (let attempt=0; attempt<100; attempt++) {
+      try { if ((await fetch(origin)).ok) break; } catch {}
+      if (attempt===99) throw Error('Runtime UI fixture did not start');
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
     await page.goto(origin);
     await page.locator('[data-agent="codex"]').waitFor();
     const other=page.locator('[data-agent-section="other"]');
     assert.equal(await other.getAttribute('open'),null);
     assert.equal(installCount,0);
-    await other.locator('summary').click();
+    await other.locator(':scope > summary').click();
     await page.locator('#tapnow-model').waitFor();
-    assert((await page.locator('.tapnow-agent').innerText()).includes('资产备份（可选）'));
+    assert((await page.locator('.tapnow-agent').innerText()).includes('资产备份'));
+    assert.equal(await page.locator('.tapnow-backup').getAttribute('open'),null);
+    assert.equal(await page.locator('.tapnow-companion #tapnow-model').count(),1);
     assert.equal(await page.locator('.tapnow-install-guide').count(),0);
     assert.equal(await page.locator('#tapnow-model').inputValue(),'gpt-6.1-sol');
     assert.equal(await page.locator('[data-tapnow-consent]').count(),0,'the enable command is the consent action');

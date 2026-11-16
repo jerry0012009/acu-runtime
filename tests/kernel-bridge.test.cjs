@@ -30,6 +30,7 @@ function setup(action = '', connected = true, agent = 'codex', modelsAvailable =
       body: { dataset: {}, classList: { add() {} }, prepend: element => notes.push(element.textContent) },
       getElementById: () => ({ hidden: false }),
       querySelector: selector => selector.includes('.row.agent') ? target : null,
+      querySelectorAll: () => [],
       createTreeWalker: () => ({ nextNode: () => false }),
       createElement: () => ({ setAttribute() {} }),
     },
@@ -91,5 +92,25 @@ test('unrecognized actions and Agent names cannot trigger a native disconnect', 
     const instance = setup(action, true, agent);
     instance.tick(); instance.tick();
     assert(!instance.clicks.includes('native-disconnect-confirmation'));
+  }
+});
+
+test('install and MCP deep links reuse native controls after the kernel cleans its URL', () => {
+  for (const library of [false, true]) {
+    const timers = new Map(); let seq = 0, clicked = 0;
+    let open = false;
+    const button = { textContent: 'MCP servers', onclick() {}, getAttribute: () => open ? 'true' : 'false', click() { open = true; clicked++; } };
+    const install = {children:[{}],getClientRects:()=>[{}],scrollIntoView(){},querySelector:()=>open?null:{onclick(){},click(){open=true;clicked++;}}};
+    vm.runInNewContext(source, {
+      URLSearchParams, Node:{TEXT_NODE:3,ELEMENT_NODE:1},NodeFilter:{SHOW_TEXT:4},
+      location:{search:'?view=library'},
+      acuKernelQuery: library ? '?acu-view=library&tab=mcp' : '?acu-view=agents&acu-focus=agentsInstall',
+      document:{body:{classList:{add(){}},dataset:{}},getElementById:id=>id==='agentsInstall'?install:{hidden:false},
+        querySelector:s=>s.includes('data-market')&&open?{}:null,querySelectorAll:()=>[button],createTreeWalker:()=>({nextNode:()=>false})},
+      MutationObserver:class{observe(){}disconnect(){}},
+      setInterval:fn=>{timers.set(++seq,fn);return seq;},clearInterval:id=>timers.delete(id),
+    });
+    for(let i=0;i<3;i++)for(const fn of [...timers.values()])fn();
+    assert.equal(clicked,1);
   }
 });
