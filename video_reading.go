@@ -9,10 +9,28 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sync"
+	"time"
 )
 
 const videoReadingName = "acu-video-reader"
 const videoMCPVersion = "0.2.3"
+
+type videoPreparationState struct {
+	sync.Mutex
+	path     string
+	size     int64
+	mod      time.Time
+	prepared time.Time
+}
+
+type videoProgressKey struct{}
+
+func videoProgress(ctx context.Context, message string) {
+	if report, ok := ctx.Value(videoProgressKey{}).(func(string)); ok {
+		report(message)
+	}
+}
 
 func (host *server) setVideoReadingEnabled(ctx context.Context, provider string, agents []string, enabled bool) error {
 	if enabled {
@@ -102,6 +120,8 @@ func videoMCPPath() (string, error) {
 // Only acquire an already-built, verified tool distribution. The tool owns its
 // embedded dependencies, cache, MCP lifecycle and browser native registration.
 func (host *server) prepareVideoTools(ctx context.Context) error {
+	host.videoPreparation.Lock()
+	defer host.videoPreparation.Unlock()
 	if host.videoToolPath != nil {
 		_, err := host.videoToolPath(ctx)
 		return err
@@ -110,23 +130,45 @@ func (host *server) prepareVideoTools(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if st, err := os.Stat(target); err == nil && host.videoPreparation.path == target && host.videoPreparation.size == st.Size() && host.videoPreparation.mod.Equal(st.ModTime()) && time.Since(host.videoPreparation.prepared) < 10*time.Minute {
+		return nil
+	}
 	p, err := videoMCPRelease(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return err
 	}
 	if !verifyVideoMCP(target, p.SHA256) {
+		videoProgress(ctx, "正在下载视频组件")
 		if _, err := installVideoMCP(ctx, p, target); err != nil {
 			return err
 		}
 	}
-	for _, arg := range []string{"--prepare", "--register-native"} {
+	for _, arg := range []string{"--prepare"} {
+		videoProgress(ctx, "正在准备视频组件")
 		c := exec.CommandContext(ctx, target, arg)
 		hideProcess(c)
 		if err := c.Run(); err != nil {
 			return errors.New("视频工具准备失败，请重试")
 		}
 	}
+	if st, err := os.Stat(target); err == nil {
+		host.videoPreparation.path, host.videoPreparation.size, host.videoPreparation.mod = target, st.Size(), st.ModTime()
+		host.videoPreparation.prepared = time.Now()
+	}
 	return nil
+}
+
+func (host *server) registerVideoNative(ctx context.Context) error {
+	if host.videoToolPath != nil {
+		return nil
+	}
+	target, err := videoMCPPath()
+	if err != nil {
+		return err
+	}
+	c := exec.CommandContext(ctx, target, "--register-native")
+	hideProcess(c)
+	return c.Run()
 }
 func (host *server) assignVideoReading(ctx context.Context, agents []string) error {
 	if len(agents) == 0 {
@@ -203,7 +245,7 @@ func (host *server) assignVideoReading(ctx context.Context, agents []string) err
 // Only configure the external MCP through the official Library environment.
 // Media processing and model requests remain entirely inside that tool.
 func (host *server) configureVideoAudio(ctx context.Context, provider string) error {
-	config, err := host.tapnowCredential(ctx, provider, "gemini-3.5-flash-lite")
+	config, err := host.tapnowCredentialFromCatalog(ctx, provider, "gemini-3.5-flash-lite", false)
 	if err != nil {
 		return err
 	}
@@ -248,6 +290,11 @@ func (host *server) configureVideoAudio(ctx context.Context, provider string) er
 		env["ACU_AUDIO_API_KEY"] = config.APIKey
 		env["ACU_AUDIO_BASE_URL"] = config.Settings.Base
 		env["ACU_AUDIO_MODEL"] = "gemini-3.5-flash-lite"
+		previous, _ := json.Marshal(tool.stored["env"])
+		next, _ := json.Marshal(env)
+		if string(previous) == string(next) {
+			return nil
+		}
 		stored["env"] = env
 		return host.writeToolLibrary(ctx, "/api/library/servers/save", map[string]any{"old": tool.Name, "server": stored})
 	}

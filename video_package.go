@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type videoPackage struct{ URL, SHA256 string }
@@ -44,11 +46,30 @@ func verifyVideoMCP(file, digest string) bool {
 	return e == nil && n <= 256<<20 && hex.EncodeToString(h.Sum(nil)) == digest
 }
 func installVideoMCP(ctx context.Context, p videoPackage, target string) (string, error) {
+	client := updateClient(3 * time.Minute)
+	defer client.CloseIdleConnections()
+	var err error
+	for _, source := range updateDownloadSources(p.URL) {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		attempt, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		var installed string
+		installed, err = downloadVideoMCP(attempt, client, videoPackage{URL: source, SHA256: p.SHA256}, target)
+		cancel()
+		if err == nil {
+			return installed, nil
+		}
+	}
+	return "", err
+}
+
+func downloadVideoMCP(ctx context.Context, client *http.Client, p videoPackage, target string) (string, error) {
 	req, e := http.NewRequestWithContext(ctx, "GET", p.URL, nil)
 	if e != nil {
 		return "", e
 	}
-	res, e := tapnowHTTPClient().Do(req)
+	res, e := client.Do(req)
 	if e != nil {
 		return "", e
 	}
@@ -65,7 +86,17 @@ func installVideoMCP(ctx context.Context, p videoPackage, target string) (string
 	}
 	defer os.Remove(f.Name())
 	h := sha256.New()
-	n, e := io.Copy(io.MultiWriter(f, h), io.LimitReader(res.Body, (256<<20)+1))
+	last := -1
+	writer := &kernelDownloadWriter{writer: io.MultiWriter(f, h), total: res.ContentLength, progress: func(done, total int64) {
+		if total > 0 {
+			percent := int(done * 100 / total)
+			if percent != last {
+				last = percent
+				videoProgress(ctx, fmt.Sprintf("正在下载视频组件 · %d%%", percent))
+			}
+		}
+	}}
+	n, e := io.Copy(writer, io.LimitReader(res.Body, (256<<20)+1))
 	ce := f.Close()
 	if e != nil || ce != nil || n > 256<<20 || hex.EncodeToString(h.Sum(nil)) != p.SHA256 {
 		return "", errors.New("视频工具校验失败，原文件保留")

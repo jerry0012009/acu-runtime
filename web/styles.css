@@ -83,6 +83,8 @@ h1{font-size:25px;font-weight:650;letter-spacing:-.5px}
 .setup-result+ .setup-result{border-top:1px solid var(--acu-line)}
 .setup-result strong{min-width:85px;color:var(--acu-text)}
 .setup-result.failed span{color:var(--acu-error)}
+.setup-result.pending span{display:flex;align-items:center;gap:8px;color:var(--acu-muted)}
+.setup-result.pending .icon{width:14px;height:14px;flex-shrink:0}
 .usage-help{margin:20px 0 4px;font-size:12px;color:var(--acu-muted);line-height:1.8}
 .usage-help summary{cursor:pointer;color:var(--acu-text-secondary)}
 .usage-help p{margin:9px 0 0}

@@ -103,6 +103,8 @@ type server struct {
 	cloudTransport   http.RoundTripper
 	update           updateState
 	capabilityMu     sync.Mutex
+	toolSetup        toolSetupState
+	videoPreparation videoPreparationState
 	setKernelSetting func(context.Context, string, string) error
 	imageSkillSource func() (string, error)
 	videoToolPath    func(context.Context) (string, error)
@@ -680,6 +682,8 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.capabilities(response, request)
 		case request.URL.Path == "/runtime/capabilities/refresh" && request.Method == http.MethodPost:
 			host.refreshCapabilityModels(response, request)
+		case request.URL.Path == "/runtime/capabilities/prepare" && (request.Method == http.MethodPost || request.Method == http.MethodGet):
+			host.prepareCapabilities(response, request)
 		case (request.Method == http.MethodGet && request.URL.Path == "/runtime/update") || (request.Method == http.MethodPost && (request.URL.Path == "/runtime/update/check" || request.URL.Path == "/runtime/update/install")):
 			host.updates(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/desktop/action":

@@ -390,7 +390,7 @@ test('one click previews options, and only confirmation configures selected agen
   assert(!instance.elements.overlay.innerHTML.includes('role="switch"'));
   assert.equal(instance.run('ui.setup.model'), 'acu-auto');
   await instance.run('confirmSetup()');
-  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/runtime/capabilities']);
+  assert.deepEqual(posts(instance).map(call => call.route), ['/runtime/agents/configure', '/runtime/capabilities/prepare']);
   assert.deepEqual(JSON.parse(posts(instance)[0].body), { agent: 'codex', provider: 'acu-runtime', model: 'acu-auto', auxiliary: false });
   assert.equal(instance.run('ui.selected.has("codex")'), false);
 });
@@ -709,11 +709,11 @@ test('bulk setup prepares kernel MCP only for confirmed agents and can opt out',
     assert.equal(instance.run('ui.setup.tools'), true);
     if (!enabled) instance.listeners.overlay.change({ target: { id: 'setup-tools', checked: false } });
     await instance.run('confirmSetup()');
-    const tools = posts(instance).filter(call => call.route === '/runtime/capabilities');
+    const tools = posts(instance).filter(call => call.route === '/runtime/capabilities/prepare');
     assert.equal(tools.length, enabled ? 1 : 0);
     if (enabled) {
-      assert.deepEqual(JSON.parse(tools[0].body), { provider: 'acu-runtime', agents: ['codex'] });
-      assert(instance.elements.app.innerHTML.includes('搜索待配置'));
+      assert.deepEqual(JSON.parse(tools[0].body), { provider: 'acu-runtime', agents: ['codex'], videoOnly:false });
+      assert.equal(instance.run('ui.applying'),false);
       assert(instance.elements.app.innerHTML.includes('图片、视频与搜索'));
     }
   }
@@ -817,9 +817,9 @@ test('desktop automatically prepares missing video reading once and respects exp
   const view={...capabilityFixture(),videoReadingReady:false,videoReadingEnabled:enabled};
   const instance=await setup({desktop:true,ready:true,agents:[{...codex(),connected:true}]},async(route,options)=>route.startsWith('/runtime/capabilities')?{body:view}:undefined);
   await new Promise(resolve=>setImmediate(resolve));
-  const writes=()=>posts(instance).filter(call=>call.route==='/runtime/capabilities'&&JSON.parse(call.body).videoReadingOnly);
+  const writes=()=>posts(instance).filter(call=>call.route==='/runtime/capabilities/prepare'&&JSON.parse(call.body).videoOnly);
   assert.equal(writes().length,enabled?1:0);
-  if(enabled)assert.deepEqual(JSON.parse(writes()[0].body),{provider:'acu-runtime',agents:['codex'],videoReadingOnly:true,videoReading:true});
+  if(enabled)assert.deepEqual(JSON.parse(writes()[0].body),{provider:'acu-runtime',agents:['codex'],videoOnly:true});
   await instance.refresh();await new Promise(resolve=>setImmediate(resolve));
   assert.equal(writes().length,enabled?1:0,'polling must not repeatedly rewrite tool assignments');
  }

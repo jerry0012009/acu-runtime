@@ -101,7 +101,19 @@ func TestNativeCatalogManagementSync(t *testing.T) {
 		if err := k.exchange(ctx, "POST", "/api/agents/connect/workbuddy", map[string]any{}, nil); err != nil {
 			return err
 		}
-		return k.exchange(ctx, "POST", "/api/agent-models/workbuddy", map[string]any{"shown": shown}, nil)
+		if err := k.exchange(ctx, "POST", "/api/agent-models/workbuddy", map[string]any{"shown": shown}, nil); err != nil {
+			return err
+		}
+		host := &server{kernel: k}
+		defs := []struct{ name, path string }{{"acu-vision", "vision"}, {"acu-image", "image"}, {"acu-search", "web-search"}}
+		for round := 0; round < 2; round++ {
+			start := time.Now()
+			if err := host.assignNativeTools(ctx, defs, []string{"workbuddy"}); err != nil {
+				return err
+			}
+			t.Logf("official kernel native tool assignment round=%d elapsed=%dms", round+1, time.Since(start).Milliseconds())
+		}
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
