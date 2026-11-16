@@ -626,6 +626,7 @@ test('new frontier Gemini models and Fable 5.2 are recommended in the saved dete
   const models=['acu-auto','claude-fable-5-2','gpt-6.1-sol','gpt-6-astra','gemini-4-carbon','gemini-4-hydrogen','claude-opus-5-5'];
   assert.equal(instance.run('recommendedModels({models:'+JSON.stringify(models.slice().reverse())+'}).join(",")'),models.join(','));
   assert.equal(instance.run('recommendedModels({models:["gemini-4-hydrogen","gpt-6-astra","claude-fable-5-2"]}).join(",")'),'claude-fable-5-2,gpt-6-astra,gemini-4-hydrogen');
+  assert.equal(instance.run('recommendedModels({models:["gemini-4-argon","gemini-4-future","unknown"]}).join(",")'),'gemini-4-argon,gemini-4-future');
 });
 
 test('existing Agent setup reveals available recommended models without replacing saved model', async () => {

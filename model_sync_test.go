@@ -34,7 +34,7 @@ func TestNativeCatalogManagementSync(t *testing.T) {
 	t.Setenv("MAGPIE_ADDR", address)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	models := []string{"acu-auto", "claude-fable-5-1", "claude-fable-5-2", "gemini-4-carbon", "gemini-4-hydrogen"}
+	models := []string{"acu-auto", "claude-fable-5-1", "claude-fable-5-2", "gemini-4-carbon", "gemini-4-hydrogen", "gemini-4-argon"}
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			t.Error("configuration sent a model request")
@@ -84,7 +84,7 @@ func TestNativeCatalogManagementSync(t *testing.T) {
 	}
 	// Exercise native visibility, then verify its own persisted model catalog.
 	err = nativeCatalogManagement(ctx, executable, func(k *kernelState) error {
-		if err := runCatalogCLI(ctx, executable, []string{"provider", "models", "acu-runtime", "+claude-fable-5-1", "+claude-fable-5-2", "+gemini-4-carbon", "+gemini-4-hydrogen"}); err != nil {
+		if err := runCatalogCLI(ctx, executable, []string{"provider", "models", "acu-runtime", "+claude-fable-5-1", "+claude-fable-5-2", "+gemini-4-carbon", "+gemini-4-hydrogen", "+gemini-4-argon"}); err != nil {
 			return err
 		}
 		var catalog agentCatalog

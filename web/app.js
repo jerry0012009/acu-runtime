@@ -173,7 +173,7 @@ function activeChoice() {
 // Recommended candidates are intersected with the account's current model list.
 const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'gemini-4-carbon', 'gemini-4-hydrogen', 'claude-opus-5-5', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
 function recommendedModels(choice) {
-  return recommendedACUModels.filter(model => choice?.models?.includes(model));
+  return [...recommendedACUModels.filter(model => choice?.models?.includes(model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))];
 }
 
 function agentRecommendation(agent, choice, selectedModel, settings) {
@@ -1093,7 +1093,7 @@ async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-']})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1108,7 +1108,7 @@ async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-']})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1159,7 +1159,8 @@ async function applyRecommendedVisibility(agentId, provider, selectedModel, pres
   const prefix = provider + '/';
   const models = catalog.models.map(model => {
     if (!model.id.startsWith(prefix) || model.own || model.inUse || model.id === prefix + selectedModel) return model;
-    if (!model.hidden || !recommendedACUModels.includes(model.id.slice(prefix.length))) return model;
+    const id = model.id.slice(prefix.length);
+    if (!model.hidden || !(recommendedACUModels.includes(id) || id.startsWith('gemini-4-'))) return model;
     return { ...model, hidden: false };
   });
   if (!models.some((model, index) => model.hidden !== catalog.models[index].hidden)) return;

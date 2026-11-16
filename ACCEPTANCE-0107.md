@@ -1,4 +1,4 @@
-# Runtime 0.1.106 Agent Model Synchronization
+# Runtime 0.1.107 Agent Model Synchronization
 
 Root causes:
 
@@ -30,8 +30,8 @@ Validation before release:
 
 - Official Magpie 0.1.4248 isolated management test reproduces fetched-but-off
   Fable 5.2, adds Fable 5.1/5.2 and Gemini4 Carbon/Hydrogen through the original
-  CLI, connects WorkBuddy through the original API and checks its actual
-  `models.json` contains all five IDs including acu-auto.
+  and Argon through the original CLI, connects WorkBuddy through the original
+  API and checks its actual `models.json` contains all six IDs including acu-auto.
 - Official kernel + installed Codex config/model parser test passes catalog
   hide/reveal, watcher replacement, login-mode preservation, original MCP
   preservation, cancellation, rollback and disconnect. It makes no inference.
