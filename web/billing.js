@@ -6,6 +6,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   const quota = value => value == null || !state.account?.cnyPerQuota ? '—' : money(value * state.account.cnyPerQuota);
   const overviewMoney = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value) > 0 && Number(value) < .01 ? '< ¥0.01' : '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let modelOrder = 'charge', showAllModels = false;
+  let renderedPriceRows = '';
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
   const button = (label, attributes = '') => `<button class="button secondary" ${attributes}>${label}</button>`;
   const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}/${ui.status?.account?.selected || 0}`;
@@ -170,9 +171,23 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
 
   function pricesPage() {
     const rows = priceRows();
+    renderedPriceRows = rows;
     return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 已含倍率</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label></div>
-      ${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}
-      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">— 表示暂无固定报价 · 更新于 ${esc(date(state.prices?.updatedAt))}</p></section>`;
+      <div id="billing-price-status">${priceStatus()}</div>
+      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">— 表示暂无固定报价 · 更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
+  }
+
+  function priceStatus() {
+    return `${state.pricesError ? note('价格刷新失败：' + state.pricesError + (state.prices?.updatedAt ? ' 当前显示上次成功获取的价格。' : '')) : ''}${state.pricesBusy ? note(state.prices ? '正在更新价格，当前显示上次成功获取的价格。' : '正在获取模型价格…') : ''}`;
+  }
+
+  function updatePriceRows() {
+    const rows = priceRows();
+    if (rows !== renderedPriceRows) {
+      document.getElementById('billing-price-rows').innerHTML = rows;
+      renderedPriceRows = rows;
+    }
+    document.getElementById('billing-price-empty').hidden = !!rows || !state.prices;
   }
 
   function update(source = '') {
@@ -191,6 +206,16 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
 
   function render() {
     if (ui.page !== 'usage') return;
+    // Keep native controls mounted while async requests and status polls finish.
+    if (state.tab === 'prices' && document.getElementById('billing-price-rows')) {
+      updatePriceRows();
+      const refresh = app.querySelector('[data-billing-refresh="prices"]');
+      refresh.disabled = state.pricesBusy;
+      refresh.textContent = state.pricesBusy ? '刷新中…' : '刷新价格';
+      document.getElementById('billing-price-status').innerHTML = priceStatus();
+      document.getElementById('billing-price-updated').textContent = date(state.prices?.updatedAt);
+      return;
+    }
     if (state.tab === 'local' && document.getElementById('billing-summary') && state.localReady === !!ui.status?.ready) { update(); return; }
     state.localReady = !!ui.status?.ready;
     const tabs = [['local','本机用量'],['account','ACU 账户'],['prices','模型价格']];
@@ -234,9 +259,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   function input(event) {
     if (event.target.id !== 'billing-price-search') return;
     state.query = event.target.value;
-    const rows = priceRows();
-    document.getElementById('billing-price-rows').innerHTML = rows;
-    document.getElementById('billing-price-empty').hidden = !!rows || !state.prices;
+    updatePriceRows();
   }
   return { open, render, syncAccount, click, change, input };
 };

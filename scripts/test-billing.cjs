@@ -38,7 +38,7 @@ async function main() {
     if (url.pathname === '/kernel/') { localLoads++; return route.fulfill({ contentType: 'text/html', body: '<h1>原有本机用量统计</h1><input aria-label="原有筛选" value="今天">' }); }
     const file = url.pathname === '/' ? path.join(web, 'index.html') : path.join(web, url.pathname.replace('/ui/', ''));
     if (!fs.existsSync(file)) return json({});
-    return route.fulfill({ contentType: file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html', body: fs.readFileSync(file,'utf8').replace('__ACU_TOKEN__','fixture-token') });
+    return route.fulfill({ contentType: file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html', body: fs.readFileSync(file,'utf8').replace('__ACU_TOKEN__','fixture-token') + (file === path.join(web, 'app.js') ? '\nglobalThis.testBillingRender = () => render();' : '') });
   });
   try {
     await page.goto('http://billing.test/');
@@ -82,6 +82,18 @@ async function main() {
     await page.getByRole('searchbox').fill('sol');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1);
     delayPrices = true;
+    await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+    await page.locator('[data-billing-sort]').click();
+    await page.evaluate(() => { globalThis.savedPriceSort = document.querySelector('[data-billing-sort]'); });
+    await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    assert(await page.evaluate(() => savedPriceSort === document.querySelector('[data-billing-sort]')), 'price refresh must retain the native sort select');
+    assert(await page.locator('[data-billing-sort]').evaluate(node => node === document.activeElement), 'price refresh must retain sort focus');
+    await page.evaluate(() => testBillingRender());
+    assert(await page.evaluate(() => savedPriceSort === document.querySelector('[data-billing-sort]')), 'background app renders must retain the native sort select');
+    await page.keyboard.press('Escape');
+    await page.locator('[data-billing-sort]').selectOption('capability_desc');
+    assert(await page.evaluate(() => savedPriceSort === document.querySelector('[data-billing-sort]')), 'sorting must not replace its own select');
+    await page.locator('[data-billing-sort]').selectOption('output_asc');
     await page.getByRole('button', { name: '刷新价格', exact: true }).click();
     assert.equal(await page.getByText(/价格刷新失败/).count(), 0, 'retry clears the previous failure');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1, 'pending refresh keeps cached rows');
