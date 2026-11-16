@@ -1,6 +1,6 @@
 # Empty Preference Example
 
-The personal preferences page shows a read-only 50-direction example across five
+The personal preferences page shows a read-only 150-direction example across five
 domains only after both profile and library reads confirm an empty account.
 Loading, failed reads, signed-out sessions, and team spaces retain their own states.
 
