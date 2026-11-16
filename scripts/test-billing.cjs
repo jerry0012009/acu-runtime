@@ -205,7 +205,13 @@ async function main() {
       }
     }
     if (process.env.ACU_PUBLIC_PRICE_FIXTURE) {
-      prices.splice(0, prices.length, ...JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8')).data);
+      const snapshot = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../model_benchmarks.json'), 'utf8'));
+      const publicPrices = JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8')).data;
+      for (const model of publicPrices) {
+        const variants = snapshot.models[model.model_name.replaceAll('.', '-')];
+        if (variants?.length) model.capability_benchmark = {benchmark:snapshot.benchmark,score:variants[0].score,variants,observed_at:snapshot.observedAt};
+      }
+      prices.splice(0, prices.length, ...publicPrices);
       await page.getByRole('button', { name: '刷新价格', exact: true }).click();
       await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
       await page.locator('[data-billing-sort]').selectOption('capability_desc');
