@@ -38,3 +38,11 @@ Pre-release verification:
 - Release workflow repeats browser and official-kernel checks on all platforms.
 
 Screenshots: `/tmp/acu-setup-browser/output/setup-progress/` (private fixture).
+
+Release v0.1.108 (application `17b5fd6`) published 2026-11-16T13:30:50Z.
+Workflow `43870405764` passed Windows x64, Intel Mac and Apple Silicon,
+including the new browser progress/retry cases and packaged official-kernel
+tool assignment checks. Apple Silicon initially failed runner allocation twice;
+the third attempt completed without source changes. The public release resolver
+returns 0.1.108 with all three download mirrors. No cloud application service
+was replaced for this Runtime-only release. Later main changes are documentation.

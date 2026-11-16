@@ -140,7 +140,9 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     const settings = state.data.settings;
     const flags = learningControls(settings);
     const ready = !state.busy || Object.keys(state.data).length;
-    return `<div class="preference-account"><div><strong>${esc(account.username || 'ACU 账户')}</strong></div><div class="preference-actions"><button class="button secondary" data-pref-refresh ${state.busy ? 'disabled' : ''}>${state.busy ? '读取中…' : '刷新'}</button><button class="text-button" data-action="account-login">切换账号</button><button class="text-button" data-pref-logout>退出账号</button></div></div>${errors}${state.busy ? note('正在读取个人偏好…') : ''}${graph?.render(profile) || ''}${flags}
+    const example = !state.busy && !state.errors.profile && !state.errors.library && profile?.status === 'empty' && !rays.length && library?.records.length === 0;
+    const chartView = example ? globalThis.createACUPreferenceExample?.() : profile;
+    return `<div class="preference-account"><div><strong>${esc(account.username || 'ACU 账户')}</strong></div><div class="preference-actions"><button class="button secondary" data-pref-refresh ${state.busy ? 'disabled' : ''}>${state.busy ? '读取中…' : '刷新'}</button><button class="text-button" data-action="account-login">切换账号</button><button class="text-button" data-pref-logout>退出账号</button></div></div>${errors}${state.busy ? note('正在读取个人偏好…') : ''}${graph?.render(chartView) || ''}${flags}
       <div class="preference-search"><label for="preference-search">搜索偏好与近期变化</label><input id="preference-search" type="search" placeholder="搜索内容、领域或适用范围" value="${esc(state.query)}"><div class="preference-filters" role="group" aria-label="偏好领域筛选"><button class="button secondary" data-pref-category="" aria-pressed="${!state.category}">全部领域</button>${categories.map(category => `<button class="button secondary" data-pref-category="${esc(category)}" aria-pressed="${state.category === category}">${esc(category)}</button>`).join('')}</div></div>
       <section aria-labelledby="pref-overview"><h2 id="pref-overview">偏好概览</h2>${profile?.profile ? `<p>${esc(profile.profile.summary || '')}</p>` : ''}${!profile?.profile && profile?.status === 'error' ? note('偏好加载失败，请重试。') : !profile?.profile && ['queued','generating'].includes(profile?.status) ? note('正在整理偏好…') : ''}${ready && profile && !profile.profile && ['ready','empty'].includes(profile.status) ? note('暂无偏好。') : ''}
       <div class="preference-rays">${filtered.map(ray => `<article class="panel preference-ray"><div class="preference-ray-heading"><h3>${esc(ray.label || '偏好')}</h3><span>${esc(ray.category || '其他领域')}</span></div><p>${esc(ray.summary || '暂无摘要。')}</p>${ray.scope ? `<p class="preference-muted">适用范围：${esc(ray.scope)}</p>` : ''}${ray.bipolar?.origin === 'authorized_initialization' ? note('初始设置') : ''}${sourceList(ray)}</article>`).join('')}</div>${rays.length && !filtered.length ? note('没有匹配的偏好。') : ''}
@@ -184,6 +186,14 @@ globalThis.createACUPreferences = ({ app, ui, request, navigation, escapeHTML: e
     }
     const chart = app.querySelector('.starfish-panel');
     const page = app.querySelector('.preference-page');
+    if (chart && !state.data.profile?.profile?.rays?.length) {
+      chart.dataset.example = 'true';
+      chart.querySelector('.starfish-header h2').textContent = '偏好向量 · 示例';
+      const disclaimer = document.createElement('p');
+      disclaimer.className = 'starfish-example-note'; disclaimer.setAttribute('role', 'note');
+      disclaimer.textContent = '示例数据，非你的个人偏好';
+      chart.querySelector('.starfish-header').after(disclaimer);
+    }
     if (chart) page.querySelector('header').after(chart);
     const settingsSection = app.querySelector('.preference-learning');
     if (settingsSection) (chart || page.querySelector('header')).after(settingsSection);
