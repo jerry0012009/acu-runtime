@@ -52,3 +52,13 @@ go test -run '^TestNativeCatalogManagementSync$' -v -timeout 3m .
 
 This validates selection and configuration propagation, not supplier uptime.
 An upstream failure must not make a published model disappear from the list.
+
+Release v0.1.107, source `6970db0`, published 2026-11-16T11:57:19Z.
+Workflow `43860353873` completed all three native builds and publication,
+including packaged-kernel model sync on Windows, Apple Silicon and Intel Mac,
+Windows quiet Codex catalog mutation, official ChatGPT installation and Runtime
+upgrade checks. Public `/api/acu-runtime/release` returns 0.1.107 and all three
+platform mirrors. The intermediate 0.1.106 build was cancelled before publication
+to include catalog-listed Gemini4 Argon and later Gemini4 IDs without another
+per-variant recommendation edit. Main changes after the tag are acceptance
+documentation only.
