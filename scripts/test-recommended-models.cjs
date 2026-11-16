@@ -11,16 +11,18 @@ fs.mkdirSync(output, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const theme of ['light', 'dark']) for (const width of [390, 1440]) for (const connected of [false, true]) {
+    for (const theme of ['light', 'dark']) for (const width of [390, 1440]) for (const connected of [false, true]) for (const agentId of ['workbuddy','codex','claude','hermes']) {
       const page = await browser.newPage({ viewport: { width, height: 950 }, colorScheme: theme });
       const errors = [], changes = [], configurations = [];
       page.on('pageerror', error => errors.push(error.message));
-      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'claude-fable-5', 'claude-fable-5-1','claude-fable-5-2','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
-      const agent = { id: 'workbuddy', name: 'WorkBuddy', detected: true, connected, wired: connected, modelOptions: [] };
+      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'claude-fable-5', 'claude-fable-5-1','claude-fable-5-2','gemini-4-carbon','gemini-4-hydrogen','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
+      const agent = { id: agentId, name: agentId, detected: true, connected, wired: connected, modelOptions: choice.models.map(model=>({value:'acu-runtime/'+model,ref:'acu-runtime/'+model})) };
       const catalog = { models: [
         { id: 'acu-runtime/acu-auto' },
         { id: 'acu-runtime/claude-fable-5-1', hidden: true },
         { id: 'acu-runtime/claude-fable-5-2', hidden: true },
+        { id: 'acu-runtime/gemini-4-carbon', hidden: true },
+        { id: 'acu-runtime/gemini-4-hydrogen', hidden: true },
         { id: 'acu-runtime/kimi-k3.1-pro', hidden: true },
         { id: 'acu-runtime/grok-4.7', hidden: true },
         { id: 'acu-runtime/gemini-3.8-flash', hidden: true },
@@ -31,11 +33,12 @@ fs.mkdirSync(output, { recursive: true });
         const request = route.request();
         const url = new URL(request.url());
         if (url.pathname === '/runtime/status') return route.fulfill({ json: { ready: true, desktop: false, agents: [agent], connection: { known: true, configured: true, provider: choice.id, choices: [choice] } } });
+        if (url.pathname === '/kernel/api/provider/models') return route.fulfill({json:{}});
         if (url.pathname === '/runtime/agents/configure') {
           configurations.push(request.postDataJSON());
-          return route.fulfill({ json: { agents: [{ id: 'workbuddy', wired: true }] } });
+          return route.fulfill({ json: { agents: [{ id: agentId, wired: true }] } });
         }
-        if (url.pathname === '/kernel/api/agent-models/workbuddy') {
+        if (url.pathname === '/kernel/api/agent-models/'+agentId) {
           if (request.method() === 'POST') { changes.push(request.postDataJSON()); return route.fulfill({ json: {} }); }
           return route.fulfill({ json: catalog });
         }
@@ -50,12 +53,13 @@ fs.mkdirSync(output, { recursive: true });
       await page.locator('.setup-adjustments > summary').click();
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-1"]').count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-2"]').count(), 1);
+      assert.equal(await page.locator('#setup-model option[value="gemini-4-carbon"]').count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5"]').count(), 0);
       for (const model of ['kimi-k3.1-pro','grok-4.7','gemini-3.8-flash']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
       assert.equal(await page.locator('#setup-model').inputValue(), 'acu-auto');
       assert(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth));
       await page.screenshot({ path: path.join(output, `${connected ? 'existing' : 'fresh'}-${theme}-${width}.png`), fullPage: true });
-      const visibilitySaved = page.waitForResponse(response => response.url().endsWith('/kernel/api/agent-models/workbuddy') && response.request().method() === 'POST');
+      const visibilitySaved = page.waitForResponse(response => response.url().endsWith('/kernel/api/agent-models/'+agentId) && response.request().method() === 'POST');
       await page.locator('[data-confirm-setup]').click();
       await visibilitySaved;
       assert.equal(configurations.length, 1);

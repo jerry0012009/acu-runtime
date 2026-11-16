@@ -171,7 +171,7 @@ function activeChoice() {
 }
 
 // Recommended candidates are intersected with the account's current model list.
-const recommendedACUModels = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-2', 'claude-fable-5-1'];
+const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'gemini-4-carbon', 'gemini-4-hydrogen', 'claude-opus-5-5', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
 function recommendedModels(choice) {
   return recommendedACUModels.filter(model => choice?.models?.includes(model));
 }
@@ -179,7 +179,7 @@ function recommendedModels(choice) {
 function agentRecommendation(agent, choice, selectedModel, settings) {
   const options = agent?.modelOptions || [];
   const nativeModels = [...new Set(options.filter(option => !option.ref && option.value).map(option => option.label || option.value))];
-  const availableModels = recommendedModels(choice).filter(model => agent.id === 'workbuddy' || options.some(option => option.ref === `${choice.id}/${model}`));
+  const availableModels = recommendedModels(choice).filter(model => agent.id === 'workbuddy' || options.some(option => option.ref === `${choice.id}/${model}`) || agent.catalog?.models?.some(option => option.id === `${choice.id}/${model}`));
   const recommendedModel = availableModels.includes('acu-auto') ? 'acu-auto' : availableModels[0] || '';
   const model = availableModels.includes(selectedModel) ? selectedModel : recommendedModel;
   const namesByAgent = {
@@ -331,7 +331,8 @@ function modelFacts(agent) {
   const roleRows = roles.map(role => ({ key: role.key, value: role.value, name: role.name, label: label(role), model: role.name || role.ref?.split('/').slice(1).join('/') || role.value, destination: role.group && !role.ref ? role.group : routeName(role.ref), ref: role.ref }));
   const configured = agent.connected && !agent.needsRepair;
   const enabled = acu.filter(model => !model.hidden && !(model.own && catalog?.ownHidden));
-  const top = [...enabled].sort((left, right) => Number(right.id.endsWith('/acu-auto')) - Number(left.id.endsWith('/acu-auto'))).slice(0, 3);
+  const recommendationRank = model => {const index=recommendedACUModels.indexOf(model.id.split('/').slice(1).join('/'));return index<0?999:index;};
+  const top = [...enabled].sort((left, right) => recommendationRank(left)-recommendationRank(right)).slice(0, 3);
   const nativeEntries = [...new Map((agent.modelOptions || []).filter(option => !option.ref && option.value).map(option => [option.value, { id: option.value, name: option.label || option.value, group: `${agent.name} 原生`, own: true, nativeOption: true, inUse: option.value === agent.model }])).values()];
   return { catalog, roleRows, configured, top, nativeEntries, routeName };
 }
@@ -456,10 +457,10 @@ function agentModelSummary(agent, advanced = '') {
   const native = shown.filter(model => model.own).length || (agent.modelOptions || []).filter(option => !option.ref || option.ref.startsWith('native/')).length;
   const other = shown.filter(model => !model.own && !model.id.startsWith('acu-runtime/')).length;
   const exampleRanks = {
-    codex: ['gpt-6-astra', 'gpt-6.1-sol', 'acu-auto'],
-    claude: ['claude-opus-5-5', 'claude-sonnet-5', 'acu-auto'],
-    workbuddy: ['gpt-6-luna', 'glm-5.3-flash', 'acu-auto'],
-    hermes: ['deepseek-v4-pro', 'deepseek-v4.1-flash', 'acu-auto'],
+    codex: ['claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'acu-auto'],
+    claude: ['claude-fable-5-2', 'claude-opus-5-5', 'acu-auto'],
+    workbuddy: ['claude-fable-5-2', 'gemini-4-carbon', 'gpt-6-luna', 'acu-auto'],
+    hermes: ['claude-fable-5-2', 'gemini-4-hydrogen', 'deepseek-v4-pro', 'acu-auto'],
   };
   const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra'];
   const examples = shown.filter(model => !model.own && rank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => rank.indexOf(a.id.split('/').slice(1).join('/')) - rank.indexOf(b.id.split('/').slice(1).join('/'))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
@@ -1090,6 +1091,11 @@ async function connectKernel() {
 
 async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
+  const provider = activeChoice()?.id;
+  if (provider) {
+    try { await requestKernel('/kernel/api/provider/models', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:provider})}); }
+    catch(error) { toast(error.message); return; }
+  }
   await refresh();
   const choice = activeChoice();
   const agents = (ui.status?.agents || []).filter(agent => ui.selected?.has(agent.id) && agent.detected && names[agent.id]);
@@ -1100,6 +1106,11 @@ async function applyAgents() {
 
 async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
+  const provider = activeChoice()?.id;
+  if (provider) {
+    try { await requestKernel('/kernel/api/provider/models', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:provider})}); }
+    catch(error) { toast(error.message); return; }
+  }
   await refresh();
   const agent = (ui.status?.agents || []).find(current => current.id === id);
   const choice = activeChoice();
@@ -1176,7 +1187,7 @@ async function confirmSetup() {
         const configured = result.agents?.find(current => current.id === id);
         if (!configured?.wired || configured.drift) throw new Error('未确认配置成功，请检查设置');
         connectedAgents.push(id);
-        if (!preserve || id === 'workbuddy') await applyRecommendedVisibility(id, setup.provider, setup.model, preserve);
+        await applyRecommendedVisibility(id, setup.provider, setup.model, preserve);
         ui.selected?.delete(id);
         ui.results.push({ id, ok: true, message: result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
