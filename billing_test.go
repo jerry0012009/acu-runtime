@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -101,12 +102,10 @@ func TestBillingUsesCloudHistoricalAmountsAndSanitizesLogs(t *testing.T) {
 			if request.URL.Query().Get("days") != "30" {
 				t.Fatal("overview range lost")
 			}
-			return cloudFixture(`{"success":true,"data":{"chargeCny":"0.123456789","count":21,"models":[{"model":"fixture-sol","count":21,"chargeCny":"0.123456789"}],"comparison":{"referenceCny":"2","chargeCny":"0.1","savedCny":"1.9","savedPercent":"95","count":20,"basis":"official"},"private_info":"must-not-leak"}}`), nil
+			return cloudFixture(`{"success":true,"data":{"chargeCny":"0.123456789","count":21,"exactChargeCount":20,"legacyChargeCount":1,"models":[{"model":"fixture-sol","count":21,"chargeCny":"0.123456789"}],"comparison":{"referenceCny":"2","chargeCny":"0.1","savedCny":"1.9","savedPercent":"95","count":20,"basis":"official"},"private_info":"must-not-leak"}}`), nil
 		case "/api/log/self/stat":
-			if request.URL.Query().Get("type") != "2" || request.URL.Query().Get("token_name") != "" {
-				t.Fatal("incorrect history scope")
-			}
-			return cloudFixture(`{"success":true,"data":{"user_charge_cny":"0.000000000123456789","exact_charge_count":1,"legacy_charge_count":0}}`), nil
+			t.Fatal("successful overview must not repeat expensive statistics")
+			return nil, nil
 		case "/api/log/self":
 			if request.URL.Query().Get("p") != "2" || request.URL.Query().Get("page_size") != "20" {
 				t.Fatal("pagination lost")
@@ -123,7 +122,7 @@ func TestBillingUsesCloudHistoricalAmountsAndSanitizesLogs(t *testing.T) {
 		t.Fatal(response.Body.String())
 	}
 	body := response.Body.String()
-	for _, expected := range []string{"0.000000000123456789", "0.123456789", "old-price-version", "savedPercent", "0.00001348"} {
+	for _, expected := range []string{"0.123456789", "old-price-version", "savedPercent", "0.00001348"} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("missing %s: %s", expected, body)
 		}
@@ -145,6 +144,46 @@ func TestBillingWithoutAccountMakesNoCloudRequest(t *testing.T) {
 	host.accountBilling(response, httptest.NewRequest("GET", "/runtime/billing/account", nil))
 	if !strings.Contains(response.Body.String(), `"loggedIn":false`) {
 		t.Fatal(response.Body.String())
+	}
+}
+
+func TestBillingCloudReadsAreConcurrentAndDoNotRepeatStats(t *testing.T) {
+	host := &server{}
+	host.account.view = accountView{LoggedIn: true, Site: billingSite}
+	host.account.userID, host.account.bearer, host.account.expires = 42, "session", time.Now().Add(time.Hour).Unix()
+	var mu sync.Mutex
+	started := map[string]bool{}
+	ready := make(chan struct{})
+	host.cloudTransport = accountTransport(func(r *http.Request) (*http.Response, error) {
+		mu.Lock()
+		started[r.URL.Path] = true
+		if len(started) == 4 {
+			close(ready)
+		}
+		mu.Unlock()
+		select {
+		case <-ready:
+		case <-time.After(3 * time.Second):
+			t.Error("billing reads are serial")
+			return nil, context.DeadlineExceeded
+		}
+		switch r.URL.Path {
+		case "/api/status":
+			return cloudFixture(`{"success":true,"data":{"quota_per_unit":500000,"usd_exchange_rate":6.74}}`), nil
+		case "/api/user/self":
+			return cloudFixture(`{"success":true,"data":{"id":42,"quota":100000}}`), nil
+		case "/api/user/self/acu-account-overview":
+			return cloudFixture(`{"success":true,"data":{"chargeCny":"2","count":1,"exactChargeCount":1,"legacyChargeCount":0,"models":[]}}`), nil
+		case "/api/log/self":
+			return cloudFixture(`{"success":true,"data":{"total":0,"items":[]}}`), nil
+		}
+		t.Error("unexpected duplicate statistics call")
+		return nil, context.Canceled
+	})
+	out := httptest.NewRecorder()
+	host.accountBilling(out, httptest.NewRequest(http.MethodGet, "/runtime/billing/account", nil))
+	if out.Code != 200 || !strings.Contains(out.Body.String(), `"user_charge_cny":"2"`) {
+		t.Fatal(out.Body.String())
 	}
 }
 

@@ -50,6 +50,8 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 	var overview struct {
 		Charge string `json:"chargeCny"`
 		Count  int64  `json:"count"`
+		Exact  int64  `json:"exactChargeCount"`
+		Legacy int64  `json:"legacyChargeCount"`
 		Models []struct {
 			Model  string `json:"model"`
 			Count  int64  `json:"count"`
@@ -76,23 +78,22 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 		QuotaPerUnit float64 `json:"quota_per_unit"`
 		FX           float64 `json:"usd_exchange_rate"`
 	}
-	if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/status", "", &config); err != nil {
-		warnings["currency"] = err.Error()
-	} else if config.QuotaPerUnit > 0 && config.FX > 0 && !math.IsInf(config.FX/config.QuotaPerUnit, 0) {
-		result["cnyPerQuota"] = config.FX / config.QuotaPerUnit
-	}
+	var configErr error
+	overviewWait.Add(1)
+	go func() {
+		defer overviewWait.Done()
+		configErr = host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/status", "", &config)
+	}()
 	var user struct {
 		ID    int    `json:"id"`
 		Quota *int64 `json:"quota"`
 	}
-	if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/user/self", bearer, &user); err != nil {
-		warnings["balance"] = err.Error()
-	} else if user.ID != userID {
-		host.json(response, 409, map[string]string{"error": "账户已变化，请重新登录。"})
-		return
-	} else {
-		result["balanceQuota"] = user.Quota
-	}
+	var userErr error
+	overviewWait.Add(1)
+	go func() {
+		defer overviewWait.Done()
+		userErr = host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/user/self", bearer, &user)
+	}()
 	now := time.Now()
 	start := now.Add(-time.Duration(days) * 24 * time.Hour).Unix()
 	query := url.Values{"type": {"2"}, "start_timestamp": {strconv.FormatInt(start, 10)}, "end_timestamp": {strconv.FormatInt(now.Unix(), 10)}}
@@ -100,11 +101,6 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 		Charge *string `json:"user_charge_cny"`
 		Exact  int64   `json:"exact_charge_count"`
 		Legacy int64   `json:"legacy_charge_count"`
-	}
-	if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/log/self/stat?"+query.Encode(), bearer, &summary); err != nil {
-		warnings["summary"] = err.Error()
-	} else {
-		result["summary"] = summary
 	}
 	query.Set("p", strconv.Itoa(page))
 	query.Set("page_size", "20")
@@ -121,8 +117,23 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 			Other   string `json:"other"`
 		} `json:"items"`
 	}
-	if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/log/self?"+query.Encode(), bearer, &logs); err != nil {
-		warnings["logs"] = err.Error()
+	logsErr := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/log/self?"+query.Encode(), bearer, &logs)
+	overviewWait.Wait()
+	if configErr != nil {
+		warnings["currency"] = "币种信息暂不可用"
+	} else if config.QuotaPerUnit > 0 && config.FX > 0 && !math.IsInf(config.FX/config.QuotaPerUnit, 0) {
+		result["cnyPerQuota"] = config.FX / config.QuotaPerUnit
+	}
+	if userErr != nil {
+		warnings["balance"] = "余额暂不可用"
+	} else if user.ID != userID {
+		host.json(response, 409, map[string]string{"error": "账户已变化，请重新登录。"})
+		return
+	} else {
+		result["balanceQuota"] = user.Quota
+	}
+	if logsErr != nil {
+		warnings["logs"] = "消费明细暂不可用"
 	} else {
 		rows := []billingLog{}
 		for _, log := range logs.Items {
@@ -148,12 +159,21 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 	overviewWait.Wait()
 	if overviewErr != nil {
 		warnings["overview"] = "账户统计暂不可用"
+		query.Del("p")
+		query.Del("page_size")
+		if err := host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/log/self/stat?"+query.Encode(), bearer, &summary); err == nil {
+			result["summary"] = summary
+		}
 	} else {
 		charge, err := strconv.ParseFloat(overview.Charge, 64)
 		if err != nil || charge < 0 || math.IsNaN(charge) || math.IsInf(charge, 0) || overview.Count < 0 {
 			warnings["overview"] = "账户统计格式暂不可用"
 		} else {
 			result["overview"] = overview
+			summary.Charge = &overview.Charge
+			summary.Exact = overview.Exact
+			summary.Legacy = overview.Legacy
+			result["summary"] = summary
 		}
 	}
 	host.account.mu.Lock()
