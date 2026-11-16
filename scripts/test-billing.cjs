@@ -13,7 +13,7 @@ async function main() {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   let account = { loggedIn: true, username: '隔离测试账号', site: 'https://console.acucompute.com', selected: 9 };
-  let failAccount = false, failPrices = false, localLoads = 0, coldPrices = false, delayPrices = false;
+  let failAccount = false, failPrices = false, localLoads = 0, coldPrices = false, delayPrices = false, comparisonMode = 'official';
   const calls = [];
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
   prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
@@ -27,7 +27,8 @@ async function main() {
     if (url.pathname === '/runtime/status') return json({ ready: true, desktop: false, account, agents: [], connection: { known: true, choices: [] } });
     if (url.pathname === '/runtime/billing/account') {
       if (failAccount) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"隔离网络失败"}' });
-      return json({ loggedIn: true, site: account.site, username: account.username, balanceQuota: 10000000, cnyPerQuota: 0.00001348, updatedAt: Math.floor(Date.now()/1000), key: { name: '开发 Key', unlimited_quota: true, status: 1, expired_time: -1 }, summary: { user_charge_cny: '0.123456789', exact_charge_count: 2, legacy_charge_count: 1 }, logs: [{ model_name: 'fixture-sol', token_name: '开发 Key', created_at: 1794490000, prompt_tokens: 1000, completion_tokens: 300, chargeCny: '0.00000000123', priceVersion: 'old-price-v1' }, { model_name: 'legacy', token_name: '其他 Key', quota: 1000 }], total: 21, warnings: {} });
+      if (comparisonMode !== 'official') return json({loggedIn:true,days:Number(url.searchParams.get('days')),page:Number(url.searchParams.get('page')),balanceQuota:10000000,cnyPerQuota:.00001348,updatedAt:1794490000,overview:{chargeCny:'3',count:1,models:[{model:'sol',count:1,chargeCny:'3'}],comparison:comparisonMode==='missing'?{referenceCny:'0',chargeCny:'0',savedCny:'0',savedPercent:null,count:0,basis:'unavailable'}:{referenceCny:'2',chargeCny:'3',savedCny:'-1',savedPercent:'-50',count:1,basis:'platform'}},logs:[],total:0,warnings:{}});
+      return json({ loggedIn: true, site: account.site, username: account.username, balanceQuota: 10000000, cnyPerQuota: 0.00001348, days:Number(url.searchParams.get('days')),page:Number(url.searchParams.get('page')), updatedAt: Math.floor(Date.now()/1000), overview:{chargeCny:'26.101194',count:1791,comparison:{referenceCny:'130',chargeCny:'25',savedCny:'105',savedPercent:'80.77',count:1772,basis:'official'},models:[{model:'GPT-6.1 Sol',count:900,chargeCny:'14.20'},{model:'Fable 5.2',count:500,chargeCny:'7.50'},{model:'DeepSeek V4.1 Flash',count:300,chargeCny:'3.10'},{model:'gpt-image-2.6',count:40,chargeCny:'1.10'},{model:'model-with-a-very-long-name-to-check-mobile-layout',count:40,chargeCny:'.15'},{model:'other',count:11,chargeCny:'.051194'}]}, summary: { user_charge_cny: '26.101194', exact_charge_count: 1772, legacy_charge_count: 19 }, logs: [{ model_name: 'fixture-sol', token_name: '开发 Key', created_at: 1794490000, prompt_tokens: 1000, completion_tokens: 300, chargeCny: '0.00000000123', priceVersion: 'old-price-v1' }, { model_name: 'legacy', token_name: '其他 Key', quota: 1000 }], total: 21, warnings: {} });
     }
     if (url.pathname === '/runtime/billing/prices') {
       if (delayPrices && !url.searchParams.has('cached')) await new Promise(resolve => setTimeout(resolve, 1000));
@@ -48,18 +49,32 @@ async function main() {
     await page.waitForResponse(response => response.url().endsWith('/runtime/status'));
     assert.equal(localLoads, before, 'status polling must preserve local iframe');
     await page.getByRole('button', { name: 'ACU 账户', exact: true }).click();
-    await page.getByText('未设额度上限', { exact: true }).waitFor();
+    await page.getByText('¥134.80', { exact: true }).waitFor();
+    assert.equal(await page.getByText('未设额度上限', { exact: true }).count(),0);
+    await page.getByText('¥105.00',{exact:true}).waitFor();
+    await page.getByText('−80.8%',{exact:true}).waitFor();
+    assert.equal(await page.locator('.billing-model-ranking li').count(),5);
+    await page.locator('[data-billing-models]').click();
+    assert.equal(await page.locator('.billing-model-ranking li').count(),6);
+    await page.locator('[data-billing-rank="count"]').click();
+    assert.equal(await page.locator('.billing-rank-model strong').first().textContent(),'GPT-6.1 Sol');
+    await page.locator('.billing-comparison summary').click();
+    for(const theme of ['light','dark']) {await page.emulateMedia({colorScheme:theme});for(const width of [1440,920,600,390]) {await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`account fits ${width}`);await page.screenshot({path:path.join(workspace,`.build/billing-account-${theme}-${width}.png`),fullPage:true});}}
+    await page.setViewportSize({width:1280,height:960});
+    comparisonMode='missing';await page.getByRole('button',{name:'刷新账户',exact:true}).click();await page.getByText('暂无可比账单',{exact:true}).waitFor();assert.equal(await page.locator('.billing-saving-percent').count(),0);
+    comparisonMode='premium';await page.getByRole('button',{name:'刷新账户',exact:true}).click();await page.getByText('较平台参考价多付',{exact:true}).waitFor();await page.getByText('+50%',{exact:true}).waitFor();assert.equal(await page.locator('.billing-saving.is-saving').count(),0);
+    comparisonMode='official';await page.getByRole('button',{name:'刷新账户',exact:true}).click();await page.getByText('¥105.00',{exact:true}).waitFor();
     assert(await page.getByText('实际扣费 · old-price-v1', { exact: true }).isVisible());
     assert(await page.getByText('¥0.00000000123', { exact: true }).isVisible());
     await page.getByRole('combobox').selectOption('30');
-    await page.getByText('最近 30 天云端消费', { exact: true }).waitFor();
+    await page.getByText('最近 30 天消费', { exact: true }).waitFor();
     await page.getByRole('button', { name: '下一页' }).click();
     await page.getByText(/第 2 页/).waitFor();
     assert(calls.some(call => call.includes('days=30&page=2')));
     failAccount = true;
-    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await page.getByRole('button', { name: '刷新账户', exact: true }).click();
     await page.getByText(/刷新失败：隔离网络失败/).waitFor();
-    assert(await page.getByText('¥134.8', { exact: true }).isVisible());
+    assert(await page.getByText('¥134.80', { exact: true }).isVisible());
     await page.screenshot({ path: path.join(workspace,'.build/billing-account-preview.png'), fullPage: true });
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
@@ -122,6 +137,7 @@ async function main() {
     await page.setViewportSize({ width: 920, height: 700 });
     await page.screenshot({ path: path.join(workspace,'.build/billing-prices-narrow.png'), fullPage: true });
     await page.getByRole('button', { name: 'ACU 账户', exact: true }).click();
+    await page.locator('.billing-account-menu summary').click();
     await page.getByRole('button', { name: '退出账号' }).click();
       await page.getByRole('heading', { name: '登录后查看余额与消费' }).waitFor();
     assert.equal(await page.getByText('¥134.8', { exact: true }).count(), 0);

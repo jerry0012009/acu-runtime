@@ -97,8 +97,11 @@ func TestBillingUsesCloudHistoricalAmountsAndSanitizesLogs(t *testing.T) {
 			return cloudFixture(`{"success":true,"data":{"quota_per_unit":500000,"usd_exchange_rate":6.74,"price":7.3}}`), nil
 		case "/api/user/self":
 			return cloudFixture(`{"success":true,"data":{"id":42,"quota":100000}}`), nil
-		case "/api/token/9":
-			return cloudFixture(`{"success":true,"data":{"id":9,"name":"fixture","remain_quota":200,"unlimited_quota":true,"key":"must-not-leak"}}`), nil
+		case "/api/user/self/acu-account-overview":
+			if request.URL.Query().Get("days") != "30" {
+				t.Fatal("overview range lost")
+			}
+			return cloudFixture(`{"success":true,"data":{"chargeCny":"0.123456789","count":21,"models":[{"model":"fixture-sol","count":21,"chargeCny":"0.123456789"}],"comparison":{"referenceCny":"2","chargeCny":"0.1","savedCny":"1.9","savedPercent":"95","count":20,"basis":"official"},"private_info":"must-not-leak"}}`), nil
 		case "/api/log/self/stat":
 			if request.URL.Query().Get("type") != "2" || request.URL.Query().Get("token_name") != "" {
 				t.Fatal("incorrect history scope")
@@ -120,13 +123,16 @@ func TestBillingUsesCloudHistoricalAmountsAndSanitizesLogs(t *testing.T) {
 		t.Fatal(response.Body.String())
 	}
 	body := response.Body.String()
-	for _, expected := range []string{"0.000000000123456789", "0.123456789", "old-price-version", "unlimited_quota", "0.00001348"} {
+	for _, expected := range []string{"0.000000000123456789", "0.123456789", "old-price-version", "savedPercent", "0.00001348"} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("missing %s: %s", expected, body)
 		}
 	}
 	if strings.Contains(body, "must-not-leak") || strings.Contains(body, "Bearer") {
 		t.Fatal("billing leaked private data")
+	}
+	if strings.Contains(body, "unlimited_quota") {
+		t.Fatal("account overview must not retrieve or expose selected Key status")
 	}
 }
 
