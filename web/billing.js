@@ -146,8 +146,17 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       const payable = model.payable || {};
       const tiers = payable.context_tiers;
       const dynamic = model.model_name === 'acu-auto';
-      const multiplier = payable.model_multiplier;
-      const validMultiplier = multiplier != null && multiplier !== '' && Number.isFinite(Number(multiplier)) && Number(multiplier) >= 0;
+      const comparison = globalThis.acuPriceComparison(model);
+      const multiplier = comparison.standard;
+      const multiple = value => value === undefined ? '—' : Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 4 }) + '×';
+      const comparisonReference = comparison.reference;
+      let comparisonSource = '平台历史参考，非已核验官方价';
+      if (comparisonReference?.source_type === 'official') {
+        comparisonSource = '官方参考';
+        if (model.model_name.startsWith('gpt-')) comparisonSource = model.model_name.endsWith('-fast') ? '官方 Fast 档参考 · 30 分钟缓存写入' : '官方 Standard 档参考 · 30 分钟缓存写入';
+      }
+      else if (comparisonReference?.source_type === 'public') comparisonSource = '厂商公开价参考（models.dev）';
+      const comparisonDetails = comparisonReference ? `<details class="billing-price-reference"><summary>价格对照</summary><dl><div><dt>输入参考价</dt><dd>${money(comparisonReference.input_cny_per_million)}</dd></div><div><dt>输出参考价</dt><dd>${money(comparisonReference.output_cny_per_million)}</dd></div><div><dt>输入 / 输出倍率</dt><dd>${multiple(comparison.input)} / ${multiple(comparison.output)}</dd></div>${comparison.long !== undefined ? `<div><dt>长上下文倍率</dt><dd>${multiple(comparison.long)}</dd></div>` : ''}</dl><p>人民币 / 百万 tokens · 目录汇率 USD/CNY ${esc(comparisonReference.fx_cny_per_usd)}<br>${esc(comparisonSource)} · ${esc(comparisonReference.observed_at || '')}${comparisonReference.source_type === 'public' ? '<br><a href="https://models.dev" target="_blank" rel="noopener noreferrer">查看公开参考来源</a>' : ''}${comparisonReference.source_type === 'official' ? '<br><a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noopener noreferrer">查看官方定价</a>' : ''}</p></details>` : '';
       const benchmark = model.capability_benchmark;
       const score = capabilityScore(model);
       const scoreText = value => Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
@@ -163,18 +172,18 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
         const valid = value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
         const longValue = tiers?.longContext?.[tierKey];
         const hasTier = Number(tiers?.thresholdTokens) > 0 && longValue != null && longValue !== '' && Number.isFinite(Number(longValue)) && Number(longValue) >= 0;
-        return `<td data-price="${key}" data-label="${label}"><span class="billing-price-value">${valid ? priceMoney(value) : '—'}</span>${hasTier ? `<small>超过 ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} tokens<br>${priceMoney(longValue)}</small>` : ''}</td>`;
+        return `<td data-price="${key}" data-label="${label}"><span class="billing-price-value">${valid ? priceMoney(value) : '—'}</span>${hasTier ? `<small class="billing-price-long" aria-label="超过 ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} 输入 tokens">${priceMoney(longValue)}</small>` : ''}</td>`;
       }).join('');
-      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}${reference}</td><td class="billing-price-multiplier" data-label="倍率"><span>${validMultiplier ? esc(Number(multiplier).toLocaleString('zh-CN', { maximumSignificantDigits: 10 })) + '×' : '—'}</span></td>${cells}</tr>`;
+      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}${tiers?.thresholdTokens > 0 ? `<small class="billing-context-label">次行：&gt; ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} 输入 tokens</small>` : ''}<div class="billing-price-meta">${reference}${comparisonDetails}</div></td><td class="billing-price-multiplier" data-label="实付倍率"><span title="人民币实付价 ÷ 同档位公开参考价折合人民币；输入、输出折扣不同时分别列示">${multiplier !== undefined ? multiple(multiplier) : comparison.input !== undefined || comparison.output !== undefined ? `<small>输入 ${multiple(comparison.input)}<br>输出 ${multiple(comparison.output)}</small>` : '—'}</span></td>${cells}</tr>`;
     }).join('');
   }
 
   function pricesPage() {
     const rows = priceRows();
     renderedPriceRows = rows;
-    return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 已含倍率</p></div>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div><div class="billing-toolbar"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label></div>
+    return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 实付单价</p></div><div class="billing-price-controls"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div></div>
       <div id="billing-price-status">${priceStatus()}</div>
-      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">— 表示暂无固定报价 · 更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
+      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">实付倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">实付倍率 = 人民币实付价 ÷ 公开参考价折合人民币（输入 / 输出），不是渠道成本倍率。无可靠对照时不显示倍率。<br>— 表示暂无报价或可比参考 · 更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
   }
 
   function priceStatus() {

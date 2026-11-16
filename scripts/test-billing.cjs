@@ -18,6 +18,7 @@ async function main() {
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
   prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
   prices[1].capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:52.5, observed_at:'2026-11-16', source_url:'https://artificialanalysis.ai/models/fixture-sol', variants:[{name:'Fixture Sol (High)',score:52.5},{name:'Fixture Sol (Medium)',score:48}] };
+  prices[1].comparison_reference = { input_cny_per_million: 13.48, output_cny_per_million: 67.4, fx_cny_per_usd: 6.74, source_type: 'public', observed_at: '2026-11-16' };
   prices.find(model=>model.model_name==='premium').capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:61.8, observed_at:'2026-11-16', source_url:'javascript:alert(1)', variants:[{name:'Premium <test>',score:61.8}] };
   prices.find(model=>model.model_name==='cheap').capability_benchmark = { score:null };
   await page.route('http://billing.test/**', async route => {
@@ -104,7 +105,7 @@ async function main() {
     assert.equal(await page.getByRole('searchbox').inputValue(), 'fixture');
     assert(await page.getByRole('searchbox').evaluate(node => node === document.activeElement), 'refresh preserves search focus');
     delayPrices = false;
-    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','倍率','输出价格','输入价格','缓存命中','缓存写入']);
+    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','实付倍率','输出价格','输入价格','缓存命中','缓存写入']);
     assert(await page.getByText('0.06×', {exact:true}).isVisible());
     const solRow = page.locator('#billing-price-rows tr');
     assert((await solRow.locator('[data-price="output"]').innerText()).startsWith('¥4.044'));
@@ -112,7 +113,7 @@ async function main() {
     assert((await solRow.locator('[data-price="cached"]').innerText()).startsWith('¥0.04044'));
     assert((await solRow.locator('[data-price="write"]').innerText()).startsWith('¥1.011'));
     assert((await solRow.locator('[data-price="input"]').innerText()).includes('¥1.6176'));
-    assert.equal(await solRow.getByText(/272,000/).count(), 2);
+    assert.equal(await solRow.getByText(/272,000/).count(), 1);
     await page.getByRole('searchbox').fill('');
     assert.equal(await page.locator('[data-billing-sort]').inputValue(), 'output_asc');
     await page.locator('[data-billing-sort]').selectOption('output_asc');
@@ -185,7 +186,7 @@ async function main() {
     assert.equal(await longRow.locator('[data-price="input"] .billing-price-value').innerText(), '—');
     assert.equal(await longRow.locator('[data-price="cached"] .billing-price-value').innerText(), '¥0.0003042');
     assert.equal(await longRow.locator('[data-price="write"] .billing-price-value').innerText(), '¥0');
-    assert.equal(await longRow.getByText(/100,000/).count(), 4);
+    assert.equal(await longRow.getByText(/100,000/).count(), 1);
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: theme });
       for (const width of [1440, 1280, 920, 600, 390]) {
@@ -201,12 +202,14 @@ async function main() {
         const inputBox = await longRow.locator('[data-price="input"]').boundingBox();
         assert(outputBox.x + outputBox.width <= inputBox.x + 1, `price columns do not overlap at ${width}`);
         assert(await longRow.locator('[data-price="write"]').isVisible());
+        assert(await longRow.locator('[data-price="output"] .billing-price-value').evaluate(node => parseFloat(getComputedStyle(node).fontSize) >= 16), 'prices stay readable');
         await page.screenshot({ path: path.join(workspace, `.build/billing-prices-${theme}-${width}.png`), fullPage: true });
       }
     }
     if (process.env.ACU_PUBLIC_PRICE_FIXTURE) {
       const snapshot = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../model_benchmarks.json'), 'utf8'));
-      const publicPrices = JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8')).data;
+      const fixture = JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8'));
+      const publicPrices = fixture.models || fixture.data;
       for (const model of publicPrices) {
         const variants = snapshot.models[model.model_name.replaceAll('.', '-')];
         if (variants?.length) model.capability_benchmark = {benchmark:snapshot.benchmark,score:variants[0].score,variants,observed_at:snapshot.observedAt};
@@ -218,10 +221,23 @@ async function main() {
       const sorted = await page.locator('#billing-price-rows tr').evaluateAll(rows => rows.map(row=>row.querySelector('strong').textContent));
       assert(sorted[0].includes('Fable 5.2') || sorted[0].includes('claude-fable-5-2'));
       await page.locator('.billing-benchmark summary').first().click();
-      for (const width of [1440, 920, 390]) {
-        await page.setViewportSize({ width, height: 960 });
-        await page.screenshot({ path: path.join(workspace, `.build/billing-public-prices-${width}.png`) });
+      for (const theme of ['light', 'dark']) {
+        await page.emulateMedia({ colorScheme: theme });
+        for (const width of [1920, 1440, 1280, 920, 600, 390, 320]) {
+          await page.setViewportSize({ width, height: 960 });
+          assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `public catalog fits ${width}`);
+          await page.screenshot({ path: path.join(workspace, `.build/billing-public-prices-${theme}-${width}.png`) });
+        }
       }
+      await page.getByRole('searchbox').fill('gpt-6');
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 960 });
+        await page.screenshot({ path: path.join(workspace, `.build/billing-gpt6-prices-${width}.png`), fullPage: true });
+      }
+      const fast = page.getByRole('row').filter({ has: page.locator('strong', { hasText: /^gpt-6-astra-fast$/ }) });
+      assert.equal(await fast.locator('.billing-price-multiplier > span').textContent(), '0.01484×');
+      await fast.locator('.billing-price-reference summary').click();
+      assert(await fast.getByText('¥674', { exact: true }).isVisible());
     }
     assert.deepEqual(errors, []);
     console.log('PASS: default capability sort, stable native sort control during refresh, prices and tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');

@@ -1,0 +1,1644 @@
+{
+  "observedAt": "2026-11-16",
+  "currency": "USD",
+  "models": {
+    "o1-pro": {
+      "inputPricePerMillion": 150,
+      "outputPricePerMillion": 600,
+      "source": "https://models.dev/api.json · openai/o1-pro"
+    },
+    "gpt-4o-2024-08-06": {
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/gpt-4o-2024-08-06"
+    },
+    "gpt-5.5-pro": {
+      "inputPricePerMillion": 30,
+      "outputPricePerMillion": 180,
+      "source": "https://models.dev/api.json · openai/gpt-5.5-pro",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 30,
+          "outputPricePerMillion": 180
+        },
+        "longContext": {
+          "inputPricePerMillion": 60,
+          "outputPricePerMillion": 270
+        }
+      }
+    },
+    "gpt-image-1.5": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/gpt-image-1.5"
+    },
+    "gpt-5.3-codex": {
+      "inputPricePerMillion": 1.75,
+      "outputPricePerMillion": 14,
+      "cachedInputPricePerMillion": 0.175,
+      "source": "https://models.dev/api.json · openai/gpt-5.3-codex"
+    },
+    "gpt-4.1-mini": {
+      "inputPricePerMillion": 0.4,
+      "outputPricePerMillion": 1.6,
+      "cachedInputPricePerMillion": 0.1,
+      "source": "https://models.dev/api.json · openai/gpt-4.1-mini"
+    },
+    "gpt-6-astra": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 1,
+      "cacheWritePricePerMillion": 12.5,
+      "source": "https://models.dev/api.json · openai/gpt-6-astra",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 10,
+          "outputPricePerMillion": 50,
+          "cachedInputPricePerMillion": 1,
+          "cacheWritePricePerMillion": 12.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 20,
+          "outputPricePerMillion": 75,
+          "cachedInputPricePerMillion": 2,
+          "cacheWritePricePerMillion": 25
+        }
+      }
+    },
+    "gpt-5-nano": {
+      "inputPricePerMillion": 0.05,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.005,
+      "source": "https://models.dev/api.json · openai/gpt-5-nano"
+    },
+    "o4-mini": {
+      "inputPricePerMillion": 1.1,
+      "outputPricePerMillion": 4.4,
+      "cachedInputPricePerMillion": 0.275,
+      "source": "https://models.dev/api.json · openai/o4-mini"
+    },
+    "gpt-4o": {
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/gpt-4o"
+    },
+    "gpt-5.4": {
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.25,
+      "source": "https://models.dev/api.json · openai/gpt-5.4",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 15,
+          "cachedInputPricePerMillion": 0.25
+        },
+        "longContext": {
+          "inputPricePerMillion": 5,
+          "outputPricePerMillion": 22.5,
+          "cachedInputPricePerMillion": 0.5
+        }
+      }
+    },
+    "gpt-5": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · openai/gpt-5"
+    },
+    "gpt-realtime-2.1": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 24,
+      "cachedInputPricePerMillion": 0.4,
+      "source": "https://models.dev/api.json · openai/gpt-realtime-2.1"
+    },
+    "gpt-5.4-nano": {
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 1.25,
+      "cachedInputPricePerMillion": 0.02,
+      "source": "https://models.dev/api.json · openai/gpt-5.4-nano"
+    },
+    "gpt-3.5-turbo": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 1.5,
+      "cachedInputPricePerMillion": 0,
+      "source": "https://models.dev/api.json · openai/gpt-3.5-turbo"
+    },
+    "gpt-5-mini": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 2,
+      "cachedInputPricePerMillion": 0.025,
+      "source": "https://models.dev/api.json · openai/gpt-5-mini"
+    },
+    "gpt-daybreak-red-latest": {
+      "inputPricePerMillion": 12.5,
+      "outputPricePerMillion": 75,
+      "cachedInputPricePerMillion": 1.25,
+      "cacheWritePricePerMillion": 15.625,
+      "source": "https://models.dev/api.json · openai/gpt-daybreak-red-latest"
+    },
+    "gpt-5.4-mini": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · openai/gpt-5.4-mini"
+    },
+    "gpt-5.6-terra": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · openai/gpt-5.6-terra",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2,
+          "cacheWritePricePerMillion": 2.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4,
+          "cacheWritePricePerMillion": 5
+        }
+      }
+    },
+    "gpt-5.5": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 30,
+      "cachedInputPricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · openai/gpt-5.5",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 5,
+          "outputPricePerMillion": 30,
+          "cachedInputPricePerMillion": 0.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 10,
+          "outputPricePerMillion": 45,
+          "cachedInputPricePerMillion": 1
+        }
+      }
+    },
+    "gpt-4o-2024-11-20": {
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/gpt-4o-2024-11-20"
+    },
+    "gpt-5-pro": {
+      "inputPricePerMillion": 15,
+      "outputPricePerMillion": 120,
+      "source": "https://models.dev/api.json · openai/gpt-5-pro"
+    },
+    "gpt-5.4-pro": {
+      "inputPricePerMillion": 30,
+      "outputPricePerMillion": 180,
+      "source": "https://models.dev/api.json · openai/gpt-5.4-pro",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 30,
+          "outputPricePerMillion": 180
+        },
+        "longContext": {
+          "inputPricePerMillion": 60,
+          "outputPricePerMillion": 270
+        }
+      }
+    },
+    "gpt-5.6-sol": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 20,
+      "cachedInputPricePerMillion": 0.4,
+      "cacheWritePricePerMillion": 5,
+      "source": "https://models.dev/api.json · openai/gpt-5.6-sol",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 20,
+          "cachedInputPricePerMillion": 0.4,
+          "cacheWritePricePerMillion": 5
+        },
+        "longContext": {
+          "inputPricePerMillion": 8,
+          "outputPricePerMillion": 30,
+          "cachedInputPricePerMillion": 0.8,
+          "cacheWritePricePerMillion": 10
+        }
+      }
+    },
+    "o1": {
+      "inputPricePerMillion": 15,
+      "outputPricePerMillion": 60,
+      "cachedInputPricePerMillion": 7.5,
+      "source": "https://models.dev/api.json · openai/o1"
+    },
+    "gpt-4o-2024-05-13": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 15,
+      "source": "https://models.dev/api.json · openai/gpt-4o-2024-05-13"
+    },
+    "gpt-5.1": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · openai/gpt-5.1"
+    },
+    "gpt-4o-mini": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · openai/gpt-4o-mini"
+    },
+    "gpt-5.6-luna": {
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.02,
+      "cacheWritePricePerMillion": 0.25,
+      "source": "https://models.dev/api.json · openai/gpt-5.6-luna",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 0.2,
+          "outputPricePerMillion": 1.2,
+          "cachedInputPricePerMillion": 0.02,
+          "cacheWritePricePerMillion": 0.25
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.4,
+          "outputPricePerMillion": 1.8,
+          "cachedInputPricePerMillion": 0.04,
+          "cacheWritePricePerMillion": 0.5
+        }
+      }
+    },
+    "gpt-4.1": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 8,
+      "cachedInputPricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · openai/gpt-4.1"
+    },
+    "gpt-4.1-nano": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.025,
+      "source": "https://models.dev/api.json · openai/gpt-4.1-nano"
+    },
+    "chatgpt-image-latest": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/chatgpt-image-latest"
+    },
+    "gpt-4-turbo": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 30,
+      "source": "https://models.dev/api.json · openai/gpt-4-turbo"
+    },
+    "gpt-5.3-codex-spark": {
+      "inputPricePerMillion": 1.75,
+      "outputPricePerMillion": 14,
+      "cachedInputPricePerMillion": 0.175,
+      "source": "https://models.dev/api.json · openai/gpt-5.3-codex-spark"
+    },
+    "gpt-6.1-terra": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 5,
+      "cachedInputPricePerMillion": 0.05,
+      "cacheWritePricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · openai/gpt-6.1-terra",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 1,
+          "outputPricePerMillion": 5,
+          "cachedInputPricePerMillion": 0.05,
+          "cacheWritePricePerMillion": 1.25
+        },
+        "longContext": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 7.5,
+          "cachedInputPricePerMillion": 0.1,
+          "cacheWritePricePerMillion": 2.5
+        }
+      }
+    },
+    "gpt-6-luna": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.5,
+      "cachedInputPricePerMillion": 0.01,
+      "cacheWritePricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · openai/gpt-6-luna",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 0.1,
+          "outputPricePerMillion": 0.5,
+          "cachedInputPricePerMillion": 0.01,
+          "cacheWritePricePerMillion": 0.125
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.2,
+          "outputPricePerMillion": 0.75,
+          "cachedInputPricePerMillion": 0.02,
+          "cacheWritePricePerMillion": 0.25
+        }
+      }
+    },
+    "gpt-4": {
+      "inputPricePerMillion": 30,
+      "outputPricePerMillion": 60,
+      "source": "https://models.dev/api.json · openai/gpt-4"
+    },
+    "gpt-daybreak-blue-latest": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 20,
+      "cachedInputPricePerMillion": 0.4,
+      "cacheWritePricePerMillion": 5,
+      "source": "https://models.dev/api.json · openai/gpt-daybreak-blue-latest",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 20,
+          "cachedInputPricePerMillion": 0.4,
+          "cacheWritePricePerMillion": 5
+        },
+        "longContext": {
+          "inputPricePerMillion": 8,
+          "outputPricePerMillion": 30,
+          "cachedInputPricePerMillion": 0.8,
+          "cacheWritePricePerMillion": 10
+        }
+      }
+    },
+    "o3-mini": {
+      "inputPricePerMillion": 1.1,
+      "outputPricePerMillion": 4.4,
+      "cachedInputPricePerMillion": 0.55,
+      "source": "https://models.dev/api.json · openai/o3-mini"
+    },
+    "gpt-6-sol": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · openai/gpt-6-sol",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 10,
+          "cachedInputPricePerMillion": 0.2,
+          "cacheWritePricePerMillion": 2.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 15,
+          "cachedInputPricePerMillion": 0.4,
+          "cacheWritePricePerMillion": 5
+        }
+      }
+    },
+    "o3": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 8,
+      "cachedInputPricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · openai/o3"
+    },
+    "gpt-5.2-pro": {
+      "inputPricePerMillion": 21,
+      "outputPricePerMillion": 168,
+      "source": "https://models.dev/api.json · openai/gpt-5.2-pro"
+    },
+    "o3-pro": {
+      "inputPricePerMillion": 20,
+      "outputPricePerMillion": 80,
+      "source": "https://models.dev/api.json · openai/o3-pro"
+    },
+    "gpt-5.6": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 20,
+      "cachedInputPricePerMillion": 0.4,
+      "cacheWritePricePerMillion": 5,
+      "source": "https://models.dev/api.json · openai/gpt-5.6",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 20,
+          "cachedInputPricePerMillion": 0.4,
+          "cacheWritePricePerMillion": 5
+        },
+        "longContext": {
+          "inputPricePerMillion": 8,
+          "outputPricePerMillion": 30,
+          "cachedInputPricePerMillion": 0.8,
+          "cacheWritePricePerMillion": 10
+        }
+      }
+    },
+    "gpt-5.2": {
+      "inputPricePerMillion": 1.75,
+      "outputPricePerMillion": 14,
+      "cachedInputPricePerMillion": 0.175,
+      "source": "https://models.dev/api.json · openai/gpt-5.2"
+    },
+    "gpt-6.1-sol": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.1,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · openai/gpt-6.1-sol",
+      "contextTiers": {
+        "thresholdTokens": 272000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 10,
+          "cachedInputPricePerMillion": 0.1,
+          "cacheWritePricePerMillion": 2.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 15,
+          "cachedInputPricePerMillion": 0.2,
+          "cacheWritePricePerMillion": 5
+        }
+      }
+    },
+    "claude-opus-4-5-20251101": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-4-5-20251101"
+    },
+    "claude-haiku-5-5": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.5,
+      "cachedInputPricePerMillion": 0.01,
+      "cacheWritePricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · anthropic/claude-haiku-5-5",
+      "contextTiers": {
+        "thresholdTokens": 100000,
+        "standard": {
+          "inputPricePerMillion": 0.1,
+          "outputPricePerMillion": 0.5,
+          "cachedInputPricePerMillion": 0.01,
+          "cacheWritePricePerMillion": 0.125
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.5,
+          "outputPricePerMillion": 2.5,
+          "cachedInputPricePerMillion": 0.05,
+          "cacheWritePricePerMillion": 0.625
+        }
+      }
+    },
+    "claude-haiku-4-5-20251001": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 5,
+      "cachedInputPricePerMillion": 0.1,
+      "cacheWritePricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · anthropic/claude-haiku-4-5-20251001"
+    },
+    "claude-haiku-4-5": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 5,
+      "cachedInputPricePerMillion": 0.1,
+      "cacheWritePricePerMillion": 1.25,
+      "source": "https://models.dev/api.json · anthropic/claude-haiku-4-5"
+    },
+    "claude-sonnet-5": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · anthropic/claude-sonnet-5"
+    },
+    "claude-sonnet-4-6": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "cacheWritePricePerMillion": 3.75,
+      "source": "https://models.dev/api.json · anthropic/claude-sonnet-4-6"
+    },
+    "claude-fable-5-1": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 0.25,
+      "cacheWritePricePerMillion": 12.5,
+      "source": "https://models.dev/api.json · anthropic/claude-fable-5-1"
+    },
+    "claude-sonnet-4-5-20250929": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "cacheWritePricePerMillion": 3.75,
+      "source": "https://models.dev/api.json · anthropic/claude-sonnet-4-5-20250929"
+    },
+    "claude-opus-4-8": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-4-8"
+    },
+    "claude-opus-4-7": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-4-7"
+    },
+    "claude-opus-4-5": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-4-5"
+    },
+    "claude-opus-4-6": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-4-6"
+    },
+    "claude-opus-5": {
+      "inputPricePerMillion": 5,
+      "outputPricePerMillion": 25,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 6.25,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-5"
+    },
+    "claude-opus-5-5": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 20,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 5,
+      "source": "https://models.dev/api.json · anthropic/claude-opus-5-5"
+    },
+    "claude-sonnet-5-5": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.1,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · anthropic/claude-sonnet-5-5"
+    },
+    "claude-fable-5": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 50,
+      "cachedInputPricePerMillion": 1,
+      "cacheWritePricePerMillion": 12.5,
+      "source": "https://models.dev/api.json · anthropic/claude-fable-5"
+    },
+    "claude-sonnet-4-5": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "cacheWritePricePerMillion": 3.75,
+      "source": "https://models.dev/api.json · anthropic/claude-sonnet-4-5"
+    },
+    "claude-fable-5-2": {
+      "inputPricePerMillion": 8,
+      "outputPricePerMillion": 40,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 10,
+      "source": "https://models.dev/api.json · anthropic/claude-fable-5-2"
+    },
+    "gemini-2.5-flash-image": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-2.5-flash-image"
+    },
+    "gemini-2.5-flash-preview-tts": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 10,
+      "source": "https://models.dev/api.json · google/gemini-2.5-flash-preview-tts"
+    },
+    "gemini-2.5-pro-preview-tts": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 20,
+      "source": "https://models.dev/api.json · google/gemini-2.5-pro-preview-tts"
+    },
+    "gemini-3-flash-preview": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 3,
+      "cachedInputPricePerMillion": 0.05,
+      "source": "https://models.dev/api.json · google/gemini-3-flash-preview"
+    },
+    "gemini-2.5-flash": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.03,
+      "source": "https://models.dev/api.json · google/gemini-2.5-flash"
+    },
+    "gemini-2.5-pro": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · google/gemini-2.5-pro",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1.25,
+          "outputPricePerMillion": 10,
+          "cachedInputPricePerMillion": 0.125
+        },
+        "longContext": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 15,
+          "cachedInputPricePerMillion": 0.25
+        }
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.03,
+      "source": "https://models.dev/api.json · google/gemini-3.5-flash-lite"
+    },
+    "gemini-4-argon": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.1,
+      "source": "https://models.dev/api.json · google/gemini-4-argon"
+    },
+    "gemini-3.7-flash": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 3.75,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-3.7-flash"
+    },
+    "gemini-2.5-computer-use-preview-10-2025": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 10,
+      "source": "https://models.dev/api.json · google/gemini-2.5-computer-use-preview-10-2025"
+    },
+    "gemini-3.1-flash-lite": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 1.5,
+      "cachedInputPricePerMillion": 0.025,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-lite"
+    },
+    "gemini-3.1-flash-image": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 3,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-image"
+    },
+    "gemini-2.5-flash-lite": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.01,
+      "source": "https://models.dev/api.json · google/gemini-2.5-flash-lite"
+    },
+    "gemini-3.1-pro-preview": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · google/gemini-3.1-pro-preview",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "gemini-3.1-flash-tts-preview": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 20,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-tts-preview"
+    },
+    "gemini-3.1-pro-preview-customtools": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · google/gemini-3.1-pro-preview-customtools",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "gemini-flash-lite-latest": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.03,
+      "source": "https://models.dev/api.json · google/gemini-flash-lite-latest"
+    },
+    "gemini-3.6-flash": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 3.75,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-3.6-flash"
+    },
+    "gemini-4-hydrogen": {
+      "inputPricePerMillion": 1.5,
+      "outputPricePerMillion": 7.5,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-4-hydrogen"
+    },
+    "gemini-3.8-flash": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 3.75,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-3.8-flash"
+    },
+    "gemini-3.5-flash": {
+      "inputPricePerMillion": 1.5,
+      "outputPricePerMillion": 9,
+      "cachedInputPricePerMillion": 0.15,
+      "source": "https://models.dev/api.json · google/gemini-3.5-flash"
+    },
+    "gemini-3.1-flash-live-preview": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 4.5,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-live-preview"
+    },
+    "gemini-omni-flash-preview": {
+      "inputPricePerMillion": 1.5,
+      "outputPricePerMillion": 17.5,
+      "source": "https://models.dev/api.json · google/gemini-omni-flash-preview"
+    },
+    "gemini-pro-latest": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · google/gemini-pro-latest",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "gemini-4-carbon": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.1,
+      "source": "https://models.dev/api.json · google/gemini-4-carbon"
+    },
+    "gemini-3.1-flash-lite-image": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 1.5,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-lite-image"
+    },
+    "deep-research-max-preview-04-2026": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · google/deep-research-max-preview-04-2026",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "gemini-3.1-flash-lite-preview": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 1.5,
+      "cachedInputPricePerMillion": 0.025,
+      "source": "https://models.dev/api.json · google/gemini-3.1-flash-lite-preview"
+    },
+    "gemini-3-pro-image": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "source": "https://models.dev/api.json · google/gemini-3-pro-image"
+    },
+    "gemini-3.5-live-translate-preview": {
+      "inputPricePerMillion": 3.5,
+      "outputPricePerMillion": 21,
+      "source": "https://models.dev/api.json · google/gemini-3.5-live-translate-preview"
+    },
+    "deep-research-preview-04-2026": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 12,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · google/deep-research-preview-04-2026",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 18,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "gemini-flash-latest": {
+      "inputPricePerMillion": 0.75,
+      "outputPricePerMillion": 3.75,
+      "cachedInputPricePerMillion": 0.075,
+      "source": "https://models.dev/api.json · google/gemini-flash-latest"
+    },
+    "deepseek-flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.003,
+      "source": "https://models.dev/api.json · deepseek/deepseek-flash"
+    },
+    "deepseek-v4-flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.003,
+      "source": "https://models.dev/api.json · deepseek/deepseek-v4-flash"
+    },
+    "deepseek-v4-pro": {
+      "inputPricePerMillion": 0.66,
+      "outputPricePerMillion": 1.98,
+      "cachedInputPricePerMillion": 0.022,
+      "source": "https://models.dev/api.json · deepseek/deepseek-v4-pro"
+    },
+    "deepseek-v4-flash-vision-exp": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.003,
+      "source": "https://models.dev/api.json · deepseek/deepseek-v4-flash-vision-exp"
+    },
+    "grok-4.20-0309-reasoning": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · xai/grok-4.20-0309-reasoning",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1.25,
+          "outputPricePerMillion": 2.5,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 5,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "grok-4.20-0309-non-reasoning": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · xai/grok-4.20-0309-non-reasoning",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1.25,
+          "outputPricePerMillion": 2.5,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 5,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "grok-4.6": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · xai/grok-4.6",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 6,
+          "cachedInputPricePerMillion": 0.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 1
+        }
+      }
+    },
+    "grok-4.20-multi-agent-0309": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · xai/grok-4.20-multi-agent-0309",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1.25,
+          "outputPricePerMillion": 2.5,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 5,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "grok-4.3": {
+      "inputPricePerMillion": 1.25,
+      "outputPricePerMillion": 2.5,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · xai/grok-4.3",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1.25,
+          "outputPricePerMillion": 2.5,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 2.5,
+          "outputPricePerMillion": 5,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "grok-4.7": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · xai/grok-4.7",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 6,
+          "cachedInputPricePerMillion": 0.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 1
+        }
+      }
+    },
+    "grok-build-0.1": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 2,
+      "cachedInputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · xai/grok-build-0.1",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 1,
+          "outputPricePerMillion": 2,
+          "cachedInputPricePerMillion": 0.2
+        },
+        "longContext": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 4,
+          "cachedInputPricePerMillion": 0.4
+        }
+      }
+    },
+    "grok-4.5": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.3,
+      "source": "https://models.dev/api.json · xai/grok-4.5",
+      "contextTiers": {
+        "thresholdTokens": 200000,
+        "standard": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 6,
+          "cachedInputPricePerMillion": 0.3
+        },
+        "longContext": {
+          "inputPricePerMillion": 4,
+          "outputPricePerMillion": 12,
+          "cachedInputPricePerMillion": 0.6
+        }
+      }
+    },
+    "kimi-k2.7-code": {
+      "inputPricePerMillion": 0.95,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.19,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k2.7-code"
+    },
+    "kimi-k3.1-pro": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 10,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 2,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k3.1-pro"
+    },
+    "kimi-k2.7-code-highspeed": {
+      "inputPricePerMillion": 1.9,
+      "outputPricePerMillion": 8,
+      "cachedInputPricePerMillion": 0.38,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k2.7-code-highspeed"
+    },
+    "kimi-k3": {
+      "inputPricePerMillion": 3,
+      "outputPricePerMillion": 15,
+      "cachedInputPricePerMillion": 0.3,
+      "cacheWritePricePerMillion": 3,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k3"
+    },
+    "kimi-k2.6": {
+      "inputPricePerMillion": 0.95,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.16,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k2.6"
+    },
+    "kimi-k3.1-pro-highspeed": {
+      "inputPricePerMillion": 4,
+      "outputPricePerMillion": 20,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 4,
+      "source": "https://models.dev/api.json · moonshotai/kimi-k3.1-pro-highspeed"
+    },
+    "glm-5.2": {
+      "inputPricePerMillion": 1.4,
+      "outputPricePerMillion": 4.4,
+      "cachedInputPricePerMillion": 0.26,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5.2"
+    },
+    "glm-5": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 3.2,
+      "cachedInputPricePerMillion": 0.2,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5"
+    },
+    "glm-5.3-flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.5,
+      "cachedInputPricePerMillion": 0.03,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5.3-flash"
+    },
+    "glm-5-turbo": {
+      "inputPricePerMillion": 1.2,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.24,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5-turbo"
+    },
+    "glm-4.5-air": {
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 1.1,
+      "cachedInputPricePerMillion": 0.03,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.5-air"
+    },
+    "glm-5v-turbo": {
+      "inputPricePerMillion": 1.2,
+      "outputPricePerMillion": 4,
+      "cachedInputPricePerMillion": 0.24,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5v-turbo"
+    },
+    "glm-4.7-flashx": {
+      "inputPricePerMillion": 0.07,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.01,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.7-flashx"
+    },
+    "glm-5.3": {
+      "inputPricePerMillion": 1.4,
+      "outputPricePerMillion": 4.4,
+      "cachedInputPricePerMillion": 0.26,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5.3"
+    },
+    "glm-4.6": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 2.2,
+      "cachedInputPricePerMillion": 0.11,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.6"
+    },
+    "glm-4.5v": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 1.8,
+      "cachedInputPricePerMillion": 0.11,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.5v"
+    },
+    "glm-4.6v": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 0.9,
+      "cachedInputPricePerMillion": 0.05,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.6v"
+    },
+    "glm-4.5": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 2.2,
+      "cachedInputPricePerMillion": 0.11,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.5"
+    },
+    "glm-5.1": {
+      "inputPricePerMillion": 1.4,
+      "outputPricePerMillion": 4.4,
+      "cachedInputPricePerMillion": 0.26,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5.1"
+    },
+    "glm-5.3-flashx": {
+      "inputPricePerMillion": 0.37,
+      "outputPricePerMillion": 1.25,
+      "cachedInputPricePerMillion": 0.075,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-5.3-flashx"
+    },
+    "glm-4.7": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 2.2,
+      "cachedInputPricePerMillion": 0.11,
+      "cacheWritePricePerMillion": 0,
+      "source": "https://models.dev/api.json · zai/glm-4.7"
+    },
+    "MiniMax-M3.1-Flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.6,
+      "cachedInputPricePerMillion": 0.015,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M3.1-Flash"
+    },
+    "MiniMax-M2.5": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.03,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2.5"
+    },
+    "MiniMax-M2": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2"
+    },
+    "MiniMax-M2.7-highspeed": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 2.4,
+      "cachedInputPricePerMillion": 0.06,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2.7-highspeed"
+    },
+    "MiniMax-M2.7": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.06,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2.7"
+    },
+    "MiniMax-M2.5-highspeed": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 2.4,
+      "cachedInputPricePerMillion": 0.03,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2.5-highspeed"
+    },
+    "MiniMax-M3": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.06,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M3",
+      "contextTiers": {
+        "thresholdTokens": 512000,
+        "standard": {
+          "inputPricePerMillion": 0.3,
+          "outputPricePerMillion": 1.2,
+          "cachedInputPricePerMillion": 0.06
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.6,
+          "outputPricePerMillion": 2.4,
+          "cachedInputPricePerMillion": 0.12
+        }
+      }
+    },
+    "MiniMax-M2.1": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.03,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · minimax/MiniMax-M2.1"
+    },
+    "qwen3-livetranslate-flash-realtime": {
+      "inputPricePerMillion": 10,
+      "outputPricePerMillion": 10,
+      "source": "https://models.dev/api.json · alibaba/qwen3-livetranslate-flash-realtime"
+    },
+    "qvq-max": {
+      "inputPricePerMillion": 1.2,
+      "outputPricePerMillion": 4.8,
+      "source": "https://models.dev/api.json · alibaba/qvq-max"
+    },
+    "qwen3.7-plus": {
+      "inputPricePerMillion": 0.4,
+      "outputPricePerMillion": 1.6,
+      "cachedInputPricePerMillion": 0.08,
+      "cacheWritePricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · alibaba/qwen3.7-plus",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.4,
+          "outputPricePerMillion": 1.6,
+          "cachedInputPricePerMillion": 0.08,
+          "cacheWritePricePerMillion": 0.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 1.2,
+          "outputPricePerMillion": 4.8,
+          "cachedInputPricePerMillion": 0.24,
+          "cacheWritePricePerMillion": 1.5
+        }
+      }
+    },
+    "qwen3-32b": {
+      "inputPricePerMillion": 0.7,
+      "outputPricePerMillion": 2.8,
+      "source": "https://models.dev/api.json · alibaba/qwen3-32b"
+    },
+    "qwen3-omni-flash": {
+      "inputPricePerMillion": 0.43,
+      "outputPricePerMillion": 1.66,
+      "source": "https://models.dev/api.json · alibaba/qwen3-omni-flash"
+    },
+    "qwen3.5-27b": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 2.4,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-27b"
+    },
+    "qwen3.6-27b": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 3.6,
+      "source": "https://models.dev/api.json · alibaba/qwen3.6-27b"
+    },
+    "qwen2-5-omni-7b": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.4,
+      "source": "https://models.dev/api.json · alibaba/qwen2-5-omni-7b"
+    },
+    "qwen3.5-flash": {
+      "inputPricePerMillion": 0.1,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.01,
+      "cacheWritePricePerMillion": 0.125,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-flash"
+    },
+    "qwen3-vl-30b-a3b": {
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 0.8,
+      "source": "https://models.dev/api.json · alibaba/qwen3-vl-30b-a3b"
+    },
+    "qwen-mt-turbo": {
+      "inputPricePerMillion": 0.16,
+      "outputPricePerMillion": 0.49,
+      "source": "https://models.dev/api.json · alibaba/qwen-mt-turbo"
+    },
+    "deepseek-v4-flash-0731": {
+      "inputPricePerMillion": 0.44,
+      "outputPricePerMillion": 1.32,
+      "cachedInputPricePerMillion": 0.088,
+      "source": "https://models.dev/api.json · alibaba/deepseek-v4-flash-0731"
+    },
+    "qwen-omni-turbo-realtime": {
+      "inputPricePerMillion": 0.27,
+      "outputPricePerMillion": 1.07,
+      "source": "https://models.dev/api.json · alibaba/qwen-omni-turbo-realtime"
+    },
+    "qwen-plus-character-ja": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 1.4,
+      "source": "https://models.dev/api.json · alibaba/qwen-plus-character-ja"
+    },
+    "qwen3-coder-plus": {
+      "inputPricePerMillion": 1,
+      "outputPricePerMillion": 5,
+      "source": "https://models.dev/api.json · alibaba/qwen3-coder-plus"
+    },
+    "qwen3-coder-30b-a3b-instruct": {
+      "inputPricePerMillion": 0.45,
+      "outputPricePerMillion": 2.25,
+      "source": "https://models.dev/api.json · alibaba/qwen3-coder-30b-a3b-instruct"
+    },
+    "qwen3.5-397b-a17b": {
+      "inputPricePerMillion": 0.6,
+      "outputPricePerMillion": 3.6,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-397b-a17b"
+    },
+    "qwen3.8-max": {
+      "inputPricePerMillion": 2,
+      "outputPricePerMillion": 6,
+      "cachedInputPricePerMillion": 0.25,
+      "cacheWritePricePerMillion": 2.5,
+      "source": "https://models.dev/api.json · alibaba/qwen3.8-max"
+    },
+    "qwen-plus": {
+      "inputPricePerMillion": 0.4,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.08,
+      "cacheWritePricePerMillion": 0.5,
+      "source": "https://models.dev/api.json · alibaba/qwen-plus",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.4,
+          "outputPricePerMillion": 1.2,
+          "cachedInputPricePerMillion": 0.08,
+          "cacheWritePricePerMillion": 0.5
+        },
+        "longContext": {
+          "inputPricePerMillion": 1.2,
+          "outputPricePerMillion": 3.6,
+          "cachedInputPricePerMillion": 0.24,
+          "cacheWritePricePerMillion": 1.5
+        }
+      }
+    },
+    "qwen-flash": {
+      "inputPricePerMillion": 0.05,
+      "outputPricePerMillion": 0.4,
+      "cachedInputPricePerMillion": 0.01,
+      "cacheWritePricePerMillion": 0.0625,
+      "source": "https://models.dev/api.json · alibaba/qwen-flash",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.05,
+          "outputPricePerMillion": 0.4,
+          "cachedInputPricePerMillion": 0.01,
+          "cacheWritePricePerMillion": 0.0625
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.25,
+          "outputPricePerMillion": 2,
+          "cachedInputPricePerMillion": 0.05,
+          "cacheWritePricePerMillion": 0.3125
+        }
+      }
+    },
+    "qwen3-vl-235b-a22b": {
+      "inputPricePerMillion": 0.7,
+      "outputPricePerMillion": 2.8,
+      "source": "https://models.dev/api.json · alibaba/qwen3-vl-235b-a22b"
+    },
+    "qwen3-8b": {
+      "inputPricePerMillion": 0.18,
+      "outputPricePerMillion": 0.7,
+      "source": "https://models.dev/api.json · alibaba/qwen3-8b"
+    },
+    "qwen3-omni-flash-realtime": {
+      "inputPricePerMillion": 0.52,
+      "outputPricePerMillion": 1.99,
+      "source": "https://models.dev/api.json · alibaba/qwen3-omni-flash-realtime"
+    },
+    "qwen-max": {
+      "inputPricePerMillion": 1.6,
+      "outputPricePerMillion": 6.4,
+      "source": "https://models.dev/api.json · alibaba/qwen-max"
+    },
+    "qwen3.5-plus": {
+      "inputPricePerMillion": 0.4,
+      "outputPricePerMillion": 2.4,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-plus",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.4,
+          "outputPricePerMillion": 2.4
+        },
+        "longContext": {
+          "inputPricePerMillion": 0.5,
+          "outputPricePerMillion": 3
+        }
+      }
+    },
+    "qwq-plus": {
+      "inputPricePerMillion": 0.8,
+      "outputPricePerMillion": 2.4,
+      "source": "https://models.dev/api.json · alibaba/qwq-plus"
+    },
+    "qwen3-max": {
+      "inputPricePerMillion": 1.2,
+      "outputPricePerMillion": 6,
+      "source": "https://models.dev/api.json · alibaba/qwen3-max"
+    },
+    "qwen3.6-max-preview": {
+      "inputPricePerMillion": 1.3,
+      "outputPricePerMillion": 7.8,
+      "cachedInputPricePerMillion": 0.13,
+      "cacheWritePricePerMillion": 1.625,
+      "source": "https://models.dev/api.json · alibaba/qwen3.6-max-preview"
+    },
+    "qwen-turbo": {
+      "inputPricePerMillion": 0.05,
+      "outputPricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · alibaba/qwen-turbo"
+    },
+    "qwen3-next-80b-a3b-thinking": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 6,
+      "source": "https://models.dev/api.json · alibaba/qwen3-next-80b-a3b-thinking"
+    },
+    "qwen3.6-plus": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 3,
+      "cachedInputPricePerMillion": 0.05,
+      "cacheWritePricePerMillion": 0.625,
+      "source": "https://models.dev/api.json · alibaba/qwen3.6-plus",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.5,
+          "outputPricePerMillion": 3,
+          "cachedInputPricePerMillion": 0.05,
+          "cacheWritePricePerMillion": 0.625
+        },
+        "longContext": {
+          "inputPricePerMillion": 2,
+          "outputPricePerMillion": 6,
+          "cachedInputPricePerMillion": 0.2,
+          "cacheWritePricePerMillion": 2.5
+        }
+      }
+    },
+    "qwen-vl-ocr": {
+      "inputPricePerMillion": 0.07,
+      "outputPricePerMillion": 0.16,
+      "source": "https://models.dev/api.json · alibaba/qwen-vl-ocr"
+    },
+    "qwen3-coder-flash": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.5,
+      "cachedInputPricePerMillion": 0.06,
+      "cacheWritePricePerMillion": 0.375,
+      "source": "https://models.dev/api.json · alibaba/qwen3-coder-flash"
+    },
+    "qwen3.7-flash": {
+      "inputPricePerMillion": 0.03,
+      "outputPricePerMillion": 0.13,
+      "cachedInputPricePerMillion": 0.006,
+      "cacheWritePricePerMillion": 0.0375,
+      "source": "https://models.dev/api.json · alibaba/qwen3.7-flash"
+    },
+    "qwen3.5-122b-a10b": {
+      "inputPricePerMillion": 0.4,
+      "outputPricePerMillion": 3.2,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-122b-a10b"
+    },
+    "qwen3-coder-480b-a35b-instruct": {
+      "inputPricePerMillion": 1.5,
+      "outputPricePerMillion": 7.5,
+      "source": "https://models.dev/api.json · alibaba/qwen3-coder-480b-a35b-instruct"
+    },
+    "qwen-vl-max": {
+      "inputPricePerMillion": 0.8,
+      "outputPricePerMillion": 3.2,
+      "source": "https://models.dev/api.json · alibaba/qwen-vl-max"
+    },
+    "qwen3-235b-a22b": {
+      "inputPricePerMillion": 0.7,
+      "outputPricePerMillion": 2.8,
+      "source": "https://models.dev/api.json · alibaba/qwen3-235b-a22b"
+    },
+    "qwen3-vl-plus": {
+      "inputPricePerMillion": 0.2,
+      "outputPricePerMillion": 1.6,
+      "cachedInputPricePerMillion": 0.04,
+      "cacheWritePricePerMillion": 0.25,
+      "source": "https://models.dev/api.json · alibaba/qwen3-vl-plus"
+    },
+    "qwen3.7-max": {
+      "inputPricePerMillion": 2.5,
+      "outputPricePerMillion": 7.5,
+      "cachedInputPricePerMillion": 0.5,
+      "cacheWritePricePerMillion": 3.125,
+      "source": "https://models.dev/api.json · alibaba/qwen3.7-max"
+    },
+    "qwen-vl-plus": {
+      "inputPricePerMillion": 0.21,
+      "outputPricePerMillion": 0.63,
+      "source": "https://models.dev/api.json · alibaba/qwen-vl-plus"
+    },
+    "qwen3.6-35b-a3b": {
+      "inputPricePerMillion": 0.375,
+      "outputPricePerMillion": 2.25,
+      "source": "https://models.dev/api.json · alibaba/qwen3.6-35b-a3b"
+    },
+    "qwen3-14b": {
+      "inputPricePerMillion": 0.35,
+      "outputPricePerMillion": 1.4,
+      "source": "https://models.dev/api.json · alibaba/qwen3-14b"
+    },
+    "qwen3.8-omni-flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.47,
+      "cachedInputPricePerMillion": 0.016,
+      "source": "https://models.dev/api.json · alibaba/qwen3.8-omni-flash"
+    },
+    "qwen3.6-flash": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 1.5,
+      "cachedInputPricePerMillion": 0.025,
+      "cacheWritePricePerMillion": 0.3125,
+      "source": "https://models.dev/api.json · alibaba/qwen3.6-flash",
+      "contextTiers": {
+        "thresholdTokens": 256000,
+        "standard": {
+          "inputPricePerMillion": 0.25,
+          "outputPricePerMillion": 1.5,
+          "cachedInputPricePerMillion": 0.025,
+          "cacheWritePricePerMillion": 0.3125
+        },
+        "longContext": {
+          "inputPricePerMillion": 1,
+          "outputPricePerMillion": 4,
+          "cachedInputPricePerMillion": 0.1,
+          "cacheWritePricePerMillion": 1.25
+        }
+      }
+    },
+    "qwen3-next-80b-a3b-instruct": {
+      "inputPricePerMillion": 0.5,
+      "outputPricePerMillion": 2,
+      "source": "https://models.dev/api.json · alibaba/qwen3-next-80b-a3b-instruct"
+    },
+    "qwen-mt-plus": {
+      "inputPricePerMillion": 2.46,
+      "outputPricePerMillion": 7.37,
+      "source": "https://models.dev/api.json · alibaba/qwen-mt-plus"
+    },
+    "qwen3.8-flash": {
+      "inputPricePerMillion": 0.15,
+      "outputPricePerMillion": 0.47,
+      "cachedInputPricePerMillion": 0.016,
+      "cacheWritePricePerMillion": 0.2,
+      "source": "https://models.dev/api.json · alibaba/qwen3.8-flash"
+    },
+    "qwen-omni-turbo": {
+      "inputPricePerMillion": 0.07,
+      "outputPricePerMillion": 0.27,
+      "source": "https://models.dev/api.json · alibaba/qwen-omni-turbo"
+    },
+    "qwen3.5-35b-a3b": {
+      "inputPricePerMillion": 0.25,
+      "outputPricePerMillion": 2,
+      "source": "https://models.dev/api.json · alibaba/qwen3.5-35b-a3b"
+    },
+    "LongCat-2.0": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.006,
+      "source": "https://models.dev/api.json · longcat/LongCat-2.0"
+    },
+    "LongCat-2.5-Preview": {
+      "inputPricePerMillion": 0.3,
+      "outputPricePerMillion": 1.2,
+      "cachedInputPricePerMillion": 0.006,
+      "source": "https://models.dev/api.json · longcat/LongCat-2.5-Preview"
+    }
+  }
+}
