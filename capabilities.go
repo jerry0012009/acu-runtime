@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -68,6 +69,7 @@ type capabilityView struct {
 	Messages              []string          `json:"messages"`
 }
 type capabilityInput struct {
+	SkipVideo        bool     `json:"-"`
 	Provider         string   `json:"provider"`
 	Agents           []string `json:"agents"`
 	Vision           *string  `json:"vision"`
@@ -85,11 +87,20 @@ func (host *server) capabilityRead(ctx context.Context, provider string) (capabi
 	view := capabilityView{Provider: provider, VideoReadingEnabled: true, VisionModels: []capabilityModel{}, ImageModels: []capabilityModel{}, Tools: []capabilityTool{}, Messages: []string{}}
 	var prefs map[string]json.RawMessage
 	var lib capabilityLibrary
-	if err := host.kernel.exchange(ctx, "GET", "/api/settings", nil, &prefs); err != nil {
-		return view, nil, lib, err
+	var settingsErr, libraryErr error
+	var reads sync.WaitGroup
+	reads.Add(1)
+	go func() {
+		defer reads.Done()
+		settingsErr = host.kernel.exchange(ctx, "GET", "/api/settings", nil, &prefs)
+	}()
+	libraryErr = host.kernel.exchange(ctx, "GET", "/api/library", nil, &lib)
+	reads.Wait()
+	if settingsErr != nil {
+		return view, nil, lib, settingsErr
 	}
-	if err := host.kernel.exchange(ctx, "GET", "/api/library", nil, &lib); err != nil {
-		return view, nil, lib, err
+	if libraryErr != nil {
+		return view, nil, lib, libraryErr
 	}
 	json.Unmarshal(prefs["vision"], &view.Vision)
 	json.Unmarshal(prefs["imageGen"], &view.ImageGen)
@@ -362,15 +373,13 @@ func (host *server) capabilityApply(ctx context.Context, input capabilityInput) 
 			}
 		}
 	}
-	for _, def := range defs {
-		if err := host.assignNativeTool(ctx, def.name, def.path, input.Agents); err != nil {
-			return view, err
-		}
+	if err := host.assignNativeTools(ctx, defs, input.Agents); err != nil {
+		return view, err
 	}
 	if err := host.assignImageGuidance(ctx, input.Agents); err != nil {
 		return view, err
 	}
-	if (input.VideoReading == nil && view.VideoReadingEnabled) || (input.VideoReading != nil && *input.VideoReading) {
+	if !input.SkipVideo && ((input.VideoReading == nil && view.VideoReadingEnabled) || (input.VideoReading != nil && *input.VideoReading)) {
 		if err := host.assignVideoReading(ctx, input.Agents); err != nil {
 			return view, fmt.Errorf("其他工具已配置，视频读取需要重试：%w", err)
 		}

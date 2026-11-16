@@ -503,11 +503,17 @@ type tapnowCredentialConfig struct {
 }
 
 func (host *server) tapnowCredential(ctx context.Context, provider, model string) (*tapnowCredentialConfig, error) {
+	return host.tapnowCredentialFromCatalog(ctx, provider, model, true)
+}
+
+func (host *server) tapnowCredentialFromCatalog(ctx context.Context, provider, model string, refresh bool) (*tapnowCredentialConfig, error) {
 	if provider == "" || model == "" {
 		return nil, errors.New("请选择 ACU Key 和模型")
 	}
-	if err := host.checkProvider(ctx, provider); err != nil {
-		return nil, err
+	if refresh {
+		if err := host.checkProvider(ctx, provider); err != nil {
+			return nil, err
+		}
 	}
 	var data struct {
 		Providers []localProvider `json:"providers"`

@@ -82,6 +82,15 @@ async function refresh(rescan = false, quiet = false) {
     billing?.syncAccount();
     preferences?.syncAccount();
     workReview?.syncAccount();
+    if (ui.toolsPending) pollToolPreparation();
+    else if (!ui.toolTaskRestored) {
+      ui.toolTaskRestored = true;
+      request('/runtime/capabilities/prepare').then(result=>{
+        if (result.id && !['complete','error'].includes(result.phase) && result.provider===activeChoice()?.id) {
+          ui.toolTask=result.id;ui.toolRequest={provider:result.provider,agents:result.agents,videoOnly:false};showToolPreparation(result);
+        }
+      }).catch(()=>{});
+    }
     if (ui.status.desktop && ui.status.update?.supported && !ui.startupUpdateChecked) {
       ui.startupUpdateChecked = true;
       // One read-only release check per window session. Installation is
@@ -106,7 +115,7 @@ async function refresh(rescan = false, quiet = false) {
       if (!ui.status.ready && !ui.status.starting) ui.status = await request('/runtime/kernel/start', { method: 'POST' });
     }
     ui.error = ui.status.error || '';
-    if (ui.status.desktop && ui.status.ready && !ui.applying && !ui.capabilities) {
+    if (ui.status.desktop && ui.status.ready && !ui.applying && !ui.capabilities && !ui.toolsPending) {
       const choice = activeChoice();
       const agents = (ui.status.agents || []).filter(agent => agent.detected && agent.connected).map(agent => agent.id);
       const identity = choice && agents.length ? JSON.stringify([choice.id, choice.masked, agents]) : '';
@@ -114,8 +123,7 @@ async function refresh(rescan = false, quiet = false) {
         ui.autoVideoReading = identity;
         request(`/runtime/capabilities?provider=${encodeURIComponent(choice.id)}`).then(view => {
           if (view.videoReadingEnabled === false || (view.videoReadingReady && agents.every(id => view.tools?.some(tool => tool.name === 'acu-video-reader' && tool.agents?.includes(id))))) return;
-          return request('/runtime/capabilities', {method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({provider:choice.id,agents,videoReadingOnly:true,videoReading:true})});
+          return beginToolPreparation(choice.id,agents,true);
         }).catch(error => { ui.results = [...ui.results.filter(item => item.id !== 'tools'),
           {id:'tools',ok:false,message:`视频读取自动配置未完成：${error.message}`}]; render(); });
       }
@@ -248,12 +256,16 @@ function agentsPage() {
   const configured = activeChoice() && detected.some(agent => agent.connected && !agent.needsRepair);
   return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${configured ? '已接入，可前往 WorkBuddy 等应用选择 ACU 模型试用。' : activeChoice() ? '点击一键配置，自动接入模型与常用工具。' : '先登录或连接 ACU，再一键配置。'}</p></div><div class="workbench-actions"><button class="text-button workbench-utility" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片、视频与搜索</button><button class="icon-button workbench-utility" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button primary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
     <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.filter(agent => agent.detected || !ui.status?.ready).map(agentCard).join('')}</div>` : ''}
+    ${setupResults()}
     <details class="optional-agents" data-agent-section="other" ${ui.otherAgentsOpen ? 'open' : ''}><summary>其他 Agent ${icon('chevron')}</summary>${tapnow?.html() || '<div class="optional-agent"><strong>TapNow</strong><span>Chrome 扩展</span></div>'}</details>
     <details class="optional-agents" data-agent-section="install" ${ui.installAgentsOpen ? 'open' : ''}><summary>安装其他 Agent ${icon('chevron')}</summary><div class="agent-install-options">${['workbuddy','codex'].filter(id => !detected.some(agent => agent.id === id)).map(id => `<div><strong>${id === 'codex' ? 'ChatGPT 桌面端' : 'WorkBuddy'}</strong><span>${id === 'codex' ? '首次下载约 1 GB' : '国内官方下载'}</span><button class="button secondary" data-action="install-agent" data-agent-id="${id}" ${!ui.status?.desktop || !ui.status?.ready || !activeChoice() || ui.applying || ui.agentInstall && !['complete','error'].includes(ui.agentInstall.phase) ? 'disabled' : ''}>安装并配置 ${id === 'codex' ? 'ChatGPT' : 'WorkBuddy'} ${icon('arrow')}</button></div>`).join('')}</div><button class="workbench-catalog-entry" data-native-view="agents" data-native-focus="agentsInstall" ${!ui.status?.ready ? 'disabled' : ''}><span class="catalog-entry-icon">${icon('terminal')}</span><span><strong>Agent 安装目录</strong><small>Claude Code、Gemini CLI、OpenCode 等</small></span>${icon('arrow')}</button></details>
     <div class="workbench-tool-entry"><button class="workbench-catalog-entry" data-native-view="library" data-native-tab="mcp" ${!ui.status?.ready ? 'disabled' : ''}><span class="catalog-entry-icon">${icon('grid')}</span><span><strong>安装工具与 MCP</strong><small>MCP 服务、技能与应用分配</small></span>${icon('arrow')}</button></div>
-    ${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片、视频与搜索' : result.id))}</strong><span>${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
-    ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && result.id === 'tools') ? '<button class="button secondary" data-action="capabilities">处理未完成工具</button>' : ''}
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
+}
+
+function setupResults() {
+  return `${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.pending ? 'pending' : result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片、视频与搜索' : result.id))}</strong><span>${result.pending ? icon('refresh','spinning') : ''}${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
+    ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && !result.pending && result.id === 'tools') ? '<button class="button secondary" data-action="retry-tools">重试未完成工具</button>' : ''}`;
 }
 
 app.addEventListener('toggle', event => {
@@ -1196,14 +1208,41 @@ async function confirmSetup() {
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
     if (setup.tools && connectedAgents.length) {
-      ui.progress = '正在准备图片、视频与搜索…'; render();
       try {
-        const capabilities = await request('/runtime/capabilities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: setup.provider, agents: connectedAgents }) });
-        ui.results.push({ id: 'tools', ok: true, message: `工具已写入 · ${capabilities.searchReady ? '搜索来源已配置' : capabilities.freeSearchConfigured ? '免费搜索已配置' : '搜索待配置'} · 重新打开 Agent 后使用` });
+        await beginToolPreparation(setup.provider,connectedAgents);
       } catch (error) { ui.results.push({ id: 'tools', ok: false, message: `模型接入已完成，工具需重试：${error.message}` }); }
     }
   } catch (error) { toast(`模型目录刷新失败：${error.message}`); }
   finally { ui.applying = false; await refresh(); }
+}
+
+async function beginToolPreparation(provider, agents, videoOnly = false) {
+  ui.toolRequest = {provider,agents,videoOnly};
+  const choice=ui.status?.connection?.choices?.find(choice=>choice.id===provider);
+  ui.autoVideoReading=JSON.stringify([provider,choice?.masked,agents]);
+  ui.toolsPending = true;
+  try {
+    const result = await request('/runtime/capabilities/prepare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ui.toolRequest)});
+    ui.toolTask = result.id;
+    showToolPreparation(result);
+  } catch(error) { ui.toolsPending = false; throw error; }
+}
+
+function showToolPreparation(result) {
+  const pending = result.phase !== 'complete' && result.phase !== 'error';
+  ui.toolsPending = pending;
+  ui.results = [...ui.results.filter(item=>item.id!=='tools'),{id:'tools',pending,basicReady:result.basicReady,ok:result.phase==='complete',message:result.failure || result.message || '正在准备工具…'}];
+  if (['overview','agents'].includes(ui.page)) render();
+}
+
+async function pollToolPreparation() {
+  if (ui.toolPolling) return;
+  ui.toolPolling = true;
+  try {
+    const result = await request('/runtime/capabilities/prepare');
+    if (result.id === ui.toolTask) showToolPreparation(result);
+  } catch { /* Keep the active task visible until its next status read. */ }
+  finally { ui.toolPolling = false; }
 }
 
 async function startAccountLogin(register) {
@@ -1302,6 +1341,7 @@ app.addEventListener('click', event => {
     'install-agent': () => installAgent(control.dataset.agentId),
     'cancel-agent-install': async () => { try { await request('/runtime/agents/install/cancel', { method: 'POST' }); await refresh(); } catch (error) { toast(error.message); } },
     'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
+    'retry-tools': () => { const task=ui.toolRequest;if(task) beginToolPreparation(task.provider,task.agents,ui.results.find(item=>item.id==='tools')?.basicReady || task.videoOnly).catch(error=>toast(error.message)); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
     'account-login': () => startAccountLogin(false), 'account-register': () => startAccountLogin(true),
     'account-cancel': cancelAccountLogin,

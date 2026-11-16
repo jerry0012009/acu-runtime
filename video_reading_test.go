@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestVideoReadingUsesStandardExternalMCP(t *testing.T) {
@@ -41,6 +42,47 @@ func TestVideoReadingUsesStandardExternalMCP(t *testing.T) {
 	}
 	if tool["command"] != "custom" || tool["hidden"] != true {
 		t.Fatal("customization lost")
+	}
+}
+
+func TestVideoPreparationCachesOnlyUnchangedInstalledTool(t *testing.T) {
+	file := os.Getenv("ACU_VIDEO_PREPARE_TEST_BINARY")
+	if file == "" {
+		t.Skip("explicit packaged video tool acceptance")
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	target, err := videoMCPPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(target, data, 0700); err != nil {
+		t.Fatal(err)
+	}
+	host := &server{}
+	for i := 0; i < 2; i++ {
+		start := time.Now()
+		if err := host.prepareVideoTools(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("packaged video prepare round=%d elapsed=%dms", i+1, time.Since(start).Milliseconds())
+	}
+	if err = os.WriteFile(target, []byte("invalid replacement"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err = host.prepareVideoTools(ctx); err == nil {
+		t.Fatal("changed binary accepted from cache")
 	}
 }
 func TestVideoReadingFailureDoesNotAssignUnavailableTool(t *testing.T) {

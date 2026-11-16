@@ -244,6 +244,10 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 			fail(videoErr)
 			return
 		}
+		if videoErr := host.registerVideoNative(ctx); videoErr != nil {
+			fail(videoErr)
+			return
+		}
 	}
 	if requiredVersion == "" && err == nil && tapnowPreparedIdentity(filepath.Join(root, edition), edition) {
 		requiredVersion = readTapnowManifest(filepath.Join(root, edition))

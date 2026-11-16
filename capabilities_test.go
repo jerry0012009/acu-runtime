@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,6 +18,7 @@ type capabilityFixture struct {
 	fail         bool
 	searchKey    string
 	refreshError bool
+	skills       []map[string]any
 }
 
 func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
@@ -45,7 +47,7 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			}
 			json.NewEncoder(w).Encode(f.prefs)
 		case "/api/library":
-			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers})
+			json.NewEncoder(w).Encode(map[string]any{"servers": f.servers, "skills": f.skills})
 		case "/api/library/market/servers":
 			io.WriteString(w, `{"items":[{"id":"magpie-vision","name":"magpie-vision"},{"id":"magpie-image","name":"magpie-image"},{"id":"magpie-web-search","name":"magpie-web-search"},{"id":"magpie-video","name":"magpie-video"}]}`)
 		case "/api/library/market/server":
@@ -63,6 +65,26 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 			for _, s := range f.servers {
 				if s["name"] == in.Name {
 					s["agents"] = in.Agents
+				}
+			}
+			io.WriteString(w, `{}`)
+		case "/api/library/servers/agents-some":
+			var in struct {
+				Names, Agents []string
+				On            bool
+			}
+			json.NewDecoder(r.Body).Decode(&in)
+			for _, s := range f.servers {
+				if slices.Contains(in.Names, s["name"].(string)) {
+					raw, _ := json.Marshal(s["agents"])
+					var ids []string
+					json.Unmarshal(raw, &ids)
+					for _, id := range in.Agents {
+						if !slices.Contains(ids, id) {
+							ids = append(ids, id)
+						}
+					}
+					s["agents"] = ids
 				}
 			}
 			io.WriteString(w, `{}`)
@@ -91,6 +113,24 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		case "/api/library/skills/probe":
 			io.WriteString(w, `{"candidates":[{"name":"acu-image-tools","path":"."}]}`)
 		case "/api/library/skills/install":
+			var in struct {
+				Source string
+				Agents []string
+			}
+			json.NewDecoder(r.Body).Decode(&in)
+			f.skills = append(f.skills, map[string]any{"name": "acu-image-tools", "source": in.Source, "agents": in.Agents})
+			io.WriteString(w, `{}`)
+		case "/api/library/skills/agents":
+			var in struct {
+				Name   string
+				Agents []string
+			}
+			json.NewDecoder(r.Body).Decode(&in)
+			for _, s := range f.skills {
+				if s["name"] == in.Name {
+					s["agents"] = in.Agents
+				}
+			}
 			io.WriteString(w, `{}`)
 		case "/api/provider/key":
 			io.WriteString(w, `{"key":"private-acu-test-key"}`)
@@ -133,7 +173,8 @@ func capabilityTestHost(t *testing.T) (*server, *capabilityFixture) {
 		f.prefs[key] = value
 		return nil
 	}
-	host.imageSkillSource = func() (string, error) { return t.TempDir(), nil }
+	source := t.TempDir()
+	host.imageSkillSource = func() (string, error) { return source, nil }
 	host.videoToolPath = func(context.Context) (string, error) { return "/fixture/acu-video-mcp", nil }
 	return host, f
 }

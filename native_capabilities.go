@@ -47,6 +47,67 @@ func (host *server) writeToolLibrary(ctx context.Context, path string, input any
 	return nil
 }
 
+// Existing definitions only need Magpie's native multi-server assignment.
+func (host *server) assignNativeTools(ctx context.Context, defs []struct{ name, path string }, agents []string) error {
+	if len(agents) == 0 {
+		return nil
+	}
+	lib, err := host.readToolLibrary(ctx)
+	if err != nil {
+		return err
+	}
+	var names []string
+	for _, def := range defs {
+		var old *capabilityTool
+		for i := range lib.Servers {
+			if lib.Servers[i].Name == def.name {
+				old = &lib.Servers[i]
+				break
+			}
+		}
+		if old == nil || (old.Transport == "http" && old.stored["command"] == nil) {
+			// Installation/migration keeps using the native market and existing preservation rules.
+			for _, d := range defs {
+				if err := host.assignNativeTool(ctx, d.name, d.path, agents); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if old.Note != capabilityOwner {
+			return errors.New("已有同名工具，请在工具目录检查 " + def.name)
+		}
+		for _, id := range agents {
+			if !slices.Contains(old.Agents, id) {
+				names = append(names, def.name)
+				break
+			}
+		}
+	}
+	if len(names) > 0 {
+		if err := host.writeToolLibrary(ctx, "/api/library/servers/agents-some", map[string]any{"names": names, "agents": agents, "on": true}); err != nil {
+			return err
+		}
+		checked, err := host.readToolLibrary(ctx)
+		if err != nil {
+			return err
+		}
+		for _, name := range names {
+			for _, id := range agents {
+				if !slices.ContainsFunc(checked.Servers, func(tool capabilityTool) bool { return tool.Name == name && slices.Contains(tool.Agents, id) }) {
+					return errors.New("工具分配未通过回读检查")
+				}
+			}
+		}
+	}
+	for _, def := range defs {
+		if def.path == "web-search" {
+			return host.finishNativeSearchMigration(ctx, def.path, def.name)
+		}
+	}
+	return nil
+}
+
 // Definition and command come from the native market. Only branding and user
 // assignments are applied here; native options are not reconstructed.
 func (host *server) assignNativeTool(ctx context.Context, name, kind string, agents []string) error {
