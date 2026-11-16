@@ -47,3 +47,9 @@ Verification:
 
 This adds a price-comparison reference only. No routing model, learning behavior,
 provider configuration, tariff, Magpie version or default Agent choice changes.
+
+Release workflow `43802571781` completed successfully for Windows x64, macOS
+ARM64 and Intel. Source/tag revision `85a90204c6fcbbb9405936a5175bc54415fa506c`;
+GitHub release published at 2026-11-16T04:25:16Z. Public
+`https://acu.best/api/acu-runtime/release` returns version 0.1.99 with all three
+mirror download URLs. Backend Router/Console applications were not replaced.
