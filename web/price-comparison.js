@@ -1,3 +1,4 @@
+globalThis.acuFormatPriceMultiplier = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value.toFixed(3) + '×' : '—';
 globalThis.acuPriceComparison = model => {
   const reference = model.comparison_reference;
   const payable = model.payable;

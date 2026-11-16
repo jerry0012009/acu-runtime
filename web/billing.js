@@ -148,7 +148,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       const dynamic = model.model_name === 'acu-auto';
       const comparison = globalThis.acuPriceComparison(model);
       const multiplier = comparison.standard;
-      const multiple = value => value === undefined ? '—' : Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 4 }) + '×';
+      const multiple = globalThis.acuFormatPriceMultiplier;
       const comparisonReference = comparison.reference;
       let comparisonSource = '平台历史参考，非已核验官方价';
       if (comparisonReference?.source_type === 'official') {

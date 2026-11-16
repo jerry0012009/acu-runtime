@@ -106,7 +106,7 @@ async function main() {
     assert(await page.getByRole('searchbox').evaluate(node => node === document.activeElement), 'refresh preserves search focus');
     delayPrices = false;
     assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','实付倍率','输出价格','输入价格','缓存命中','缓存写入']);
-    assert(await page.getByText('0.06×', {exact:true}).isVisible());
+    assert(await page.getByText('0.060×', {exact:true}).isVisible());
     const solRow = page.locator('#billing-price-rows tr');
     assert((await solRow.locator('[data-price="output"]').innerText()).startsWith('¥4.044'));
     assert((await solRow.locator('[data-price="input"]').innerText()).startsWith('¥0.8088'));
@@ -235,7 +235,7 @@ async function main() {
         await page.screenshot({ path: path.join(workspace, `.build/billing-gpt6-prices-${width}.png`), fullPage: true });
       }
       const fast = page.getByRole('row').filter({ has: page.locator('strong', { hasText: /^gpt-6-astra-fast$/ }) });
-      assert.equal(await fast.locator('.billing-price-multiplier > span').textContent(), '0.04×');
+      assert.equal(await fast.locator('.billing-price-multiplier > span').textContent(), '0.040×');
       assert.equal(await fast.locator('[data-price="output"] .billing-price-value').textContent(), '¥26.96');
       await fast.locator('.billing-price-reference summary').click();
       assert(await fast.getByText('¥674', { exact: true }).isVisible());

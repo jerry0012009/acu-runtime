@@ -38,6 +38,17 @@ func TestNativeCNYCreditReferenceIsNotAnOfficialComparison(t *testing.T) {
 	}
 }
 
+func TestPublishedUSDReferenceIsNotReplacedByClientCatalog(t *testing.T) {
+	input := json.RawMessage(`[{"model_name":"gpt-6-luna","reference":{"source_type":"platform","original_currency":"USD","input_cny_per_million":10,"output_cny_per_million":50,"fx_cny_per_usd":6.74}}]`)
+	var rows []map[string]json.RawMessage
+	if err := json.Unmarshal(attachPriceReferences(input), &rows); err != nil {
+		t.Fatal(err)
+	}
+	if string(rows[0]["reference"]) != string(rows[0]["comparison_reference"]) {
+		t.Fatal("Runtime changed the server reference")
+	}
+}
+
 func TestPublicReferenceNeedsFXAndDoesNotStripNonGPTFastNames(t *testing.T) {
 	for _, input := range []json.RawMessage{
 		json.RawMessage(`[{"model_name":"gpt-6-astra-fast","reference":{"original_currency":"CNY","fx_cny_per_usd":0}}]`),
