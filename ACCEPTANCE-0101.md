@@ -39,3 +39,10 @@ Verification:
 Main concurrently received account billing improvements in 0.1.100; retain
 them and release this separate change as 0.1.101. Production Router/Console
 are not changed by this Runtime-only release.
+
+Release `v0.1.101` published 2026-11-16T05:22:32Z, source revision
+`8cd4bea13595fb5de42ab65f9ec05de81ab3eb21`. Workflow `43808559464` completed
+successfully for Windows x64, macOS ARM and Intel, including the new setup
+hierarchy screenshots. Public `/api/acu-runtime/release` returns 0.1.101 with
+all three download mirror URLs. Main also retains the parallel 0.1.100
+acceptance documentation; no application rebuild is needed for that document.
