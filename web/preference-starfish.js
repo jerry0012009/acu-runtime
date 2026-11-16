@@ -17,18 +17,19 @@ globalThis.ACUStarfishGeometry = {
 };
 
 globalThis.createACUStarfish = ({ escapeHTML: esc, sourceList, onSelect }) => {
-  let pinned = '', preview = '', zoom = 1, rays = [], profile = null, bipolar = false, valid = false;
+  let pinned = '', preview = '', zoom = 1, rays = [], profile = null, bipolar = false, valid = false, example = false;
   const finite = (n, max) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
   const origin = { authorized_initialization: '初始设置', learned: '来自交流', user_explicit: '个人设置' };
-  function reset() { pinned = ''; preview = ''; zoom = 1; rays = []; profile = null; }
+  function reset() { pinned = ''; preview = ''; zoom = 1; rays = []; profile = null; example = false; }
   function selected() { return rays.find(ray => ray.id === (preview || pinned)) || rays[0]; }
   function detail() {
     const ray = selected();
     if (!ray) return '';
     const b = ray.bipolar;
-    return `<article class="starfish-detail-content"><p class="preference-muted">${esc(ray.category)}</p><h3>${esc(ray.label)}</h3><p>${esc(ray.summary || '暂无摘要。')}</p>${ray.scope ? `<p class="preference-muted">适用范围：${esc(ray.scope)}</p>` : ''}${bipolar && b ? `<div class="starfish-poles"><span>${esc(b.end_a)}</span><span>${esc(b.end_b)}</span></div><p>${esc(origin[b.origin] || '')}</p>${b.applicability === false ? '<p class="preference-note">当前场景不适用</p>' : b.position === 60 ? '<p class="preference-muted">无明显倾向</p>' : ''}${b.scope ? `<p class="preference-muted">${[['project','项目'],['task','任务'],['subtype','子类型']].filter(([key]) => b.scope[key]).map(([key,label]) => `${label}：${esc(b.scope[key])}`).join(' · ')}</p>` : ''}` : ''}${sourceList(ray)}${profile?.acceptanceConditions?.length ? `<details><summary>适用条件</summary><ul>${profile.acceptanceConditions.map(condition => `<li>${esc(condition)}</li>`).join('')}</ul></details>` : ''}</article>`;
+    return `<article class="starfish-detail-content">${example ? '<p class="preference-muted">示例偏好详情</p>' : ''}<p class="preference-muted">${esc(ray.category)}</p><h3>${esc(ray.label)}</h3><p>${esc(ray.summary || '暂无摘要。')}</p>${ray.scope ? `<p class="preference-muted">适用范围：${esc(ray.scope)}</p>` : ''}${bipolar && b ? `<div class="starfish-poles"><span>${esc(b.end_a)}</span><span>${esc(b.end_b)}</span></div><p>${esc(origin[b.origin] || '')}</p>${b.applicability === false ? '<p class="preference-note">当前场景不适用</p>' : b.position === 60 ? '<p class="preference-muted">无明显倾向</p>' : ''}${b.scope ? `<p class="preference-muted">${[['project','项目'],['task','任务'],['subtype','子类型']].filter(([key]) => b.scope[key]).map(([key,label]) => `${label}：${esc(b.scope[key])}`).join(' · ')}</p>` : ''}` : ''}${example ? '' : sourceList(ray)}${profile?.acceptanceConditions?.length ? `<details><summary>适用条件</summary><ul>${profile.acceptanceConditions.map(condition => `<li>${esc(condition)}</li>`).join('')}</ul></details>` : ''}</article>`;
   }
   function render(view) {
+    example = view?.example === true;
     profile = view?.profile;
     rays = Array.isArray(profile?.rays) ? profile.rays : [];
     if (!rays.length) return '';

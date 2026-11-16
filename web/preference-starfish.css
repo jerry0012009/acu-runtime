@@ -9,4 +9,5 @@
 @media(prefers-reduced-motion:reduce){.starfish-pulse,.starfish-core,.starfish-scan{animation:none}.starfish-ray,.starfish-arrow{transition:none}}
 
 .preference-page .starfish-header h2{margin:0}.starfish-layout{align-items:start}
+.starfish-example-note{border-left:2px solid var(--acu-line);padding-left:12px;font-size:13px;line-height:1.6}
 @media(min-width:800px){.starfish-viewport{width:min(100%,max(220px,calc(100dvh - 410px)));margin-inline:auto}}
