@@ -79,6 +79,8 @@ async function main() {
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-billing-sort]').inputValue(), 'capability_desc');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','ACU Auto','cheap','free','unknown']);
     await page.getByRole('searchbox').fill('sol');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1);
     delayPrices = true;
@@ -216,7 +218,7 @@ async function main() {
       }
     }
     assert.deepEqual(errors, []);
-    console.log('PASS: complete prices and multipliers, default output sort, zero and missing prices, tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');
+    console.log('PASS: default capability sort, stable native sort control during refresh, prices and tiers, search, refresh persistence, historical charges, failure recovery, logout isolation and responsive themes.');
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,5 +1,5 @@
 globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, icon }) => {
-  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'output_asc', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
+  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'capability_desc', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
   const money = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : '¥' + new Intl.NumberFormat('zh-CN', Number(value) !== 0 && Math.abs(Number(value)) < 0.000001 ? { maximumSignificantDigits: 4 } : { maximumFractionDigits: 6 }).format(Number(value));
   const priceMoney = value => '¥' + Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 10 });
   const date = value => value ? new Date(value * 1000).toLocaleString('zh-CN') : '尚未刷新';
