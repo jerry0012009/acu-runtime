@@ -1,5 +1,5 @@
 (() => {
-  const parameters = new URLSearchParams(location.search);
+  const parameters = new URLSearchParams(globalThis.acuKernelQuery ?? location.search);
   if (parameters.get('acu-developer') === '1') return;
   document.body.classList.add('acu-embedded');
   const view = parameters.get('acu-view') || 'agents';
@@ -77,13 +77,30 @@
   });
   observer.observe(document.body, { childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'aria-label'], subtree: true });
   const focusID = parameters.get('acu-focus');
-  if (new Set(['imagesList', 'searchList']).has(focusID)) {
+  if (new Set(['imagesList', 'searchList', 'agentsInstall']).has(focusID)) {
+    if (focusID === 'agentsInstall') document.body.classList.add('acu-agent-install');
     let count = 0;
     const focusTimer = setInterval(() => {
       count += 1;
       const target = document.getElementById(focusID);
-      if (target?.children.length && target.getClientRects().length) { target.scrollIntoView({ block: 'start' }); clearInterval(focusTimer); }
+      if (target?.children.length && target.getClientRects().length) {
+        const expand = focusID === 'agentsInstall' ? target.querySelector('.ag-install-head[aria-expanded="false"]') : null;
+        if (expand?.onclick) { expand.click(); return; }
+        target.scrollIntoView({ block: 'start' }); clearInterval(focusTimer);
+      }
       else if (count > 40) clearInterval(focusTimer);
+    }, 200);
+  }
+  if (view === 'library' && parameters.get('tab') === 'mcp') {
+    let count = 0;
+    const libraryTimer = setInterval(() => {
+      count++;
+      const tab = [...document.querySelectorAll('#view-library .lib-tabs button')].find(button => /^MCP\b/i.test(button.textContent.trim()));
+      if (tab?.onclick) {
+        if (tab.getAttribute('aria-pressed') !== 'true') tab.click();
+        if (document.querySelector('#view-library .mk[data-market="mcp"]')) clearInterval(libraryTimer);
+      }
+      if (count > 40) clearInterval(libraryTimer);
     }, 200);
   }
   const agent = parameters.get('acu-agent');
