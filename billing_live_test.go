@@ -31,10 +31,17 @@ func TestAccountBillingLiveAcceptance(t *testing.T) {
 	host := &server{token: "acceptance-local"}
 	host.account.view = accountView{LoggedIn: true, Site: "https://acu.best", Username: "wzr0012026"}
 	host.account.userID, host.account.bearer, host.account.expires = 122, auth.AccessToken, time.Now().Add(time.Hour).Unix()
+	days := os.Getenv("ACU_BILLING_LIVE_DAYS")
+	if days == "" {
+		days = "7"
+	}
+	if days != "1" && days != "7" && days != "30" {
+		t.Fatal("unsupported live account range")
+	}
 	for i := 0; i < 2; i++ {
 		start := time.Now()
 		out := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/runtime/billing/account?days=7&page=1", nil)
+		req := httptest.NewRequest(http.MethodGet, "/runtime/billing/account?days="+days+"&page=1", nil)
 		req.Header.Set("X-ACU-Token", host.token)
 		host.accountBilling(out, req)
 		if out.Code != 200 {
@@ -85,6 +92,6 @@ func TestAccountBillingLiveAcceptance(t *testing.T) {
 		if err := os.WriteFile(os.Getenv("ACU_BILLING_LIVE_OUTPUT"), out.Body.Bytes(), 0600); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("LIVE Runtime billing read %d: %dms; records=%d comparable=%d\n", i+1, time.Since(start).Milliseconds(), result.Overview.Count, result.Overview.Comparison.Count)
+		fmt.Printf("LIVE Runtime billing %sd read %d: %dms; records=%d comparable=%d\n", days, i+1, time.Since(start).Milliseconds(), result.Overview.Count, result.Overview.Comparison.Count)
 	}
 }
