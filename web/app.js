@@ -170,9 +170,8 @@ function activeChoice() {
   return connection.choices?.find(choice => choice.id === provider);
 }
 
-// Curated text-model candidates, smoke-tested through Magpie on 2026-11-06.
-// This is a recommendation list, not a permanent availability guarantee.
-const recommendedACUModels = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1'];
+// Recommended candidates are intersected with the account's current model list.
+const recommendedACUModels = ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-2', 'claude-fable-5-1'];
 function recommendedModels(choice) {
   return recommendedACUModels.filter(model => choice?.models?.includes(model));
 }

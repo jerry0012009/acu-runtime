@@ -592,9 +592,10 @@ test('DeepSeek V4.1 Flash variants are recommended while legacy V4 Flash is omit
   assert(!models.includes('deepseek-v4-flash'));
 });
 
-test('Fable 5.1 replaces Fable 5 in recommendations and respects the account model list', async () => {
+test('Fable 5.2 is recommended ahead of 5.1 and respects the account model list', async () => {
   const instance = await setup({ ready: true, agents: [codex()] });
   assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5", "claude-fable-5-1", "claude-opus-5-5"] }).join(",")'), 'claude-opus-5-5,claude-fable-5-1');
+  assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5-1", "claude-fable-5-2"] }).join(",")'), 'claude-fable-5-2,claude-fable-5-1');
   assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5"] }).length'), 0);
   const options = [
     {value:'acu-runtime/claude-fable-5',ref:'acu-runtime/claude-fable-5',label:'Fable 5'},
