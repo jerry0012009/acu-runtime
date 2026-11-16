@@ -1,4 +1,4 @@
-Published release: **0.1.95** shows model multipliers and complete input/output/cache prices, with default output-price sorting and responsive layouts. Windows x64 and both macOS jobs passed and publication completed on 2026-11-15. Official Magpie v0.1.4248 stays unmodified. See [ACCEPTANCE-0195.md](ACCEPTANCE-0195.md) for verification and release evidence. Main may contain later release candidates.
+Release candidate: **0.1.110** compares actual CNY spending with matching official Standard/Fast tariffs, displays readable complete prices, and preserves current capability sorting. Fast static retail is centrally published at twice paired Standard retail; historical bills are unchanged. Official Magpie v0.1.4248 stays unmodified. See [ACCEPTANCE-0110.md](ACCEPTANCE-0110.md) for verification and publication status.
 
 Retains 0.1.89's sequential TapNow setup, automatic address/directory copying, native clipboard fallback and receipt-confirmed completion. Same-version setup goes directly to connection. Shared workbenches and GPT-6.1 Sol remain included. See [ACCEPTANCE-0188.md](ACCEPTANCE-0188.md) and the [worktree closeout](INTEGRATION-0190.md).
 

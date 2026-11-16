@@ -235,7 +235,8 @@ async function main() {
         await page.screenshot({ path: path.join(workspace, `.build/billing-gpt6-prices-${width}.png`), fullPage: true });
       }
       const fast = page.getByRole('row').filter({ has: page.locator('strong', { hasText: /^gpt-6-astra-fast$/ }) });
-      assert.equal(await fast.locator('.billing-price-multiplier > span').textContent(), '0.01484×');
+      assert.equal(await fast.locator('.billing-price-multiplier > span').textContent(), '0.04×');
+      assert.equal(await fast.locator('[data-price="output"] .billing-price-value').textContent(), '¥26.96');
       await fast.locator('.billing-price-reference summary').click();
       assert(await fast.getByText('¥674', { exact: true }).isVisible());
     }
