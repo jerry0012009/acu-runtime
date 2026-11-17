@@ -65,7 +65,7 @@ function toast(message) {
 }
 
 async function refresh(rescan = false, quiet = false) {
-  if (ui.applying || ui.accountBusy) return;
+  if (ui.applying || ui.accountBusy || ui.inventorySaving) return;
   if (ui.polling) return;
   ui.polling = true;
   clearTimeout(refresh.timer);
@@ -499,6 +499,47 @@ function inventorySnapshot(agent) {
   return agent?.catalog ? JSON.parse(JSON.stringify(agent.catalog)) : null;
 }
 
+function inventoryAgent(id) {
+  const agent = (ui.status?.agents || []).find(item => item.id === id);
+  return ui.inventoryEditor?.id === id ? { ...agent, catalog: ui.inventoryEditor.catalog } : agent;
+}
+
+function inventoryDirty() {
+  const editor = ui.inventoryEditor;
+  const selection = catalog => JSON.stringify({ only: !!catalog.only, ownHidden: !!catalog.ownHidden, models: catalog.models.map(model => [model.id, !!model.hidden]) });
+  return !!editor && selection(editor.catalog) !== selection(editor.before);
+}
+
+function inventoryOperations() {
+  const editor = ui.inventoryEditor;
+  if (!editor) return [];
+  const operations = [];
+  if (!!editor.catalog.only !== !!editor.before.only) operations.push({ only: !!editor.catalog.only });
+  const visibility = catalog => JSON.stringify(catalog.models.map(model => [model.id, !!model.hidden]).sort((a, b) => a[0].localeCompare(b[0])));
+  if (visibility(editor.catalog) !== visibility(editor.before)) operations.push(visibilityPayload(inventoryAgent(editor.id)));
+  if (!!editor.catalog.ownHidden !== !!editor.before.ownHidden) operations.push({ ownHidden: !!editor.catalog.ownHidden });
+  if (JSON.stringify(editor.catalog.models.map(model => model.id)) !== JSON.stringify(editor.before.models.map(model => model.id))) operations.push({ order: editor.catalog.models.filter(model => !modelIsHidden(inventoryAgent(editor.id), model)).map(model => model.id) });
+  return operations;
+}
+
+async function saveInventoryDraft() {
+  const editor = ui.inventoryEditor;
+  if (!editor || !inventoryDirty() || ui.inventorySaving) return;
+  ui.inventorySaving = true;
+  editor.error = '';
+  redrawInventory();
+  try {
+    const result = await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: editor.id, operations: inventoryOperations(), expected: editor.before }) });
+    if (!Array.isArray(result.models)) throw new Error('无法确认模型列表已保存，请重试');
+    const agent = ui.status?.agents?.find(item => item.id === editor.id);
+    if (agent) agent.catalog = result;
+    editor.catalog = JSON.parse(JSON.stringify(result));
+    editor.before = JSON.parse(JSON.stringify(result));
+    toast('模型显示设置已保存');
+  } catch (error) { editor.error = error.message; }
+  finally { ui.inventorySaving = false; redrawInventory(); refresh(false, true); }
+}
+
 function redrawInventory() {
   if (!ui.inventory) return;
   const body = overlay.querySelector?.('.recommendation-body');
@@ -510,24 +551,6 @@ function redrawInventory() {
   if (nextBody) nextBody.scrollTop = scroll;
 }
 
-async function saveInventoryChange(agent, body, before) {
-  if (!agent?.catalog || ui.inventorySaving) return;
-  ui.inventorySaving = true;
-  redrawInventory();
-  try {
-    const result = await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: agent.id, ...body }) });
-    if (result?.models) agent.catalog = { ...agent.catalog, ...result, models: result.models };
-    else if (result && typeof result === 'object') agent.catalog = { ...agent.catalog, ...result };
-    toast('模型显示设置已保存');
-  } catch (error) {
-    agent.catalog = before;
-    toast(error.message);
-  } finally {
-    ui.inventorySaving = false;
-    redrawInventory();
-  }
-}
-
 function visibilityPayload(agent) {
   const models = agent.catalog?.models || [];
   if (agent.catalog?.only) return { shown: models.filter(model => !modelIsHidden(agent, model)).map(model => model.id) };
@@ -535,26 +558,23 @@ function visibilityPayload(agent) {
 }
 
 function toggleModelVisibility(agentId, modelId) {
-  const agent = ui.status?.agents?.find(item => item.id === agentId);
+  const agent = inventoryAgent(agentId);
   const model = agent?.catalog?.models?.find(item => item.id === modelId);
   if (!agent?.catalog || !model || model.inUse || model.own || ui.inventorySaving) return;
-  const before = inventorySnapshot(agent);
   model.hidden = !model.hidden;
-  saveInventoryChange(agent, visibilityPayload(agent), before);
+  redrawInventory();
 }
 
 function toggleInventoryFlag(agentId, flag) {
-  const agent = ui.status?.agents?.find(item => item.id === agentId);
+  const agent = inventoryAgent(agentId);
   if (!agent?.catalog || ui.inventorySaving) return;
-  const before = inventorySnapshot(agent);
   if (flag === 'only') agent.catalog.only = !agent.catalog.only;
   if (flag === 'own') agent.catalog.ownHidden = !agent.catalog.ownHidden;
-  const body = flag === 'only' ? { only: agent.catalog.only } : { ownHidden: agent.catalog.ownHidden };
-  saveInventoryChange(agent, body, before);
+  redrawInventory();
 }
 
 function bulkInventory(agentId, action) {
-  const agent = ui.status?.agents?.find(item => item.id === agentId);
+  const agent = inventoryAgent(agentId);
   const models = agent?.catalog?.models || [];
   if (!agent?.catalog || ui.inventorySaving) return;
   if (ui.inventoryBulk !== action) {
@@ -563,34 +583,39 @@ function bulkInventory(agentId, action) {
     return;
   }
   ui.inventoryBulk = null;
-  const before = inventorySnapshot(agent);
   for (const model of models) {
     if (model.inUse || model.own || isRoutingGroup(model)) continue;
     model.hidden = action === 'hide';
   }
-  saveInventoryChange(agent, visibilityPayload(agent), before);
+  redrawInventory();
 }
 
 function moveInventoryModel(agentId, modelId, direction) {
-  const agent = ui.status?.agents?.find(item => item.id === agentId);
+  const agent = inventoryAgent(agentId);
   const models = agent?.catalog?.models || [];
   const shown = models.filter(model => !modelIsHidden(agent, model) && !isRoutingGroup(model));
   const index = shown.findIndex(model => model.id === modelId);
   if (!agent?.catalog || index < 0 || ui.inventorySaving) return;
   const target = index + (direction === 'up' ? -1 : 1);
   if (target < 0 || target >= shown.length) return;
-  const before = inventorySnapshot(agent);
   [shown[index], shown[target]] = [shown[target], shown[index]];
   // Swap only ordinary model slots, retaining advanced entries and hidden entries in place.
   let position = 0;
   models.splice(0, models.length, ...models.map(model => !modelIsHidden(agent, model) && !isRoutingGroup(model) ? shown[position++] : model));
-  saveInventoryChange(agent, { order: models.filter(model => !modelIsHidden(agent, model)).map(model => model.id) }, before);
+  redrawInventory();
 }
 
 function openModelInventory(id) {
-  const agent = ui.status?.agents?.find(item => item.id === id);
+  let agent = ui.status?.agents?.find(item => item.id === id);
   if (!agent || !ui.status?.ready) return;
-  if (ui.inventory !== id) { ui.inventoryQuery = ''; ui.inventoryTab = 'all'; ui.inventoryBulk = null; }
+  if (ui.inventoryEditor && !inventoryDirty() && !ui.inventorySaving && !agent.catalog) ui.inventoryEditor = null;
+  if (ui.inventory !== id) { ui.inventoryQuery = ''; ui.inventoryTab = 'all'; ui.inventoryBulk = null; ui.inventoryEditor = null; ui.inventoryLeaving = false; }
+  if (!ui.inventoryEditor && agent.catalog) ui.inventoryEditor = { id, before: inventorySnapshot(agent), catalog: inventorySnapshot(agent), error: '' };
+  if (ui.inventoryEditor && !inventoryDirty() && !ui.inventorySaving && agent.catalog) {
+    ui.inventoryEditor.before = inventorySnapshot(agent);
+    ui.inventoryEditor.catalog = inventorySnapshot(agent);
+  }
+  agent = inventoryAgent(id);
   ui.inventory = id;
   const warning = agent.needsRepair ? '配置已变化，请重新核对' : !agent.connected ? '接入后可添加以下模型' : '';
   const catalog = agent.catalog;
@@ -605,6 +630,14 @@ function openModelInventory(id) {
   const bulkLabel = action => ui.inventoryBulk === action ? (action === 'hide' ? '再次点击隐藏未使用' : '再次点击显示全部') : (action === 'hide' ? '隐藏未使用' : '显示全部');
   overlay.innerHTML = `<div class="scrim"><section class="modal inventory-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-title"><div class="recommendation-header"><button class="icon-button modal-close" data-close aria-label="关闭">${icon('close')}</button><h2 id="inventory-title">${escapeHTML(agent.name)} · 模型</h2><p class="inventory-intro">在这里管理 Agent 模型列表；切换只影响显示，不改变模型路由。</p>${warning ? `<p class="inventory-warning">${warning}</p>` : ''}${ownSwitch}${onlySwitch}<input id="inventory-search" type="search" aria-label="搜索模型" placeholder="搜索模型" value="${escapeHTML(ui.inventoryQuery || '')}">${tabs}</div><div class="recommendation-body">${modelFlow(agent, false, { tab })}${!agent.catalog ? `<p class="model-empty" role="status">${escapeHTML(agent.catalogError || '正在读取模型…')}</p>` : ''}<p class="model-empty" data-flow-empty hidden>没有找到匹配的模型</p>${id === 'codex' && agent.loginMode === 'api' ? '<details class="inventory-note"><summary>原生模型说明</summary><p>Codex 原生模型由当前登录方式提供；API 接入时，具体可用模型以当前账号返回的列表为准。</p></details>' : ''}</div><div class="recommendation-footer"><div class="inventory-bulk-actions"><button type="button" class="text-button" data-inventory-bulk="hide" data-agent-id="${escapeHTML(agent.id)}" ${ui.inventorySaving ? 'disabled' : ''}>${bulkLabel('hide')}</button><span>·</span><button type="button" class="text-button" data-inventory-bulk="show" data-agent-id="${escapeHTML(agent.id)}" ${ui.inventorySaving ? 'disabled' : ''}>${bulkLabel('show')}</button></div><div class="modal-actions"><button class="button secondary" data-close>返回</button></div></div></section></div>`;
   document.body.classList.add('overlay-open');
+  const footer = overlay.querySelector('.inventory-modal .modal-actions');
+  if (footer) footer.innerHTML = ui.inventoryLeaving
+    ? '<button class="button secondary" data-inventory-stay>继续编辑</button><button class="button secondary" data-inventory-discard>放弃修改</button>'
+    : `<button class="button secondary" data-close ${ui.inventorySaving ? 'disabled' : ''}>${inventoryDirty() ? '取消' : '返回'}</button><button class="button primary" data-inventory-save ${!inventoryDirty() || ui.inventorySaving ? 'disabled' : ''}>${ui.inventorySaving ? '保存中…' : '保存'}</button>`;
+  if (ui.inventoryEditor?.error) {
+    const error = document.createElement?.('p');
+    if (error) { error.className = 'inventory-warning'; error.setAttribute('role', 'alert'); error.textContent = ui.inventoryEditor.error; overlay.querySelector('.recommendation-body')?.prepend(error); }
+  }
   filterModelInventory();
 }
 
@@ -840,10 +873,14 @@ function render() {
 }
 
 function closeOverlay() {
+  if (ui.inventorySaving) return;
+  if (ui.inventory && inventoryDirty() && !ui.inventoryDiscarding) { ui.inventoryLeaving = true; redrawInventory(); return; }
   if (ui.capabilities?.leavingBusy) return;
   if (ui.page !== 'capabilities') ui.capabilities = null;
   ui.capabilityNext = null;
   ui.inventory = null;
+  ui.inventoryEditor = null;
+  ui.inventoryLeaving = false;
   ui.inventoryQuery = '';
   ui.setup = null;
   ui.disconnect = null;
@@ -1389,6 +1426,9 @@ app.addEventListener('submit', event => {
   configureConnection({ base: values.get('base'), key: values.get('key') });
 });
 overlay.addEventListener('click', event => {
+  if (event.target.closest('[data-inventory-save]')) { saveInventoryDraft(); return; }
+  if (event.target.closest('[data-inventory-stay]')) { ui.inventoryLeaving = false; redrawInventory(); return; }
+  if (event.target.closest('[data-inventory-discard]')) { ui.inventoryDiscarding = true; closeOverlay(); ui.inventoryDiscarding = false; return; }
   const visibility = event.target.closest('[data-model-visibility]');
   if (visibility) { event.preventDefault?.(); toggleModelVisibility(visibility.dataset.agentId, visibility.dataset.modelId); return; }
   const move = event.target.closest('[data-model-move]');

@@ -28,7 +28,14 @@ async function setup(state, handler) {
       if (route === '/runtime/agents/models') {
         const body = JSON.parse(options.body); synced.set(body.agent, body);
         const result = await handler?.(route, options);
-        return {ok:result?.ok !== false,status:result?.status || 200,json:async()=>result?.body || {}};
+        const catalog = JSON.parse(JSON.stringify(state.agents?.find(a=>a.id===body.agent)?.catalog || inventory()));
+        for (const op of body.operations || []) {
+          if ('only' in op) catalog.only=op.only;
+          if ('ownHidden' in op) catalog.ownHidden=op.ownHidden;
+          if (op.hidden) catalog.models.forEach(m=>m.hidden=op.hidden.includes(m.id));
+          if (op.shown) catalog.models.forEach(m=>m.hidden=!op.shown.includes(m.id));
+        }
+        return {ok:result?.ok !== false,status:result?.status || 200,json:async()=>result?.body || (body.operations ? catalog : {})};
       }
       const result = await handler?.(route, options);
       if (result) {
@@ -79,13 +86,15 @@ test('inventory toggles model visibility inline without opening native settings'
   const target = { closest: selector => selector === '[data-model-visibility]' ? { dataset: { agentId: 'codex', modelId: 'acu-runtime/gpt-6.1-sol' } } : null };
   instance.listeners.overlay.click({ target });
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(posts(instance).length, 0);
+  await instance.run('saveInventoryDraft()');
   const writes = posts(instance);
   assert.equal(writes.at(-1).route, '/runtime/agents/models');
-  assert.deepEqual(JSON.parse(writes.at(-1).body), { agent: 'codex', hidden: ['acu-runtime/gpt-6.1-sol', 'acu-runtime/image'] });
+  assert.deepEqual(JSON.parse(writes.at(-1).body).operations, [{ hidden: ['acu-runtime/gpt-6.1-sol', 'acu-runtime/image'] }]);
   assert.equal(instance.elements.overlay.innerHTML.includes('data-native-model-list'), false);
 });
 test('Codex inventory flags and order use safe Runtime writes without a setup detour', async () => {
-  const instance = await setup({ ready: true, desktop: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] });
+  const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] });
   instance.run('openModelInventory("codex")');
   for (const [command, expected] of [
     ['toggleInventoryFlag("codex", "only")', { agent: 'codex', only: true }],
@@ -95,19 +104,67 @@ test('Codex inventory flags and order use safe Runtime writes without a setup de
   ]) {
     instance.run(command);
     await new Promise(resolve => setImmediate(resolve));
-    const write = posts(instance).at(-1);
-    assert.equal(write.route, '/runtime/agents/models');
-    assert.deepEqual(JSON.parse(write.body), expected);
+    assert.equal(posts(instance).length, 0);
   }
+  await instance.run('saveInventoryDraft()');
+  assert.equal(posts(instance).length, 1);
+  assert.equal(posts(instance)[0].route, '/runtime/agents/models');
   assert(!posts(instance).some(call => call.route.startsWith('/kernel/api/agent-models/')));
   assert(!posts(instance).some(call => call.route === '/runtime/agents/configure'));
 });
-test('failed safe inventory write restores the previous selection', async () => {
+test('failed inventory batch retains draft for retry without changing saved selection', async () => {
   const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] }, async route => route === '/runtime/agents/models' ? { ok: false, status: 409, body: { error: 'fixture write failed' } } : undefined);
   instance.run('openModelInventory("codex"); toggleInventoryFlag("codex", "only")');
+  await instance.run('saveInventoryDraft()');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(instance.run('!!ui.status.agents[0].catalog.only'), false);
   assert.equal(instance.run('ui.inventorySaving'), false);
+  assert.equal(instance.run('ui.inventoryEditor.catalog.only'), true);
+  assert.equal(instance.run('ui.inventoryEditor.error'), 'fixture write failed');
+});
+test('inventory drafts survive status polling and can be discarded without a write', async () => {
+  const state = { ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] };
+  const instance = await setup(state);
+  instance.run('openModelInventory("codex"); toggleInventoryFlag("codex", "only")');
+  state.agents = [{ ...state.agents[0], restartRequired: true, catalog: inventory() }];
+  await instance.refresh();
+  assert.equal(instance.run('ui.inventoryEditor.catalog.only'), true);
+  assert.equal(instance.run('!!ui.status.agents[0].catalog.only'), false);
+  instance.run('closeOverlay()');
+  assert.equal(instance.run('ui.inventoryLeaving'), true);
+  assert.equal(instance.run('ui.inventory'), 'codex');
+  instance.run('ui.inventoryDiscarding = true; closeOverlay(); ui.inventoryDiscarding = false');
+  assert.equal(instance.run('ui.inventory'), null);
+  assert.equal(posts(instance).length, 0);
+});
+test('reverting a draft avoids a write and ordering alone does not rewrite visibility', async () => {
+  const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] });
+  instance.run('openModelInventory("codex"); toggleInventoryFlag("codex", "only"); toggleInventoryFlag("codex", "only")');
+  assert.equal(instance.run('inventoryDirty()'), false);
+  await instance.run('saveInventoryDraft()');
+  assert.equal(posts(instance).length, 0);
+  instance.run('moveInventoryModel("codex", "acu-runtime/gpt-6.1-sol", "up")');
+  assert.equal(instance.run('inventoryOperations().length'), 1);
+  assert.equal(instance.run('Object.keys(inventoryOperations()[0])[0]'), 'order');
+});
+test('inventory blocks duplicate saves, polling and dismissal while the batch is running', async () => {
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] }, async route => route === '/runtime/agents/models' ? pending : undefined);
+  instance.run('openModelInventory("codex"); toggleInventoryFlag("codex", "only")');
+  const saving = instance.run('saveInventoryDraft()');
+  await instance.run('saveInventoryDraft()');
+  instance.run('closeOverlay(); toggleInventoryFlag("codex", "own")');
+  const reads = instance.calls.length;
+  await instance.refresh();
+  assert.equal(instance.calls.length, reads);
+  assert.equal(instance.run('ui.inventory'), 'codex');
+  assert.equal(instance.run('!!ui.inventoryEditor.catalog.ownHidden'), false);
+  assert.equal(posts(instance).length, 1);
+  finish({body:{...inventory(),only:true}});
+  await saving;
+  assert.equal(instance.run('ui.inventorySaving'), false);
+  assert.equal(instance.run('inventoryDirty()'), false);
 });
 test('disconnected and drifted Agents never claim their catalog was added', async () => {
   for (const [connected, needsRepair, label] of [[false, false, '可添加'], [true, true, '待核对']]) {
@@ -598,7 +655,8 @@ test('ordinary inventory excludes routing groups and bulk actions preserve their
   assert(!html.includes('自动选择'));
   instance.run('bulkInventory("codex", "hide"); bulkInventory("codex", "hide")');
   await new Promise(resolve => setImmediate(resolve));
-  const payload = JSON.parse(posts(instance).at(-1).body);
+  assert.equal(posts(instance).length, 0);
+  const payload = instance.run('inventoryOperations()[0]');
   assert(!payload.hidden.includes('auto/image'));
   assert(payload.hidden.includes('auto/hidden'));
 });

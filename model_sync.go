@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -198,12 +199,14 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 
 func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Agent     string    `json:"agent"`
-		Hidden    *[]string `json:"hidden"`
-		Shown     *[]string `json:"shown"`
-		Only      *bool     `json:"only"`
-		OwnHidden *bool     `json:"ownHidden"`
-		Order     *[]string `json:"order"`
+		Agent      string             `json:"agent"`
+		Hidden     *[]string          `json:"hidden"`
+		Shown      *[]string          `json:"shown"`
+		Only       *bool              `json:"only"`
+		OwnHidden  *bool              `json:"ownHidden"`
+		Order      *[]string          `json:"order"`
+		Operations []catalogOperation `json:"operations"`
+		Expected   *agentCatalog      `json:"expected"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&input) != nil {
 		host.json(w, 400, map[string]string{"error": "无法读取模型列表"})
@@ -219,6 +222,22 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 		host.json(w, 400, map[string]string{"error": "请选择支持的应用"})
 		return
 	}
+	if len(input.Operations) > 5 {
+		host.json(w, 400, map[string]string{"error": "模型列表修改过多"})
+		return
+	}
+	for _, operation := range input.Operations {
+		fields := 0
+		for _, present := range []bool{operation.Hidden != nil, operation.Shown != nil, operation.Only != nil, operation.OwnHidden != nil, operation.Order != nil} {
+			if present {
+				fields++
+			}
+		}
+		if fields != 1 {
+			host.json(w, 400, map[string]string{"error": "模型列表修改格式无效"})
+			return
+		}
+	}
 	if input.Agent == "codex" && !host.allowCodexDesktopChange(w) {
 		return
 	}
@@ -226,6 +245,23 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	var result map[string]any
 	err := host.catalogMutation(ctx, func(k *kernelState) error {
+		if input.Expected != nil {
+			var current agentCatalog
+			if err := k.exchange(ctx, "GET", "/api/agent-models/"+input.Agent, nil, &current); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(current, *input.Expected) {
+				return errors.New("模型列表已在其他位置变化，请取消后重新打开再修改")
+			}
+		}
+		if len(input.Operations) > 0 {
+			for _, operation := range input.Operations {
+				if err := k.exchange(ctx, "POST", "/api/agent-models/"+input.Agent, operation, nil); err != nil {
+					return err
+				}
+			}
+			return k.exchange(ctx, "GET", "/api/agent-models/"+input.Agent, nil, &result)
+		}
 		body := map[string]any{}
 		if input.Hidden != nil {
 			body["hidden"] = *input.Hidden
@@ -249,4 +285,12 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host.json(w, 200, result)
+}
+
+type catalogOperation struct {
+	Hidden    *[]string `json:"hidden,omitempty"`
+	Shown     *[]string `json:"shown,omitempty"`
+	Only      *bool     `json:"only,omitempty"`
+	OwnHidden *bool     `json:"ownHidden,omitempty"`
+	Order     *[]string `json:"order,omitempty"`
 }

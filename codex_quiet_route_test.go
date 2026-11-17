@@ -196,6 +196,33 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	if !found {
 		t.Fatal("new model was not visible after quiet native sync")
 	}
+	batchStarted := time.Now()
+	batchBody, _ := json.Marshal(map[string]any{"agent": "codex", "expected": syncedCatalog, "operations": []map[string]any{
+		{"only": true}, {"shown": []string{"acu-runtime/acu-auto"}}, {"ownHidden": true}, {"order": []string{"acu-runtime/acu-auto"}},
+	}})
+	batchResponse := httptest.NewRecorder()
+	host.syncAgentModels(batchResponse, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(string(batchBody))).WithContext(ctx))
+	if batchResponse.Code != 200 {
+		t.Fatalf("quiet native batch: %d %s", batchResponse.Code, batchResponse.Body)
+	}
+	var saved agentCatalog
+	if err := json.Unmarshal(batchResponse.Body.Bytes(), &saved); err != nil || !saved.Only || !saved.OwnHidden {
+		t.Fatalf("batch flags not saved: %s", batchResponse.Body)
+	}
+	for _, model := range saved.Models {
+		if model.ID == "acu-runtime/second-model" && !model.Hidden {
+			t.Fatal("batch did not hide unselected model")
+		}
+	}
+	t.Logf("Verified four Codex catalog operations in one safe transaction in %s", time.Since(batchStarted).Round(time.Millisecond))
+	restoreBody, _ := json.Marshal(map[string]any{"agent": "codex", "expected": saved, "operations": []map[string]any{
+		{"only": false}, {"hidden": []string{}}, {"ownHidden": false}, {"order": []string{}},
+	}})
+	restoreResponse := httptest.NewRecorder()
+	host.syncAgentModels(restoreResponse, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(string(restoreBody))).WithContext(ctx))
+	if restoreResponse.Code != 200 {
+		t.Fatalf("quiet native batch restore: %d %s", restoreResponse.Code, restoreResponse.Body)
+	}
 	for _, mode := range []string{"api", "chatgpt", ""} {
 		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"login", mode}}, false)
 		if err != nil {

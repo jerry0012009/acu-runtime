@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -105,6 +106,36 @@ func TestNativeCatalogManagementSync(t *testing.T) {
 			return err
 		}
 		host := &server{kernel: k}
+		var before agentCatalog
+		if err := k.exchange(ctx, "GET", "/api/agent-models/workbuddy", nil, &before); err != nil {
+			return err
+		}
+		body, _ := json.Marshal(map[string]any{"agent": "workbuddy", "expected": before, "operations": []map[string]any{
+			{"only": true}, {"shown": []string{"acu-runtime/acu-auto", "acu-runtime/gemini-4-carbon"}},
+			{"ownHidden": true}, {"order": []string{"acu-runtime/gemini-4-carbon", "acu-runtime/acu-auto"}},
+		}})
+		w := httptest.NewRecorder()
+		host.syncAgentModels(w, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(string(body))))
+		if w.Code != 200 {
+			t.Fatalf("native batch: %d %s", w.Code, w.Body)
+		}
+		var batch agentCatalog
+		if err := k.exchange(ctx, "GET", "/api/agent-models/workbuddy", nil, &batch); err != nil {
+			return err
+		}
+		if !batch.Only || !batch.OwnHidden || len(batch.Models) == 0 || batch.Models[0].ID != "acu-runtime/gemini-4-carbon" {
+			t.Fatalf("native batch not applied: %+v", batch)
+		}
+		for _, m := range batch.Models {
+			if m.ID == "acu-runtime/claude-fable-5-2" && !m.Hidden {
+				t.Fatal("unselected model still shown")
+			}
+		}
+		for _, operation := range []map[string]any{{"only": false}, {"hidden": []string{}}, {"ownHidden": false}, {"order": []string{}}} {
+			if err := k.exchange(ctx, "POST", "/api/agent-models/workbuddy", operation, nil); err != nil {
+				return err
+			}
+		}
 		defs := []struct{ name, path string }{{"acu-vision", "vision"}, {"acu-image", "image"}, {"acu-search", "web-search"}}
 		for round := 0; round < 2; round++ {
 			start := time.Now()
@@ -205,5 +236,54 @@ func TestModelSyncPreservesEveryNativeInventoryOperation(t *testing.T) {
 				t.Fatalf("native result lost: status=%d body=%s", w.Code, w.Body)
 			}
 		})
+	}
+}
+
+func TestModelBatchUsesNativeOperationsInOrderAndReadsBack(t *testing.T) {
+	var writes []map[string]any
+	reads := 0
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/agent-models/codex" {
+			t.Fatal(r.URL.Path)
+		}
+		if r.Method == "GET" {
+			reads++
+			json.NewEncoder(w).Encode(agentCatalog{Models: []agentCatalogModel{}})
+			return
+		}
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		writes = append(writes, body)
+		io.WriteString(w, `{}`)
+	}))
+	w := httptest.NewRecorder()
+	host.syncAgentModels(w, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(`{"agent":"codex","expected":{"models":[]},"operations":[{"only":true},{"shown":[]},{"ownHidden":true},{"order":[]}]}`)))
+	if w.Code != 200 || reads != 2 || len(writes) != 4 {
+		t.Fatalf("status=%d reads=%d writes=%v body=%s", w.Code, reads, writes, w.Body)
+	}
+	for i, field := range []string{"only", "shown", "ownHidden", "order"} {
+		if _, ok := writes[i][field]; !ok {
+			t.Fatalf("operation %d lost %s", i, field)
+		}
+	}
+}
+
+func TestModelBatchRejectsConflictAndAmbiguousOperationsBeforeWrites(t *testing.T) {
+	for _, body := range []string{
+		`{"agent":"codex","expected":{"models":[],"only":true},"operations":[{"only":false}]}`,
+		`{"agent":"codex","operations":[{"only":true,"hidden":[]}]}`,
+		`{"agent":"codex","operations":[{}]}`,
+	} {
+		host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "GET" {
+				t.Fatal("conflicting batch wrote native settings")
+			}
+			io.WriteString(w, `{"models":[]}`)
+		}))
+		w := httptest.NewRecorder()
+		host.syncAgentModels(w, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(body)))
+		if w.Code != 400 && w.Code != 409 {
+			t.Fatalf("status=%d body=%s", w.Code, w.Body)
+		}
 	}
 }
