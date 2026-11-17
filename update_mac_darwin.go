@@ -380,7 +380,10 @@ func launchUpdatedMac(ctx context.Context, target, version, kernel string) (*os.
 			e = json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&status)
 			response.Body.Close()
 			if e == nil && status.PID == command.Process.Pid && status.Desktop && status.Ready && status.Version == version && status.Update.Kernel == kernel {
-				return command.Process, nil
+				serving, probeErr := readServingKernel(ctx)
+				if probeErr == nil && !desktopVersionNewer(kernel, serving.Version) {
+					return command.Process, nil
+				}
 			}
 		}
 		select {

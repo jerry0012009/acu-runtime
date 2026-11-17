@@ -1,3 +1,16 @@
+## Runtime 0.1.113 Mac Update Installation
+
+Mac arm64/amd64 can check, download and install an architecture-matched official
+app.zip after confirmation. Complete ZIP SHA256, application identity/version,
+bundle signature integrity, Mach-O architecture and packaged kernel are checked
+before quit. A detached helper waits for the exact old process, retains a full
+backup, replaces the bundle on the same volume, then checks the new PID, app
+version, ready state and serving kernel. Failed startup restores the old bundle.
+Only writable real app locations are accepted; DMG/translocation paths fail
+without changing the install. No password collection or permission bypass.
+Older clients must manually install 0.1.113 once. See ACCEPTANCE-0113.md for
+native platform evidence. Historical sections below retain their dated limits.
+
 ## Runtime 0.1.112 / Magpie 0.1.4350
 
 The user-side package pins official Magpie 0.1.4350, with all four CLI hashes
