@@ -1,4 +1,17 @@
-## Runtime 0.1.84 / Magpie 0.1.4248
+## Runtime 0.1.112 / Magpie 0.1.4350
+
+The user-side package pins official Magpie 0.1.4350, with all four CLI hashes
+and Windows GUI migration hashes from its official SHA256SUMS. Linux isolated
+tests passed for all four Agent writers, model refresh, original MCP preservation,
+shared image/video settings, default/explicit video routing and four MCP tool
+lists. The release workflow repeats packaged-kernel compatibility natively on
+Windows x64 and both Macs, and upgrades current Runtime 0.1.111 on clean Windows
+while checking config/auth preservation and the actual serving kernel version.
+See ACCEPTANCE-0112.md for final platform publication status and limitations.
+Custom independent kernel installations are not overwritten or downgraded;
+older running independent Mac gateways need their own update or explicit exit.
+
+## Historical Runtime 0.1.84 / Magpie 0.1.4248
 
 The default video model is the native `videoGen` setting, shared with the kernel
 settings page and CLI. Runtime reads native videoGenModels/videoGenAuto and writes

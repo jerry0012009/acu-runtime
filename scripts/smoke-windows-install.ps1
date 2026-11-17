@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Installer, [string]$PreviousInstaller)
+param([Parameter(Mandatory=$true)][string]$Installer, [string]$PreviousInstaller, [string]$PreviousVersion = '0.1.70')
 $ErrorActionPreference = 'Stop'
 $target = Join-Path $env:LOCALAPPDATA 'Programs/ACU Runtime'
 if (Test-Path -LiteralPath $target) { throw 'Clean runner required: Runtime already exists' }
@@ -22,7 +22,7 @@ $configHashes = @{}
 if ($PreviousInstaller) {
     $previous = Start-Process -FilePath (Resolve-Path -LiteralPath $PreviousInstaller).Path -ArgumentList @('--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
     if (!$previous.WaitForExit(60000) -or $previous.ExitCode -ne 0) { throw 'Previous release installation failed' }
-    $old = Wait-InstalledRuntime '0.1.70'
+    $old = Wait-InstalledRuntime $PreviousVersion
     $codexConfig = Join-Path $env:USERPROFILE '.codex/config.toml'
     if (!(Test-Path -LiteralPath $codexConfig)) {
         New-Item -ItemType Directory -Force (Split-Path $codexConfig -Parent) | Out-Null

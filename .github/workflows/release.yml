@@ -182,9 +182,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          python scripts/download-release.py jerry0012009/acu-runtime v0.1.70 ACU-Runtime-0.1.70-windows-amd64-Setup.exe bda3e5815402b3286131a332962254906c8603dcb4cd64cfc025ccb94eacaf86 dist/previous-setup.exe
+          python scripts/download-release.py jerry0012009/acu-runtime v0.1.111 ACU-Runtime-0.1.111-windows-amd64-Setup.exe 28b86b4fe109ea1ec3d81f6b69d5b96fe318f09e33ce982dce59dec3ff8a84ba dist/previous-setup.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/smoke-windows-install.ps1 -Installer 'dist/windows-amd64/ACU Runtime Setup.exe' -PreviousInstaller 'dist/previous-setup.exe'
+          ./scripts/smoke-windows-install.ps1 -Installer 'dist/windows-amd64/ACU Runtime Setup.exe' -PreviousInstaller 'dist/previous-setup.exe' -PreviousVersion '0.1.111'
       - name: Verify packaged kernel and Runtime API compatibility
         shell: bash
         run: |

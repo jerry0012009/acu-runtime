@@ -30,9 +30,9 @@ func upgradeOldGateway(ctx context.Context, info servingKernel) error {
 	if !strings.EqualFold(filepath.Clean(actual), filepath.Clean(target)) {
 		return errors.New("正在运行的内核位于自定义目录，无法安全完成自动升级")
 	}
-	asset, digest := "magpie-windows-amd64.exe", "40384096cd62c1443a3bd90d9573ad3ddfd6b7e56029897d89855987eaff79b1"
+	asset, digest := "magpie-windows-amd64.exe", "6a3762ed01c0e832dee5f03383d77bf1b513fdd8b6802bf0c54e94b800d4269b"
 	if runtime.GOARCH == "arm64" {
-		asset, digest = "magpie-windows-arm64.exe", "7e7985e7f114cc1df8f607b4b2dd42192f7d5138ef0699e9dffbb1a0d5918ef5"
+		asset, digest = "magpie-windows-arm64.exe", "bd5dc9d0c920d95219fafccf696cdd7b757e36ee43431a16ffba10e957434047"
 	}
 	cache := filepath.Join(filepath.Dir(managedKernelPath()), asset)
 	if !verifyKernel(cache, digest) {
