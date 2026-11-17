@@ -211,6 +211,9 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 		if err = brandCodexProvider(); err != nil {
 			return nil, errors.New("无法保存 Codex 显示名称，请重试")
 		}
+		if err = configureCodexGeminiTools(); err != nil {
+			return nil, errors.New("无法保存 Gemini 工具配置，正在恢复原配置")
+		}
 	}
 	model := probeModel
 	for _, c := range changes {

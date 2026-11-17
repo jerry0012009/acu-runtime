@@ -90,6 +90,16 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 	if model != "" && config.Config.Model != model {
 		return errors.New("Codex 读取的模型与所选模型不一致")
 	}
+	if model == "acu-runtime/gemini-4-hydrogen" {
+		name := "codex-code-mode-host"
+		if filepath.Ext(executable) == ".exe" {
+			name += ".exe"
+		}
+		info, hostErr := os.Stat(filepath.Join(filepath.Dir(executable), name))
+		if hostErr != nil || !info.Mode().IsRegular() {
+			return errors.New("当前 Codex 缺少配套 Code Mode 组件，请更新 ChatGPT / Codex 后再选择 Gemini")
+		}
+	}
 	if model == "" {
 		return verifyCodexAuthUnchanged(authPath, authBefore, authErr)
 	}

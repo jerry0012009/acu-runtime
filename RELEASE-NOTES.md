@@ -1,4 +1,10 @@
-# ACU Runtime 0.1.116
+# ACU Runtime 0.1.117
+
+Windows 通过 Runtime 选择 ACU Gemini Hydrogen 或保存 Codex 模型列表时，在已有安全配置事务内补齐该模型的 Codex Code Mode 工具模式，保留原生工具与动态搜索，不启用 Responses Lite。仅作用于官方内核管理的 ACU Hydrogen 条目，不改其他模型、自定义目录、登录或用户显式工具模式。
+
+选择 Hydrogen 时检查已安装 Codex 是否有配套官方 Code Mode host；缺失则提示更新并恢复本次配置。升级后请保存工作，先在 Runtime 重新选择 Hydrogen，再手动完全重开 ChatGPT / Codex。旧会话可继续测试。服务端仅保留通过验收的 Hydrogen 原生供给，Carbon / Argon 暂不可用。未在客户 Windows 桌面完成实际业务验收；不保证所有插件或供给时刻可用。
+
+## 保留 0.1.116 的模型列表统一保存
 
 模型列表改为统一保存：连续勾选显示/隐藏、调整“只显示我勾选的模型”、原生模型开关和排序时即时更新选择，点击“保存”后一次提交。Windows 将全部修改放在同一轮现有安全事务中，避免每点一个开关都等待内核暂停、校验与恢复；保存本身仍需等待安全检查完成。
 
