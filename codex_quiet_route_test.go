@@ -79,7 +79,32 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 			return probeCodexConfiguration(ctx, probeExecutable, model)
 		}
 	}
+	baseValidate := k.codexValidate
+	k.codexValidate = func(ctx context.Context, model string) error {
+		// The signed-in route has no local catalog: its model list is
+		// fetched from the gateway, which must be running during the probe.
+		serving, err := readServingKernel(ctx)
+		if err != nil {
+			return err
+		}
+		k.mu.Lock()
+		command := k.process
+		k.mu.Unlock()
+		if command == nil || command.Process == nil || uint32(command.Process.Pid) != serving.PID {
+			t.Error("Codex validation ran without the owned gateway")
+			return context.Canceled
+		}
+		if baseValidate != nil {
+			return baseValidate(ctx, model)
+		}
+		return validateInstalledCodex(ctx, model)
+	}
 	defaultValidate := k.codexValidate
+	validationCalls := 0
+	k.codexValidate = func(ctx context.Context, model string) error {
+		validationCalls++
+		return defaultValidate(ctx, model)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
 	defer cancel()
 	defer func() {
@@ -224,10 +249,15 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatalf("quiet native batch restore: %d %s", restoreResponse.Code, restoreResponse.Body)
 	}
 	for _, mode := range []string{"api", "chatgpt", ""} {
+		callsBefore := validationCalls
 		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"login", mode}}, false)
 		if err != nil {
 			t.Fatal("native login change", mode, err)
 		}
+		if validationCalls != callsBefore+1 {
+			t.Fatal("login change skipped native validation")
+		}
+		assertLogin(state, mode)
 		state, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false)
 		if err != nil {
 			t.Fatal("model change with native login", mode, err)

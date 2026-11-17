@@ -63,6 +63,12 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 			}
 		}
 	}
+	model := probeModel
+	for _, change := range changes {
+		if change.Field == "model" {
+			model = change.Value
+		}
+	}
 	snapshot, err := snapshotCodexRoute(executable)
 	if err != nil {
 		return nil, errors.New("无法备份 Codex 配置，未更改配置")
@@ -133,7 +139,21 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 			return
 		}
 		if resultErr == nil {
-			result, resultErr = k.readState(recovery)
+			// Signed-in Codex reads Magpie's live /models endpoint. Validate
+			// only after the replacement gateway serves the complete route.
+			validate := k.codexValidate
+			if validate == nil {
+				validate = validateInstalledCodex
+			}
+			if model != "" {
+				resultErr = validate(ctx, model)
+			}
+			if resultErr == nil {
+				resultErr = verifyCodexAuthUnchanged(authPath, authBefore, authErr)
+			}
+			if resultErr == nil {
+				result, resultErr = k.readState(recovery)
+			}
 			if resultErr == nil && (len(changes) > 0 || disconnect) {
 				resultErr = verifyCodexRouteState(result, changes, disconnect)
 			}
@@ -160,7 +180,7 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 					resultErr = errors.New("配置已恢复，内核恢复连接失败，请重新打开 Runtime")
 					return
 				}
-				resultErr = errors.New("未确认 Codex 配置生效，已恢复原配置")
+				resultErr = errors.New(resultErr.Error() + "；已恢复原配置")
 			}
 		}
 	}()
@@ -213,21 +233,6 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 		}
 		if err = configureCodexGeminiTools(); err != nil {
 			return nil, errors.New("无法保存 Gemini 工具配置，正在恢复原配置")
-		}
-	}
-	model := probeModel
-	for _, c := range changes {
-		if c.Field == "model" {
-			model = c.Value
-		}
-	}
-	validate := k.codexValidate
-	if validate == nil {
-		validate = validateInstalledCodex
-	}
-	if model != "" {
-		if err = validate(ctx, model); err != nil {
-			return nil, err
 		}
 	}
 	if err = verifyCodexAuthUnchanged(authPath, authBefore, authErr); err != nil {
