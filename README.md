@@ -1,4 +1,4 @@
-Release candidate: **0.1.113** adds verified macOS in-app updates with automatic restart and rollback, retaining official Magpie **v0.1.4350** and existing configuration. See [ACCEPTANCE-0113.md](ACCEPTANCE-0113.md) for platform checks and publication status. Older Mac clients need one manual install to acquire the new updater.
+Release candidate: **0.1.114** adds verified macOS in-app updates with automatic restart and rollback, retaining official Magpie **v0.1.4350** and existing configuration. See [ACCEPTANCE-0114.md](ACCEPTANCE-0114.md) for platform checks and publication status. Older Mac clients need one manual install to acquire the new updater.
 
 Retains 0.1.89's sequential TapNow setup, automatic address/directory copying, native clipboard fallback and receipt-confirmed completion. Same-version setup goes directly to connection. Shared workbenches and GPT-6.1 Sol remain included. See [ACCEPTANCE-0188.md](ACCEPTANCE-0188.md) and the [worktree closeout](INTEGRATION-0190.md).
 
@@ -175,7 +175,7 @@ ChatGPT 使用 OpenAI 官方完整 MSIX（Windows x64/ARM64）或 DMG（macOS）
 
 ### 0.1.52 首页更新与启动通知
 
-桌面窗口启动后自动检查一次 Runtime 正式版；发现新版时显示确认弹窗，取消后首页仍保留入口。用户确认后才下载并校验 SHA-256。Windows 默认安装和 macOS 可写应用目录支持一起替换 Runtime 与配套内核并重启，已有 Key 和 Agent 配置保留。Mac 使用对应架构的 ZIP、完整应用验证及独立替换助手，启动验证失败恢复旧应用；DMG/隔离临时目录和不可写目录不强行覆盖。0.1.112 及更早的 Mac 客户端需先手动安装 0.1.113 一次，之后可应用内更新。配套内核固定为发行版验证版本，不盲目追踪上游 latest，不覆盖自定义独立 Magpie。
+桌面窗口启动后自动检查一次 Runtime 正式版；发现新版时显示确认弹窗，取消后首页仍保留入口。用户确认后才下载并校验 SHA-256。Windows 默认安装和 macOS 可写应用目录支持一起替换 Runtime 与配套内核并重启，已有 Key 和 Agent 配置保留。Mac 使用对应架构的 ZIP、完整应用验证及独立替换助手，启动验证失败恢复旧应用；DMG/隔离临时目录和不可写目录不强行覆盖。0.1.112 及更早的 Mac 客户端需先手动安装 0.1.114 一次，之后可应用内更新。配套内核固定为发行版验证版本，不盲目追踪上游 latest，不覆盖自定义独立 Magpie。
 
 首页低强调更新栏提供检查更新和全部更新。Agent 卡片仅在 Magpie `/api/agents/cli` 明确报告 `update=true` 时显示更新按钮，调用原生 `/api/agents/cli/{id}`，按原来的安装方式更新。Codex CLI 明确标注为 CLI，不能冒充 ChatGPT 桌面版本；WorkBuddy 桌面目前无此原生 CLI 更新接口，继续使用应用内更新。全部更新逐个处理可更新项，保留逐项结果；全成功后才更新 Runtime，失败时不自动退出掩盖错误。
 

@@ -189,7 +189,31 @@ func TestMacNativeUpdateHandoffAndRollback(t *testing.T) {
 					t.Fatal(string(raw))
 				}
 				p, _ := os.FindProcess(result.PID)
-				p.Signal(syscall.SIGTERM)
+				stamp := macProcessStamp(result.PID)
+				serving, probeErr := readServingKernel(ctx)
+				if err = p.Signal(syscall.SIGTERM); err != nil {
+					t.Fatal(err)
+				}
+				deadline := time.Now().Add(20 * time.Second)
+				for macProcessStamp(result.PID) == stamp && time.Now().Before(deadline) {
+					time.Sleep(100 * time.Millisecond)
+				}
+				if macProcessStamp(result.PID) == stamp {
+					t.Fatal("updated Runtime did not finish shutdown")
+				}
+				if probeErr == nil && serving.PID > 1 {
+					kernelStamp := macProcessStamp(int(serving.PID))
+					if kernelStamp != "" {
+						kernelProcess, _ := os.FindProcess(int(serving.PID))
+						_ = kernelProcess.Signal(syscall.SIGTERM)
+						for macProcessStamp(int(serving.PID)) == kernelStamp && time.Now().Before(deadline) {
+							time.Sleep(100 * time.Millisecond)
+						}
+						if macProcessStamp(int(serving.PID)) == kernelStamp {
+							t.Fatal("isolated kernel did not finish shutdown")
+						}
+					}
+				}
 			}
 			if _, err = validateMacBundle(ctx, target, version); err != nil {
 				t.Fatal("installed/restored bundle invalid", err)
