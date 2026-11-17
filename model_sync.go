@@ -198,9 +198,12 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 
 func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Agent  string    `json:"agent"`
-		Hidden []string  `json:"hidden"`
-		Shown  *[]string `json:"shown"`
+		Agent     string    `json:"agent"`
+		Hidden    *[]string `json:"hidden"`
+		Shown     *[]string `json:"shown"`
+		Only      *bool     `json:"only"`
+		OwnHidden *bool     `json:"ownHidden"`
+		Order     *[]string `json:"order"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&input) != nil {
 		host.json(w, 400, map[string]string{"error": "无法读取模型列表"})
@@ -221,11 +224,23 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	var result agentCatalog
+	var result map[string]any
 	err := host.catalogMutation(ctx, func(k *kernelState) error {
-		body := map[string]any{"hidden": input.Hidden}
+		body := map[string]any{}
+		if input.Hidden != nil {
+			body["hidden"] = *input.Hidden
+		}
 		if input.Shown != nil {
-			body = map[string]any{"shown": *input.Shown}
+			body["shown"] = *input.Shown
+		}
+		if input.Only != nil {
+			body["only"] = *input.Only
+		}
+		if input.OwnHidden != nil {
+			body["ownHidden"] = *input.OwnHidden
+		}
+		if input.Order != nil {
+			body["order"] = *input.Order
 		}
 		return k.exchange(ctx, "POST", "/api/agent-models/"+input.Agent, body, &result)
 	})

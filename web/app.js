@@ -515,7 +515,7 @@ async function saveInventoryChange(agent, body, before) {
   ui.inventorySaving = true;
   redrawInventory();
   try {
-    const result = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agent.id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: agent.id, ...body }) });
     if (result?.models) agent.catalog = { ...agent.catalog, ...result, models: result.models };
     else if (result && typeof result === 'object') agent.catalog = { ...agent.catalog, ...result };
     toast('模型显示设置已保存');

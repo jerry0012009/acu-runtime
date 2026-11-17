@@ -1,4 +1,4 @@
-Published release: **0.1.114** adds verified macOS in-app updates with automatic restart and rollback, retaining official Magpie **v0.1.4350** and existing configuration. All three platforms passed; both Macs verified real application replacement, restart, startup checks and launch-failure rollback. See [ACCEPTANCE-0114.md](ACCEPTANCE-0114.md) for evidence. Older Mac clients need one manual install to acquire the new updater.
+Release **0.1.115** fixes Codex model visibility, picked-only mode, native model visibility and ordering through Runtime's existing safe catalog transaction. It retains macOS in-app updates, official Magpie **v0.1.4350** and existing configuration. See [ACCEPTANCE-0114.md](ACCEPTANCE-0114.md) for the previous updater acceptance. Older Mac clients need one manual install to acquire the updater.
 
 Retains 0.1.89's sequential TapNow setup, automatic address/directory copying, native clipboard fallback and receipt-confirmed completion. Same-version setup goes directly to connection. Shared workbenches and GPT-6.1 Sol remain included. See [ACCEPTANCE-0188.md](ACCEPTANCE-0188.md) and the [worktree closeout](INTEGRATION-0190.md).
 

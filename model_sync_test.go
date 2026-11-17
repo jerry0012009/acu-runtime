@@ -172,3 +172,38 @@ func TestModelSyncUsesNativeVisibilityAndRejectsUnknownAgent(t *testing.T) {
 		}
 	}
 }
+
+func TestModelSyncPreservesEveryNativeInventoryOperation(t *testing.T) {
+	for _, payload := range []string{
+		`{"hidden":[]}`, `{"hidden":["acu-runtime/acu-auto"]}`,
+		`{"shown":[]}`, `{"shown":["acu-runtime/acu-auto"]}`,
+		`{"only":true}`, `{"only":false}`,
+		`{"ownHidden":true}`, `{"ownHidden":false}`,
+		`{"order":[]}`, `{"order":["acu-runtime/acu-auto"]}`,
+	} {
+		t.Run(payload, func(t *testing.T) {
+			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || r.URL.Path != "/api/agent-models/codex" {
+					t.Fatalf("unexpected native mutation: %s %s", r.Method, r.URL.Path)
+				}
+				var got, want map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+					t.Fatal(err)
+				}
+				_ = json.Unmarshal([]byte(payload), &want)
+				gotJSON, _ := json.Marshal(got)
+				wantJSON, _ := json.Marshal(want)
+				if string(gotJSON) != string(wantJSON) {
+					t.Fatalf("inventory operation changed: got %s want %s", gotJSON, wantJSON)
+				}
+				json.NewEncoder(w).Encode(agentCatalog{Only: true, OwnHidden: true, Models: []agentCatalogModel{{ID: "acu-runtime/acu-auto"}}})
+			}))
+			w := httptest.NewRecorder()
+			body := `{"agent":"codex",` + payload[1:]
+			host.syncAgentModels(w, httptest.NewRequest(http.MethodPost, "/runtime/agents/models", strings.NewReader(body)))
+			if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"only":true`) {
+				t.Fatalf("native result lost: status=%d body=%s", w.Code, w.Body)
+			}
+		})
+	}
+}
