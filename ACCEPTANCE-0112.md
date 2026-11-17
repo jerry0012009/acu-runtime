@@ -10,6 +10,10 @@ release when selected on November 17, not a continuously moving latest target.
 All four CLI platform/architecture hashes and both Windows GUI upgrade hashes
 come from the official 0.1.4350 SHA256SUMS. Linux qualification used the official
 CLI, verified SHA256 a0fe7a75b78eb584a2547e02dd45fc9d1b37b229085b68758b6aa4c9cadc1a27.
+All six Windows/Mac CLI and Windows GUI binaries were also downloaded locally
+and their complete SHA256 values matched the official manifest. Upstream
+Release workflow 44032290218 succeeded; Test workflow 44031852243 for the same
+commit was cancelled, not a passing whole-upstream-suite qualification.
 
 Local isolated official-binary compatibility passed: four Agent configuration
 writers, native update-policy commands, existing catalog refresh, explicit and
@@ -33,4 +37,19 @@ binaries are not downgraded. macOS users replace Runtime with the new DMG;
 an old separately running Magpie must be updated through its own updater or
 closed before reconnecting. No unattended force-stop is added on macOS.
 
-Three-platform publication evidence will be added after CI completion.
+## Publication
+
+Runtime v0.1.112 published at 2026-11-17T07:11:11Z from application revision
+`bab093e`. Workflow `44034978995` succeeded for Windows x64, Intel Mac, Apple
+Silicon and publication, without retries or removed gates. All three packaged
+CLI compatibility runs explicitly reported kernel 0.1.4350, four Agent writers,
+four MCP lists and preservation checks. Windows quiet Codex test passed in
+53.09 seconds; installation from public 0.1.111 reached ready=true as 0.1.112,
+checked actual serving kernel 0.1.4350 and unchanged config/auth hashes.
+
+The public `/api/acu-runtime/release` returns 0.1.112 with three platform mirrors.
+All five installer/DMG/ZIP artifacts are checked against published SHA256SUMS.
+Linux and platform logs/evidence are under `/tmp/acu-runtime-kernel-4350/`.
+This makes the update available; it does not prove every remote user installed
+it. Users retain explicit confirmation and platform-specific installation steps.
+No Router, Console, protocol bridge or persistent service was restarted.
