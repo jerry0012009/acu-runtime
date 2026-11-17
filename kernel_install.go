@@ -141,7 +141,7 @@ func (kernel *kernelState) install(ctx context.Context) (string, error) {
 			name += ".exe"
 		}
 		bundled := filepath.Join(filepath.Dir(executable), "kernel", name)
-		if verifyKernel(bundled, release.sha256) {
+		if verifyBundledKernel(bundled, release) {
 			return bundled, nil
 		}
 	}
@@ -160,4 +160,8 @@ func (kernel *kernelState) install(ctx context.Context) (string, error) {
 		kernel.downloaded, kernel.total = downloaded, total
 		kernel.mu.Unlock()
 	})
+}
+
+func verifyBundledKernel(path string, release kernelRelease) bool {
+	return verifyKernel(path, release.sha256) || verifySignedMacKernel(path)
 }

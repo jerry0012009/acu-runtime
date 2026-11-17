@@ -172,9 +172,9 @@ func TestCheckUpdateReportsCurrentAndUnsupportedPlatforms(t *testing.T) {
 	}
 }
 
-func TestUpdateSupportIsLimitedToWindowsAmd64Desktop(t *testing.T) {
+func TestUpdateSupportMatchesNativeDesktopPlatforms(t *testing.T) {
 	state := updateState{}
-	if state.snapshot(true).Supported != (runtime.GOOS == "windows" && runtime.GOARCH == "amd64") {
+	if state.snapshot(true).Supported != updatePlatformSupported(runtime.GOOS, runtime.GOARCH) {
 		t.Fatal("application update support does not match the platform")
 	}
 	if state.snapshot(false).Supported {

@@ -178,6 +178,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/build-macos.sh
+      - name: Verify Mac in-app update handoff and rollback
+        if: runner.os == 'macOS'
+        run: |
+          arch=$(go env GOARCH)
+          ACU_MAC_UPDATE_BUNDLE="$PWD/dist/darwin-$arch/ACU Runtime.app" go test -run '^TestMacNativeUpdateHandoffAndRollback$' -v -timeout 6m .
       - name: Verify published Runtime upgrade and matching kernel on clean Windows
         if: runner.os == 'Windows'
         shell: pwsh

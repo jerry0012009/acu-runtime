@@ -697,6 +697,15 @@ test('desktop settings exposes compatibility update status and the check action'
   assert(!instance.elements.app.innerHTML.includes('GitHub'));
 });
 
+test('Mac settings retains Runtime update controls without duplicate Agent installation information', async () => {
+ const instance=await setup({desktop:true,platform:'darwin',version:'0.1.113',update:{supported:true,phase:'available',release:{version:'0.1.114'}}});
+ instance.run('ui.page="settings"; render()');
+ const html=instance.elements.app.innerHTML;
+ assert(!html.includes('Agent 安装与更新'));
+ assert(!html.includes('在工作台各 Agent 卡片查看当前版本与可用更新'));
+ assert(html.includes('更新并重启'));
+});
+
 const capabilityFixture = () => ({ vision: 'native/vision', imageGen: 'off', visionModels: [{ id: 'acu-runtime/gpt-6.1-sol', name: 'GPT Sol' }], imageModels: [], tools: [], searchReady: false, searchURL: '', messages: ['PDF 继续使用应用文件工具'] });
 
 test('bulk setup prepares kernel MCP only for confirmed agents and can opt out', async () => {

@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.112"
+const appVersion = "0.1.113"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 
@@ -54,11 +54,14 @@ func (u *updateState) snapshot(desktop bool) updateView {
 	v := u.view
 	v.Current = appVersion
 	v.Kernel = kernelVersion
-	v.Supported = desktop && runtime.GOOS == "windows" && runtime.GOARCH == "amd64"
+	v.Supported = desktop && updatePlatformSupported(runtime.GOOS, runtime.GOARCH)
 	if v.Phase == "" {
 		v.Phase = "idle"
 	}
 	return v
+}
+func updatePlatformSupported(platform, arch string) bool {
+	return platform == "windows" && arch == "amd64" || platform == "darwin" && (arch == "amd64" || arch == "arm64")
 }
 func newerVersion(candidate, current string) bool {
 	a, b := releaseVersionPattern.FindStringSubmatch(candidate), releaseVersionPattern.FindStringSubmatch(current)
@@ -209,13 +212,16 @@ func checkUpdate(ctx context.Context, client *http.Client, endpoint, current, pl
 	}
 	version := strings.TrimPrefix(release.Tag, "v")
 	name := fmt.Sprintf("ACU-Runtime-%s-%s-%s-Setup.exe", version, platform, arch)
+	if platform == "darwin" {
+		name = fmt.Sprintf("ACU-Runtime-%s-macos-%s.app.zip", version, arch)
+	}
 	for _, a := range release.Assets {
 		if a.Name != name {
 			continue
 		}
 		expected := updateRepository + "/releases/download/" + release.Tag + "/" + name
 		digest := strings.TrimPrefix(a.Digest, "sha256:")
-		if platform != "windows" || a.URL != expected || !digestPattern.MatchString(digest) || a.Size <= 0 || a.Size > 128<<20 {
+		if !updatePlatformSupported(platform, arch) || a.URL != expected || !digestPattern.MatchString(digest) || a.Size <= 0 || a.Size > 128<<20 {
 			return nil, errors.New("更新包缺少可信校验信息，未下载")
 		}
 		notes := release.Body
@@ -232,7 +238,7 @@ func (host *server) updates(response http.ResponseWriter, request *http.Request)
 		host.json(response, 200, u.snapshot(host.desktop))
 		return
 	}
-	if !host.desktop || runtime.GOOS != "windows" || runtime.GOARCH != "amd64" {
+	if !host.desktop || !updatePlatformSupported(runtime.GOOS, runtime.GOARCH) {
 		host.json(response, 400, map[string]string{"error": "此平台暂未提供应用内更新安装包"})
 		return
 	}
@@ -305,6 +311,12 @@ func (host *server) updates(response http.ResponseWriter, request *http.Request)
 	}()
 }
 func (host *server) downloadUpdate(ctx context.Context, release *updateRelease) error {
+	if runtime.GOOS == "darwin" {
+		return host.downloadMacUpdate(ctx, release)
+	}
+	return host.downloadWindowsUpdate(ctx, release)
+}
+func (host *server) downloadWindowsUpdate(ctx context.Context, release *updateRelease) error {
 	executable, err := os.Executable()
 	if err != nil {
 		return err

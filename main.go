@@ -136,7 +136,7 @@ func findKernel() string {
 				name += ".exe"
 			}
 			bundled := filepath.Join(filepath.Dir(executable), "kernel", name)
-			if verifyKernel(bundled, release.sha256) {
+			if verifyBundledKernel(bundled, release) {
 				return bundled
 			}
 		}
@@ -546,7 +546,7 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 		groups = host.modelInventory(ctx, agents)
 		cancel()
 	}
-	host.json(response, 200, map[string]any{"version": appVersion, "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot(), "update": host.update.snapshot(host.desktop), "agentInstall": host.agentInstall.snapshot()})
+	host.json(response, 200, map[string]any{"version": appVersion, "pid": os.Getpid(), "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot(), "update": host.update.snapshot(host.desktop), "agentInstall": host.agentInstall.snapshot()})
 }
 
 func (host *server) proxy(response http.ResponseWriter, request *http.Request) {
@@ -746,6 +746,12 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--apply-mac-update" {
+		if err := applyMacUpdate(os.Args[2]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if isTapnowNativeInvocation(os.Args) {
 		_ = runTapnowNative(os.Args[1], os.Stdin, os.Stdout)
 		return
