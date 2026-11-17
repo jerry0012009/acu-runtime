@@ -39,3 +39,20 @@ Editing no longer waits for an HTTP write per action. Saving still waits for
 the original safety transaction; no fixed latency improvement is asserted for
 the customer's hardware. Platform build/publication status is recorded only
 after the release workflow completes.
+
+## Published Acceptance
+
+Release v0.1.116, application SHA 30a4c0f, published 2026-11-17T13:43:20Z.
+Workflow 44090418058 completed all three platform builds and publication.
+Windows first attempt timed out in the existing third native login fixture
+waiting for quick-key; the same source passed its full Windows rerun without
+skipping or weakening tests. Both Mac jobs passed on their first attempt.
+Windows logged four native Codex catalog operations in one safe transaction
+at 5.561 seconds, plus successful installation, upgrade and kernel compatibility.
+This CI measurement is not a latency guarantee for customer hardware.
+
+The public acu.best/api/acu-runtime/release endpoint returned 0.1.116 and all
+three platform download URLs. Windows Setup, both Mac DMGs and app ZIPs,
+installation notes and SHA256SUMS are present in the published release.
+Local verification also passed 148 Node tests, Go tests/race/vet, the official
+kernel management integration, Windows cross-compilation and browser checks.
