@@ -22,7 +22,7 @@ Tests cover exact Mac architecture/package matching, invalid release metadata,
 unsafe archive paths/symlinks, native helper PID handoff and rollback, user config
 preservation, and Settings controls. Native Mac tests run against the signed
 packaged application on both Intel and Apple Silicon. Cross compilation is not
-reported as native acceptance. Platform results follow after CI.
+reported as native acceptance.
 
 Candidate workflow 44040193051 passed all three native platforms without
 publishing. Native Mac handoff/rollback passed at 6.46/4.34 seconds on Apple
@@ -40,3 +40,19 @@ the isolated kernel was still writing the temporary HOME. The regression now
 waits for the exact updated Runtime and isolated kernel to exit before removing
 the fixture. No production user process is targeted. This fix is carried in
 v0.1.114 rather than moving/reusing the failed version tag.
+
+## Publication
+
+Release v0.1.114 published at 2026-11-17T08:20:31Z from revision `ac4b95f`.
+Workflow 44043479604 passed all three platform jobs and publication, including
+Mac native helper success/rollback and clean fixture shutdown. Apple Silicon
+success/rollback took 7.56/5.26 seconds, Intel 22.16/9.67 seconds in isolated
+fixtures. Windows upgrade, quiet Codex routing, native login renewal and
+packaged-kernel compatibility remained passing. Settings browser checks passed
+both themes and 390/1440 widths; the duplicate Agent section is absent.
+
+The public release resolver returns 0.1.114 with all three mirrors. Five final
+installer/DMG/ZIP assets are checked against published SHA256SUMS. No cloud
+application, profile, price book or user credentials were changed by this release.
+Mac users on earlier versions must manually install this release once to gain
+future in-app updates; current system permissions and security prompts remain.
