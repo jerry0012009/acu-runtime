@@ -1215,18 +1215,16 @@ async function applyRecommendedVisibility(agentId, provider, selectedModel, pres
   if (!Array.isArray(catalog?.models)) throw new Error('接入已保存，但无法读取模型清单，请重试推荐配置');
   const prefix = provider + '/';
   const models = catalog.models.map(model => {
-    if (!model.id.startsWith(prefix) || model.own || model.inUse || model.id === prefix + selectedModel) return model;
+    if (!model.id.startsWith(prefix) || model.own) return model;
     const id = model.id.slice(prefix.length);
     if (!model.hidden || !(recommendedACUModels.includes(id) || id.startsWith('gemini-4-'))) return model;
     return { ...model, hidden: false };
   });
   if (!models.some((model, index) => model.hidden !== catalog.models[index].hidden)) return;
-  const body = catalog.only
-    ? { shown: models.filter(model => !model.hidden && !(model.own && catalog.ownHidden)).map(model => model.id) }
-    : { hidden: models.filter(model => !model.own && model.hidden).map(model => model.id) };
+  const body = visibilityPayload({ catalog: { ...catalog, models } });
   await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({agent:agentId,...body}) });
   const verified = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`);
-  if (!Array.isArray(verified?.models) || models.some(model => !model.hidden && !model.own && !verified.models.some(current => current.id === model.id && !current.hidden))) throw new Error('模型列表尚未同步完成，请重试配置');
+  if (!Array.isArray(verified?.models) || models.some(model => !model.hidden && !model.own && !verified.models.some(current => current.id === model.id && !current.hidden && !current.kept))) throw new Error('模型列表尚未同步完成，请重试配置');
 }
 
 async function confirmSetup() {

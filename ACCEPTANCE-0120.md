@@ -1,5 +1,11 @@
 # Runtime 0.1.120 Model Visibility
 
+Follow-up included in 0.1.121: one-click visibility synchronization now uses
+the same upstream widen contract for available recommendations across Codex,
+Claude Code, Hermes and WorkBuddy, including only-picked mode. Existing primary
+model and unselected unrelated models are preserved. Matrix regression tests
+cover both visibility modes for all four agents.
+
 ## Confirmed Integration Gaps
 
 Official Magpie v0.1.4350 already provides `kept` model metadata and the `widen`

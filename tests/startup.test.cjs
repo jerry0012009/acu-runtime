@@ -40,7 +40,7 @@ async function setup(state, handler) {
       const result = await handler?.(route, options);
       if (result) {
         const sync = synced.get(route.split('/').at(-1));
-        if (route.startsWith('/kernel/api/agent-models/') && sync && result.body?.models) result.body.models = result.body.models.map(m=>({...m,hidden:sync.shown ? !sync.shown.includes(m.id) : sync.hidden.includes(m.id)}));
+        if (route.startsWith('/kernel/api/agent-models/') && sync && result.body?.models) result.body.models = result.body.models.map(m=>({...m,kept:m.kept && !sync.widen?.includes(m.id),hidden:sync.shown ? !sync.shown.includes(m.id) : sync.hidden.includes(m.id)}));
         return { ok: result.ok !== false, status: result.status || 200, json: async () => result.body };
       }
       if (route.startsWith('/kernel/api/agent-models/') && !options.method) return { ok: true, json: async () => inventory() };
@@ -793,6 +793,37 @@ test('existing Agent setup reveals available recommended models without replacin
   assert.equal(instance.run('ui.status.agents[0].model'),native.model);
   assert.equal(result,undefined);
 });
+
+for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const only of [false, true]) {
+  test(`${agentID} one-click reveals all GPT-6.2 and Gemini4 choices including native source filters, only=${only}`, async () => {
+    const targets = ['gpt-6.2-sol', 'gpt-6.2-astra', 'gemini-4-carbon', 'gemini-4-argon', 'gemini-4-hydrogen'];
+    const models = ['acu-auto', ...targets];
+    const current = 'acu-runtime/acu-auto';
+    const agent = { ...codex(), id: agentID, name: agentID, connected: true, model: current };
+    const catalog = { only, ownHidden: true, models: [
+      { id: current, inUse: true },
+      ...targets.map(id => ({ id: 'acu-runtime/' + id, hidden: true, kept: true })),
+      { id: 'acu-runtime/old-hidden', hidden: true },
+      { id: 'other/visible' }, { id: 'other/hidden', hidden: true },
+      { id: 'codex/native-hidden', own: true, hidden: true },
+    ] };
+    const instance = await setup({ ready: true, connection: { known: true, configured: true, provider: 'acu-runtime', choices: [{ id: 'acu-runtime', models }] }, agents: [agent] }, async (route, options) => {
+      if (route === '/runtime/agents/configure') return { body: { agents: [{ id: agentID, wired: true }] } };
+      if (route === `/kernel/api/agent-models/${agentID}` && !options.method) return { body: structuredClone(catalog) };
+    });
+    instance.run(`ui.selected = new Set(["${agentID}"])`);
+    await instance.run('applyAgents();');
+    instance.run('ui.setup.tools = false');
+    await instance.run('confirmSetup()');
+    assert.equal(JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/configure').body).preserve, true);
+    const payload = JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/models').body);
+    assert.deepEqual(payload.widen, targets.map(id => 'acu-runtime/' + id));
+    if (only) assert.deepEqual(payload.shown, [current, ...payload.widen, 'other/visible']);
+    else assert.deepEqual(payload.hidden, ['acu-runtime/old-hidden', 'other/hidden', 'codex/native-hidden']);
+    assert.equal(instance.run('ui.status.agents[0].model'), current);
+    assert.equal(instance.run('ui.results[0].ok'), true);
+  });
+}
 
 test('WorkBuddy one-click setup exposes Fable 5.1 and preserves active legacy and unrelated models', async () => {
   const choice = {id:'acu-runtime',name:'ACU',models:['acu-auto','claude-fable-5','claude-fable-5-1']};
