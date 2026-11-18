@@ -93,6 +93,51 @@ test('inventory toggles model visibility inline without opening native settings'
   assert.deepEqual(JSON.parse(writes.at(-1).body).operations, [{ hidden: ['acu-runtime/gpt-6.1-sol', 'acu-runtime/image'] }]);
   assert.equal(instance.elements.overlay.innerHTML.includes('data-native-model-list'), false);
 });
+test('native GPT-6.2 models can be individually enabled without revealing hidden siblings', async () => {
+  for (const only of [false, true]) {
+    const catalog = { own: true, ownHidden: true, only, models: [
+      { id: 'acu-runtime/acu-auto', inUse: true },
+      { id: 'codex/gpt-6.2-sol', own: true },
+      { id: 'codex/gpt-6.2-astra', own: true },
+      { id: 'codex/gpt-6-astra', own: true },
+    ] };
+    const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog }] });
+    instance.run('openModelInventory("codex"); toggleModelVisibility("codex", "codex/gpt-6.2-sol")');
+    assert.equal(instance.run('ui.inventoryEditor.catalog.ownHidden'), false);
+    assert.equal(instance.run('ui.inventoryEditor.catalog.models[1].hidden'), false);
+    assert.equal(instance.run('ui.inventoryEditor.catalog.models[2].hidden'), true);
+    instance.run('toggleModelVisibility("codex", "codex/gpt-6.2-astra")');
+    await instance.run('saveInventoryDraft()');
+    const operations = JSON.parse(posts(instance).at(-1).body).operations;
+    assert.deepEqual(operations, [only
+      ? { shown: ['acu-runtime/acu-auto', 'codex/gpt-6.2-sol', 'codex/gpt-6.2-astra'] }
+      : { hidden: ['codex/gpt-6-astra'] }, { ownHidden: false }]);
+  }
+});
+test('native GPT-6.2 individual hides are retained in the native visibility payload', async () => {
+  const catalog = { own: true, models: [{ id: 'codex/gpt-6.2-sol', own: true }, { id: 'codex/gpt-6.2-astra', own: true }] };
+  const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog }] });
+  instance.run('openModelInventory("codex"); toggleModelVisibility("codex", "codex/gpt-6.2-sol")');
+  await instance.run('saveInventoryDraft()');
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body).operations, [{ hidden: ['codex/gpt-6.2-sol'] }]);
+});
+test('models kept out by native source visibility use upstream widen when enabled', async () => {
+  for (const only of [false, true]) {
+    const catalog = { only, models: [
+      { id: 'acu-runtime/acu-auto', inUse: true },
+      ...['gemini-4-carbon', 'gemini-4-argon', 'gpt-6.2-sol', 'gpt-6.2-astra'].map(id => ({ id: 'acu-runtime/' + id, hidden: true, kept: true })),
+    ] };
+    const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog }] });
+    instance.run('openModelInventory("codex")');
+    for (const id of ['gemini-4-carbon', 'gemini-4-argon', 'gpt-6.2-sol', 'gpt-6.2-astra'])
+      instance.run(`toggleModelVisibility("codex", "acu-runtime/${id}")`);
+    await instance.run('saveInventoryDraft()');
+    const op = JSON.parse(posts(instance).at(-1).body).operations[0];
+    assert.deepEqual(op.widen, catalog.models.slice(1).map(m => m.id));
+    if (only) assert.deepEqual(op.shown, catalog.models.map(m => m.id));
+    else assert.deepEqual(op.hidden, []);
+  }
+});
 test('Codex inventory flags and order use safe Runtime writes without a setup detour', async () => {
   const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true, catalog: inventory() }] });
   instance.run('openModelInventory("codex")');

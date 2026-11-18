@@ -136,6 +136,96 @@ func TestNativeCatalogManagementSync(t *testing.T) {
 				return err
 			}
 		}
+		// A source hidden by native visibility still appears as kept in the
+		// management list. Enabling it must use Magpie's widen contract.
+		extras := []string{"gemini-4-carbon", "gemini-4-argon", "gpt-6.2-sol", "gpt-6.2-astra"}
+		if err := os.WriteFile(filepath.Join(codexConfigDirectory(), "config.toml"), []byte("# Synthetic catalog fixture\n"), 0600); err != nil {
+			return err
+		}
+		if err := k.exchange(ctx, "POST", "/api/provider/save", map[string]any{"id": "extras", "name": "Extra fixture", "new": true, "key": "fixture-extra", "chat": remote.URL + "/extra/v1", "models": extras}, nil); err != nil {
+			t.Fatalf("extra provider save: %v", err)
+		}
+		if err := runCatalogCLI(ctx, executable, []string{"codex", "acu-runtime/acu-auto"}); err != nil {
+			return err
+		}
+		for _, only := range []bool{false, true} {
+			if err := runCatalogCLI(ctx, executable, []string{"visible", "codex", "acu-runtime"}); err != nil {
+				return err
+			}
+			if err := k.exchange(ctx, "POST", "/api/agent-models/codex", map[string]any{"only": only}, nil); err != nil {
+				t.Fatalf("native only change: %v", err)
+			}
+			var before agentCatalog
+			if err := k.exchange(ctx, "GET", "/api/agent-models/codex", nil, &before); err != nil {
+				return err
+			}
+			widen, shown, hidden := []string{}, []string{}, []string{}
+			for _, m := range before.Models {
+				if strings.HasPrefix(m.ID, "extras/") {
+					if !m.Kept || !m.Hidden {
+						t.Fatalf("missing upstream kept metadata: %+v", m)
+					}
+					widen = append(widen, m.ID)
+					shown = append(shown, m.ID)
+				} else if !m.Hidden {
+					shown = append(shown, m.ID)
+				} else {
+					hidden = append(hidden, m.ID)
+				}
+			}
+			if len(widen) != len(extras) {
+				t.Fatalf("kept fixture missing: %+v", before)
+			}
+			op := map[string]any{"hidden": hidden, "widen": widen}
+			if only {
+				op = map[string]any{"shown": shown, "widen": widen}
+			}
+			withoutWiden := map[string]any{"hidden": hidden}
+			if only {
+				withoutWiden = map[string]any{"shown": shown}
+			}
+			if err := k.exchange(ctx, "POST", "/api/agent-models/codex", withoutWiden, nil); err != nil {
+				return err
+			}
+			if err := k.exchange(ctx, "GET", "/api/agent-models/codex", nil, &before); err != nil {
+				return err
+			}
+			for _, m := range before.Models {
+				if strings.HasPrefix(m.ID, "extras/") && (!m.Kept || !m.Hidden) {
+					t.Fatalf("control unexpectedly revealed without widen: %+v", m)
+				}
+			}
+			body, _ := json.Marshal(map[string]any{"agent": "codex", "expected": before, "operations": []any{op}})
+			w := httptest.NewRecorder()
+			host.syncAgentModels(w, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(string(body))))
+			if w.Code != 200 {
+				t.Fatalf("native widen save: %d %s", w.Code, w.Body)
+			}
+			var after agentCatalog
+			if err := json.Unmarshal(w.Body.Bytes(), &after); err != nil {
+				return err
+			}
+			for _, m := range after.Models {
+				if strings.HasPrefix(m.ID, "extras/") && (m.Kept || m.Hidden) {
+					t.Fatalf("native widen did not reveal model: %+v", m)
+				}
+			}
+			deadline := time.Now().Add(10 * time.Second)
+			for {
+				data, err := os.ReadFile(filepath.Join(codexConfigDirectory(), "magpie-models.json"))
+				complete := err == nil
+				for _, id := range extras {
+					complete = complete && strings.Contains(string(data), `"extras/`+id+`"`)
+				}
+				if complete {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("saved Codex catalog missing widened models: %s", data)
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
 		defs := []struct{ name, path string }{{"acu-vision", "vision"}, {"acu-image", "image"}, {"acu-search", "web-search"}}
 		for round := 0; round < 2; round++ {
 			start := time.Now()
@@ -211,6 +301,7 @@ func TestModelSyncPreservesEveryNativeInventoryOperation(t *testing.T) {
 		`{"only":true}`, `{"only":false}`,
 		`{"ownHidden":true}`, `{"ownHidden":false}`,
 		`{"order":[]}`, `{"order":["acu-runtime/acu-auto"]}`,
+		`{"hidden":[],"widen":["acu-runtime/gemini-4-carbon"]}`,
 	} {
 		t.Run(payload, func(t *testing.T) {
 			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +356,26 @@ func TestModelBatchUsesNativeOperationsInOrderAndReadsBack(t *testing.T) {
 		if _, ok := writes[i][field]; !ok {
 			t.Fatalf("operation %d lost %s", i, field)
 		}
+	}
+}
+
+func TestModelBatchPreservesWidenAndKeptMetadata(t *testing.T) {
+	model := agentCatalogModel{ID: "acu-runtime/gpt-6.2-sol", Hidden: true, Kept: true}
+	var write catalogOperation
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			if err := json.NewDecoder(r.Body).Decode(&write); err != nil {
+				t.Fatal(err)
+			}
+			model.Hidden, model.Kept = false, false
+		}
+		json.NewEncoder(w).Encode(agentCatalog{Models: []agentCatalogModel{model}})
+	}))
+	w := httptest.NewRecorder()
+	body := `{"agent":"codex","expected":{"models":[{"id":"acu-runtime/gpt-6.2-sol","name":"","group":"","hidden":true,"kept":true}],"own":false,"ownHidden":false,"only":false},"operations":[{"hidden":[],"widen":["acu-runtime/gpt-6.2-sol"]}]}`
+	host.syncAgentModels(w, httptest.NewRequest("POST", "/runtime/agents/models", strings.NewReader(body)))
+	if w.Code != 200 || len(write.Widen) != 1 || write.Widen[0] != model.ID || strings.Contains(w.Body.String(), `"kept":true`) {
+		t.Fatalf("native visibility metadata lost: status=%d operation=%+v result=%s", w.Code, write, w.Body)
 	}
 }
 

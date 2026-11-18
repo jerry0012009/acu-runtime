@@ -444,7 +444,7 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
     const mode = hidden ? '已隐藏' : model.own ? '原生' : agent.needsRepair ? '待核对' : !agent.connected ? '可添加' : source;
     const detail = [group?.members?.length ? `候选来源：${group.members.map(member => member.split('/')[0]).filter((value, index, all) => all.indexOf(value) === index).join('、')}` : '', group?.patterns?.length ? `适用模型：${group.patterns.join('、')}` : ''].filter(Boolean).join(' · ');
     const provider = !model.own && !group && model.id.includes('/') ? model.id.split('/')[0] : '';
-    const visibility = inventory && inventory.tab !== 'order' && model.inUse ? '<span class="model-in-use" title="请先切换默认模型或子任务模型，再隐藏此模型">使用中 · 保留显示</span>' : inventory && inventory.tab !== 'order' ? `<button type="button" class="model-visibility ${hidden ? '' : 'is-on'}" data-model-visibility data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" role="switch" aria-checked="${!hidden}" ${model.inUse || model.own || ui.inventorySaving ? 'disabled' : ''} title="${escapeHTML(model.inUse ? '当前模型会始终保留' : model.own ? '原生模型由上方开关控制' : hidden ? '显示此模型' : '隐藏此模型')}"><span aria-hidden="true"></span><span class="sr-only">${hidden ? '隐藏' : '显示'}</span></button>` : '';
+    const visibility = inventory && inventory.tab !== 'order' && model.inUse ? '<span class="model-in-use" title="请先切换默认模型或子任务模型，再隐藏此模型">使用中 · 保留显示</span>' : inventory && inventory.tab !== 'order' ? `<button type="button" class="model-visibility ${hidden ? '' : 'is-on'}" data-model-visibility data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" role="switch" aria-checked="${!hidden}" ${model.nativeOption || ui.inventorySaving ? 'disabled' : ''} title="${escapeHTML(model.nativeOption ? '原生模型由上方开关控制' : hidden ? '显示此模型' : '隐藏此模型')}"><span aria-hidden="true"></span><span class="sr-only">${hidden ? '隐藏' : '显示'}</span></button>` : '';
     const order = inventory?.tab === 'order' ? `<span class="model-order-actions"><button type="button" data-model-move="up" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === 0 || ui.inventorySaving ? 'disabled' : ''} aria-label="上移">↑</button><button type="button" data-model-move="down" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === models.length - 1 || ui.inventorySaving ? 'disabled' : ''} aria-label="下移">↓</button></span>` : '';
     add('model:' + model.id, model.own ? 'native' : 'add', model.name || model.id, '', mode, detail, hidden, '', visibility || order, provider);
   });
@@ -553,15 +553,24 @@ function redrawInventory() {
 
 function visibilityPayload(agent) {
   const models = agent.catalog?.models || [];
-  if (agent.catalog?.only) return { shown: models.filter(model => !modelIsHidden(agent, model)).map(model => model.id) };
-  return { hidden: models.filter(model => !model.own && model.hidden).map(model => model.id) };
+  const widen = models.filter(model => model.kept && !model.hidden).map(model => model.id);
+  const payload = agent.catalog?.only ? { shown: models.filter(model => !model.hidden).map(model => model.id) }
+    : { hidden: models.filter(model => model.hidden).map(model => model.id) };
+  if (widen.length) payload.widen = widen;
+  return payload;
 }
 
 function toggleModelVisibility(agentId, modelId) {
   const agent = inventoryAgent(agentId);
   const model = agent?.catalog?.models?.find(item => item.id === modelId);
-  if (!agent?.catalog || !model || model.inUse || model.own || ui.inventorySaving) return;
-  model.hidden = !model.hidden;
+  if (!agent?.catalog || !model || model.inUse || ui.inventorySaving) return;
+  if (model.own && agent.catalog.ownHidden) {
+    // The native master switch gates every own model. Preserve that effective
+    // selection as per-model hides before revealing just the clicked entry.
+    for (const entry of agent.catalog.models) if (entry.own && !entry.inUse) entry.hidden = true;
+    agent.catalog.ownHidden = false;
+    model.hidden = false;
+  } else model.hidden = !model.hidden;
   redrawInventory();
 }
 

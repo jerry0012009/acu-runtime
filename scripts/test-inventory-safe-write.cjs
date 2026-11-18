@@ -18,6 +18,8 @@ fs.mkdirSync(output, { recursive: true });
         { id: 'acu-runtime/acu-auto', name: 'acu-auto', inUse: true },
         { id: 'acu-runtime/gemini-4-carbon', name: 'Gemini Carbon' },
         { id: 'acu-runtime/gemini-4-argon', name: 'Gemini Argon' },
+        { id: 'acu-runtime/gpt-6.2-sol', name: 'GPT 6.2 Sol', hidden: true, kept: true },
+        { id: 'codex/gpt-6.2-astra', name: 'GPT 6.2 Astra', own: true, hidden: true },
       ] };
       const agent = { id: 'codex', name: 'Codex', detected: true, connected: true, catalog };
       await page.route('http://inventory.test/**', async route => {
@@ -28,6 +30,10 @@ fs.mkdirSync(output, { recursive: true });
           if (failNext) { failNext = false; return route.fulfill({ status: 409, json: { error: 'fixture save failed' } }); }
           if (delayNext) { delayNext = false; await new Promise(resolve => setTimeout(resolve, 600)); }
           for (const op of body.operations || [body]) {
+            for (const id of op.widen || []) {
+              const model = catalog.models.find(model => model.id === id);
+              if (model) model.kept = false;
+            }
             if ('only' in op) catalog.only = op.only;
             if ('ownHidden' in op) catalog.ownHidden = op.ownHidden;
             if (op.hidden) catalog.models.forEach(model => { model.hidden = op.hidden.includes(model.id); });
@@ -47,6 +53,18 @@ fs.mkdirSync(output, { recursive: true });
       });
       await page.goto('http://inventory.test/');
       await page.locator('[data-action="model-inventory"][data-agent-id="codex"]:enabled').click();
+      for (const id of ['acu-runtime/gpt-6.2-sol', 'codex/gpt-6.2-astra']) {
+        const control = page.locator(`[data-model-visibility][data-model-id="${id}"]`);
+        assert.equal(await control.isDisabled(), false);
+        await control.click();
+        assert.equal(await control.getAttribute('aria-checked'), 'true');
+      }
+      await page.locator('[data-inventory-save]').click();
+      await page.waitForFunction(() => document.querySelector('[data-inventory-save]')?.disabled === true);
+      assert.deepEqual(writes[0].operations[0].widen, ['acu-runtime/gpt-6.2-sol']);
+      assert.equal(catalog.models.find(m => m.id === 'acu-runtime/gpt-6.2-sol').hidden, false);
+      assert.equal(catalog.models.find(m => m.id === 'codex/gpt-6.2-astra').hidden, false);
+      writes.length = 0;
       await page.locator('[data-inventory-flag="only"]').click();
       await page.locator('[data-model-visibility][data-model-id="acu-runtime/gemini-4-argon"]').click();
       await page.locator('[data-inventory-flag="own"]').click();

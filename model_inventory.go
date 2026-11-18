@@ -13,6 +13,7 @@ type agentCatalogModel struct {
 	Hidden bool   `json:"hidden,omitempty"`
 	InUse  bool   `json:"inUse,omitempty"`
 	Own    bool   `json:"own,omitempty"`
+	Kept   bool   `json:"kept,omitempty"`
 }
 
 type agentCatalog struct {

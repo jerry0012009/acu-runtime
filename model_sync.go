@@ -205,6 +205,7 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 		Only       *bool              `json:"only"`
 		OwnHidden  *bool              `json:"ownHidden"`
 		Order      *[]string          `json:"order"`
+		Widen      []string           `json:"widen"`
 		Operations []catalogOperation `json:"operations"`
 		Expected   *agentCatalog      `json:"expected"`
 	}
@@ -278,6 +279,9 @@ func (host *server) syncAgentModels(w http.ResponseWriter, r *http.Request) {
 		if input.Order != nil {
 			body["order"] = *input.Order
 		}
+		if len(input.Widen) > 0 {
+			body["widen"] = input.Widen
+		}
 		return k.exchange(ctx, "POST", "/api/agent-models/"+input.Agent, body, &result)
 	})
 	if err != nil {
@@ -293,4 +297,5 @@ type catalogOperation struct {
 	Only      *bool     `json:"only,omitempty"`
 	OwnHidden *bool     `json:"ownHidden,omitempty"`
 	Order     *[]string `json:"order,omitempty"`
+	Widen     []string  `json:"widen,omitempty"`
 }
