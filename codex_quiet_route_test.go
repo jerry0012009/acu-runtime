@@ -181,9 +181,13 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	repairHost := &server{kernel: k, desktop: true}
-	state, err = repairHost.repairPreservedCodex(ctx, codexFieldChange{"model", "acu-runtime/acu-auto"})
+	err = repairHost.prepareCodexSetupRoute(ctx, "acu-runtime", []string{"acu-auto"})
 	if err != nil {
 		t.Fatal("preserved Codex drift repair", err)
+	}
+	state, err = k.readState(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if err := verifyCodexRouteState(state, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false); err != nil {
 		t.Fatal(err)

@@ -7,7 +7,7 @@ rejecting unresolved drift, leaving the UI to emit a generic failure. Native
 `bypassed` (old app still on previous configuration) was also rendered as broken
 configuration rather than a restart notice.
 
-Runtime 0.1.123 reads native drift and uses official Magpie reapply for unwired
+Runtime 0.1.124 reads native drift and uses official Magpie reapply for unwired
 Codex under preserve mode. The retained available ACU model or already-confirmed
 setup model must read back correctly and the native wiring error must disappear.
 Windows performs reapply inside the existing
@@ -44,3 +44,8 @@ operator's unseen local drift cause or private configuration was inspected.
 Users should save work, update Runtime, fully exit ChatGPT/Codex and retry.
 The one-click flow performs repair and confirmed-model fallback automatically.
 No account, auth.json or session deletion.
+
+The v0.1.123 candidate workflow was cancelled before publication when final
+review found that model preparation precedes per-Agent configuration. Version
+0.1.124 repairs existing Codex drift before the Windows catalog transaction,
+so the initial one-click model preparation cannot be blocked by the old route.

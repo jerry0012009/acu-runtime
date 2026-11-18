@@ -110,8 +110,27 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 	if host.desktop && runtime.GOOS == "darwin" && !host.allowCodexDesktopChange(w) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 	defer cancel()
+	if host.desktop && runtime.GOOS == "windows" {
+		if !host.allowCodexDesktopChange(w) {
+			return
+		}
+		valid := false
+		for _, choice := range host.connection(ctx).Choices {
+			if choice.ID == input.Provider {
+				valid = true
+			}
+		}
+		if !valid {
+			host.json(w, http.StatusBadRequest, map[string]string{"error": "所选 ACU Key 不可用，未更改配置"})
+			return
+		}
+		if err := host.prepareCodexSetupRoute(ctx, input.Provider, input.Models); err != nil {
+			host.json(w, http.StatusConflict, map[string]string{"error": "一键配置自动修复未完成：" + err.Error()})
+			return
+		}
+	}
 	err := host.catalogMutation(ctx, func(k *kernelState) error {
 		var providers struct {
 			Providers []syncProvider `json:"providers"`

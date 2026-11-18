@@ -164,6 +164,44 @@ func pickACU(fields []setupField, field, provider, model string) string {
 	return ""
 }
 
+func (host *server) prepareCodexSetupRoute(ctx context.Context, provider string, models []string) error {
+	state, err := host.kernel.readState(ctx)
+	if err != nil {
+		return err
+	}
+	var agents []setupAgent
+	if json.Unmarshal(state["agents"], &agents) != nil {
+		return errors.New("无法读取 Codex 自动配置状态")
+	}
+	for _, agent := range agents {
+		if agent.ID != "codex" || !agent.Wired || !agent.needsRepair() {
+			continue
+		}
+		model := ""
+		for _, candidate := range models {
+			if model = pickACU(agent.Fields, "model", provider, candidate); model != "" {
+				break
+			}
+		}
+		for _, field := range agent.Fields {
+			if field.Key != "model" {
+				continue
+			}
+			for _, option := range field.Options {
+				if option.Value == field.Value && strings.HasPrefix(option.Ref, provider+"/") {
+					model = field.Value
+				}
+			}
+		}
+		if model == "" {
+			return errors.New("当前 Key 未提供可用于 Codex 自动配置的模型")
+		}
+		_, err := host.repairPreservedCodex(ctx, codexFieldChange{"model", model})
+		return err
+	}
+	return nil
+}
+
 func (host *server) configureAgent(response http.ResponseWriter, request *http.Request) {
 	var input struct {
 		Agent     string `json:"agent"`
