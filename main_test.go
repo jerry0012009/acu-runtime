@@ -79,6 +79,27 @@ func TestOnboardingStatusProjectsConnectAndRestartFacts(t *testing.T) {
 	}
 }
 
+func TestBypassedAgentReportsRestartNotConfigurationCorruption(t *testing.T) {
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"drift":{"kind":"bypassed","detail":"private request path"},"fields":[]}]}`)
+	}))
+	out := httptest.NewRecorder()
+	host.status(out, httptest.NewRequest("GET", "/runtime/status", nil))
+	var response struct {
+		Agents []agentView `json:"agents"`
+	}
+	if err := json.Unmarshal(out.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	codex := response.Agents[0]
+	if codex.NeedsRepair || !codex.RestartRequired || codex.DriftKind != "bypassed" {
+		t.Fatalf("wrong recovery action: %+v", codex)
+	}
+	if strings.Contains(out.Body.String(), "private request path") {
+		t.Fatal("private drift detail leaked")
+	}
+}
+
 func TestBrowserBoundary(t *testing.T) {
 	host, _ := testServer(t, http.NotFoundHandler())
 	for _, check := range []struct{ name, method, path, hostname, origin, site, token string }{

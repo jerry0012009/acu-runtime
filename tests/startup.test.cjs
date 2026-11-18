@@ -406,6 +406,33 @@ test('no compatible models blocks confirmation instead of guessing from the acco
   assert.equal(posts(instance).length, 0);
 });
 
+test('one-click accepts native restart-only drift and explains reopening', async () => {
+  const instance = await setup({ ready: true, agents: [{ ...codex(), connected: true }] }, async route => {
+    if (route === '/runtime/agents/configure') return { body: { agents: [{ id: 'codex', wired: true, drift: { kind: 'bypassed' } }] } };
+    if (route === '/kernel/api/agent-models/codex') return { body: { models: [] } };
+  });
+  instance.run('ui.setup = {provider:"acu-runtime",model:"acu-auto",agents:new Set(["codex"]),tools:false}');
+  await instance.run('confirmSetup()');
+  assert.equal(instance.run('ui.results[0].ok'), true);
+  assert(instance.run('ui.results[0].message').includes('完全重开'));
+});
+
+test('summary shows each canonical model once without removing provider catalog entries', async () => {
+  const catalog={models:[{id:'acu-runtime/gpt-6.2-sol',name:'GPT-6.2 Sol'},{id:'other/gpt-6.2-sol',name:'GPT-6.2-Sol'},{id:'acu-runtime/gpt-6.2-astra',name:'GPT-6.2 Astra'}]};
+  const agent={...codex(),connected:true,catalog};
+  const instance=await setup({ready:true,agents:[agent]});
+  const html=instance.run('agentModelSummary(ui.status.agents[0], "")');
+  assert.equal((html.match(/class="model-example">GPT-6.2(?:-| )Sol/g)||[]).length,1);
+  assert.equal(instance.run('ui.status.agents[0].catalog.models.length'),3);
+});
+
+test('drifted connected Codex retains one-click configuration without manual repair action', async () => {
+  const instance=await setup({ready:true,agents:[{...codex(),connected:true,needsRepair:true}]});
+  assert(instance.elements.app.innerHTML.includes('data-action="apply-agents"'));
+  assert(!instance.elements.app.innerHTML.includes('核对并重新接入'));
+  assert.equal(posts(instance).length,0);
+});
+
 test('capability preview reads shared settings without modifying tools or claiming success', async () => {
   const settings = { vision: 'off', imageGen: 'missing/image', imageGenMissing: 'missing/image', imageGenAuto: 'fixture/draw', imageGenModels: [{ id: 'fixture/draw', name: '示例生图', pname: '已有来源' }], searchAPIs: [{ name: '关闭的搜索', ready: true, off: true }, { name: '已有搜索', ready: true }] };
   const instance = await setup({ ready: true, agents: [codex()] }, async route => route === '/api/settings' ? { body: settings } : undefined);

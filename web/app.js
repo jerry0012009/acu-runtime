@@ -475,7 +475,8 @@ function agentModelSummary(agent, advanced = '') {
     hermes: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-hydrogen', 'deepseek-v4-pro', 'acu-auto'],
   };
   const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra'];
-  const examples = shown.filter(model => !model.own && rank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => rank.indexOf(a.id.split('/').slice(1).join('/')) - rank.indexOf(b.id.split('/').slice(1).join('/'))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
+  const exampleModels = shown.filter(model => !model.own && rank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => rank.indexOf(a.id.split('/').slice(1).join('/')) - rank.indexOf(b.id.split('/').slice(1).join('/')));
+  const examples = [...new Map(exampleModels.map(model => [model.id.split('/').slice(1).join('/'), model])).values()].slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
   const stateHint = !agent.connected ? '<span class="model-example muted">可添加</span>' : agent.needsRepair ? '<span class="model-example muted">待核对</span>' : '';
   const nativeHint = agent.id === 'workbuddy' ? '<span class="model-example muted">WorkBuddy 原生模型 · 保留</span>' : '';
   const hiddenCompatibility = shown.filter(model => !model.own).slice(0, 4).map(model => `<span class="sr-only">${escapeHTML(model.name || model.id)}</span>`).join('');
@@ -1243,11 +1244,11 @@ async function confirmSetup() {
         const preserve = setup.mode !== 'single' && !setup.replace && ui.status?.agents?.some(agent => agent.id === id && agent.connected);
         const result = await request('/runtime/agents/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: setup.provider, model: setup.model, auxiliary: setup.auxiliary, ...(preserve ? { preserve: true } : {}) }) });
         const configured = result.agents?.find(current => current.id === id);
-        if (!configured?.wired || configured.drift) throw new Error('未确认配置成功，请检查设置');
+        if (!configured?.wired || configured.drift && configured.drift.kind !== 'bypassed') throw new Error('自动配置未通过核验，原配置已保留');
         connectedAgents.push(id);
         await applyRecommendedVisibility(id, setup.provider, setup.model, preserve);
         ui.selected?.delete(id);
-        ui.results.push({ id, ok: true, message: result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
+        ui.results.push({ id, ok: true, message: configured.drift?.kind === 'bypassed' ? '配置已保存 · 保存工作后完全重开应用' : result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
     if (setup.tools && connectedAgents.length) {

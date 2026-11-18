@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -220,5 +221,89 @@ func TestAgentSetupPreserveDoesNotRewriteConnectedModel(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), "other/custom-model") {
 		t.Fatal("lost existing choice")
+	}
+}
+
+func TestPreservedCodexRepairsWiringAndVerifiesDrift(t *testing.T) {
+	for _, remains := range []bool{false, true} {
+		t.Run(fmt.Sprint(remains), func(t *testing.T) {
+			drift := `{"kind":"unwired","detail":"private native path"}`
+			repairs := 0
+			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/providers":
+					io.WriteString(w, setupProviders)
+					return
+				case "/api/provider/models":
+					io.WriteString(w, `{}`)
+					return
+				case "/api/agents/reapply/codex":
+					repairs++
+					if !remains {
+						drift = "null"
+					}
+				case "/api/set":
+					if !remains {
+						t.Error("healthy repair should retain its model without another write")
+					}
+				case "/api/state":
+				default:
+					t.Errorf("unexpected model/config mutation: %s", r.URL.Path)
+				}
+				fmt.Fprintf(w, `{"agents":[{"id":"codex","wired":true,"drift":%s,"fields":[{"key":"model","value":"other/custom-model","options":[{"value":"other/custom-model","ref":"acu-runtime/acu-auto"}]}]}]}`, drift)
+			}))
+			response := setupRequest(host, `{"agent":"codex","provider":"acu-runtime","model":"acu-auto","preserve":true}`)
+			want := http.StatusOK
+			if remains {
+				want = http.StatusConflict
+			}
+			if response.Code != want || repairs != 1 {
+				t.Fatalf("status=%d repairs=%d: %s", response.Code, repairs, response.Body)
+			}
+			if remains && strings.Contains(response.Body.String(), "private native path") {
+				t.Fatal("native private details leaked")
+			}
+			if !remains && !strings.Contains(response.Body.String(), "other/custom-model") {
+				t.Fatal("current default model lost")
+			}
+		})
+	}
+}
+
+func TestPreservedCodexAutomaticallyAppliesSelectedModelWhenExternallyReplaced(t *testing.T) {
+	repaired := false
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/providers":
+			io.WriteString(w, setupProviders)
+		case "/api/provider/models":
+			io.WriteString(w, `{}`)
+		case "/api/state":
+			io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"drift":{"kind":"replaced","want":"old/model"},"fields":[{"key":"model","value":"native-current","options":[{"value":"acu-runtime/acu-auto","ref":"acu-runtime/acu-auto"}]}]}]}`)
+		case "/api/set":
+			var body map[string]string
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["value"] != "acu-runtime/acu-auto" {
+				t.Fatal("restored an unrelated old model")
+			}
+			repaired = true
+			io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"drift":null,"fields":[{"key":"model","value":"acu-runtime/acu-auto"}]}]}`)
+		default:
+			t.Errorf("unexpected mutation: %s", r.URL.Path)
+		}
+	}))
+	r := setupRequest(host, `{"agent":"codex","provider":"acu-runtime","model":"acu-auto","preserve":true}`)
+	if r.Code != http.StatusOK || !repaired {
+		t.Fatalf("one-click did not repair selected model: %d %s", r.Code, r.Body)
+	}
+}
+
+func TestCodexVerificationRejectsUnresolvedWiringButAllowsRestartNotice(t *testing.T) {
+	for _, kind := range []string{"unwired", "replaced", "proxied", "unreachable", "bypassed", ""} {
+		state := map[string]json.RawMessage{"agents": json.RawMessage(fmt.Sprintf(`[{"id":"codex","wired":true,"drift":{"kind":%q},"fields":[{"key":"model","value":"acu-runtime/acu-auto"}]}]`, kind))}
+		err := verifyCodexRouteState(state, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false)
+		if (err == nil) != (kind == "bypassed" || kind == "") {
+			t.Fatalf("kind=%q error=%v", kind, err)
+		}
 	}
 }

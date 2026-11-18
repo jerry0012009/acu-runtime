@@ -40,6 +40,114 @@ type setupAgent struct {
 	Wired      bool         `json:"wired"`
 	CLIMissing bool         `json:"cliMissing"`
 	Fields     []setupField `json:"fields"`
+	Drift      *agentDrift  `json:"drift,omitempty"`
+}
+
+type agentDrift struct {
+	Kind string `json:"kind"`
+}
+
+func (a setupAgent) needsRepair() bool {
+	return a.Drift != nil && a.Drift.Kind != "" && a.Drift.Kind != "bypassed"
+}
+
+func (host *server) repairPreservedCodex(ctx context.Context, fallback ...codexFieldChange) (map[string]json.RawMessage, error) {
+	before, err := host.kernel.readState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var agents []setupAgent
+	if err := json.Unmarshal(before["agents"], &agents); err != nil {
+		return nil, err
+	}
+	var changes []codexFieldChange
+	found := false
+	for _, agent := range agents {
+		if agent.ID != "codex" {
+			continue
+		}
+		found = true
+		for _, field := range agent.Fields {
+			changes = append(changes, codexFieldChange{field.Key, field.Value})
+		}
+	}
+	if !found {
+		return nil, errors.New("无法找到 Codex 配置，未更改接入")
+	}
+	if len(fallback) > 0 {
+		changes = fallback
+	}
+	var result map[string]json.RawMessage
+	repair := func(k *kernelState) error {
+		current, err := k.readState(ctx)
+		if err != nil {
+			return err
+		}
+		var agents []setupAgent
+		if json.Unmarshal(current["agents"], &agents) != nil {
+			return errors.New("无法重新核对 Codex 配置")
+		}
+		if len(fallback) == 0 {
+			if err := verifyCodexPreservedFields(agents, changes); err != nil {
+				return err
+			}
+		}
+		// Repair wiring first without restoring a historically replaced model.
+		for _, agent := range agents {
+			if agent.ID == "codex" && (agent.Drift == nil || agent.Drift.Kind == "unwired") {
+				if err := k.exchange(ctx, "POST", "/api/agents/reapply/codex", map[string]any{}, &result); err != nil && len(fallback) == 0 {
+					return err
+				}
+			}
+		}
+		if result != nil && verifyCodexRouteState(result, changes, false) == nil {
+			return nil
+		}
+		if len(fallback) == 0 {
+			return errors.New("Codex 自动修复未通过核验")
+		}
+		for _, change := range changes {
+			if err := k.exchange(ctx, "POST", "/api/set", map[string]string{"agent": "codex", "field": change.Field, "value": change.Value}, &result); err != nil {
+				return err
+			}
+		}
+		return verifyCodexRouteState(result, changes, false)
+	}
+	if host.desktop && runtime.GOOS == "windows" {
+		return host.kernel.changeCodexQuietlyWith(ctx, changes, false, func(executable string) error {
+			return nativeCatalogManagement(ctx, executable, repair)
+		})
+	}
+	err = repair(host.kernel)
+	if err == nil {
+		err = verifyCodexRouteState(result, changes, false)
+	}
+	return result, err
+}
+
+func verifyCodexPreservedFields(agents []setupAgent, changes []codexFieldChange) error {
+	for _, agent := range agents {
+		if agent.ID != "codex" {
+			continue
+		}
+		if agent.needsRepair() && agent.Drift.Kind != "unwired" {
+			return errors.New("Codex 配置在修复前已变化，请重新核对")
+		}
+		for _, change := range changes {
+			found := false
+			for _, field := range agent.Fields {
+				if field.Key == change.Field && field.Value == change.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return errors.New("Codex 配置在修复前已变化，请重新核对")
+			}
+		}
+		return nil
+	}
+	return errors.New("无法找到 Codex 配置")
 }
 
 func pickACU(fields []setupField, field, provider, model string) string {
@@ -78,7 +186,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		host.json(response, 400, map[string]string{"error": "请选择 Agent、Key 和模型"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(request.Context(), 120*time.Second)
 	defer cancel()
 	if input.Agent == "codex" && !host.allowCodexDesktopChange(response) {
 		return
@@ -122,7 +230,32 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		host.json(response, 400, map[string]string{"error": "PDF 组件路径同步失败：" + err.Error()})
 		return
 	}
-	if input.Preserve && target.Wired && host.desktop && runtime.GOOS == "windows" && input.Agent == "codex" {
+	if input.Agent == "codex" && input.Preserve && target.Wired && target.needsRepair() {
+		model := pickACU(target.Fields, "model", input.Provider, input.Model)
+		for _, field := range target.Fields {
+			if field.Key != "model" {
+				continue
+			}
+			for _, option := range field.Options {
+				if option.Value == field.Value && strings.HasPrefix(option.Ref, input.Provider+"/") {
+					model = field.Value
+				}
+			}
+		}
+		if model == "" {
+			host.json(response, http.StatusConflict, map[string]string{"error": "当前 Key 无可用 Codex 模型，自动配置未写入"})
+			return
+		}
+		result, repairErr := host.repairPreservedCodex(ctx, codexFieldChange{"model", model})
+		if repairErr != nil {
+			host.json(response, http.StatusConflict, map[string]string{"error": "Codex 自动修复未通过核验，原配置已保留，可重试本次一键配置"})
+			return
+		}
+		result["runtimeSetup"], _ = json.Marshal(map[string]any{"reopenDesktop": host.desktop})
+		host.json(response, http.StatusOK, result)
+		return
+	}
+	if input.Preserve && target.Wired && target.Drift == nil && host.desktop && runtime.GOOS == "windows" && input.Agent == "codex" {
 		for _, field := range target.Fields {
 			if field.Key != "model" {
 				continue
@@ -209,7 +342,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 	confirmed := false
 	if json.Unmarshal(result["agents"], &verified) == nil {
 		for _, agent := range verified {
-			if agent.ID != input.Agent || !agent.Wired {
+			if agent.ID != input.Agent || !agent.Wired || agent.needsRepair() {
 				continue
 			}
 			confirmed = input.Agent == "workbuddy"

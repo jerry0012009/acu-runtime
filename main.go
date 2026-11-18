@@ -49,6 +49,7 @@ type agentView struct {
 	Path            string             `json:"path,omitempty"`
 	CanConnect      bool               `json:"canConnect"`
 	NeedsRepair     bool               `json:"needsRepair"`
+	DriftKind       string             `json:"driftKind,omitempty"`
 	RestartRequired bool               `json:"restartRequired"`
 	RestartKinds    []string           `json:"restartKinds,omitempty"`
 	ModelOptions    []agentModelOption `json:"modelOptions,omitempty"`
@@ -491,8 +492,16 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 					for _, native := range current {
 						if native.ID == agents[index].ID {
 							agents[index].Detected, agents[index].Connected, agents[index].Source, agents[index].Path = !native.CLIMissing, native.Wired, native.Source, native.Path
-							agents[index].NeedsRepair = len(native.Drift) > 0 && string(native.Drift) != "null"
+							var drift agentDrift
+							hasDrift := len(native.Drift) > 0 && string(native.Drift) != "null"
+							_ = json.Unmarshal(native.Drift, &drift)
+							agents[index].DriftKind = drift.Kind
+							agents[index].NeedsRepair = hasDrift && drift.Kind != "bypassed"
 							agents[index].RestartRequired = native.Stale > 0 || len(native.AppRestart) > 0 && string(native.AppRestart) != "null"
+							if drift.Kind == "bypassed" {
+								agents[index].RestartRequired = true
+								agents[index].RestartKinds = append(agents[index].RestartKinds, "app")
+							}
 							if len(native.AppRestart) > 0 && string(native.AppRestart) != "null" {
 								agents[index].RestartKinds = append(agents[index].RestartKinds, "app")
 							}

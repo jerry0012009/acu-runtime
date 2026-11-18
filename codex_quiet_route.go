@@ -154,7 +154,7 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 			if resultErr == nil {
 				result, resultErr = k.readState(recovery)
 			}
-			if resultErr == nil && (len(changes) > 0 || disconnect) {
+			if resultErr == nil && (len(changes) > 0 || disconnect || mutation != nil && probeModel != "") {
 				resultErr = verifyCodexRouteState(result, changes, disconnect)
 			}
 			if resultErr != nil {
@@ -259,6 +259,9 @@ func verifyCodexRouteState(state map[string]json.RawMessage, changes []codexFiel
 		}
 		if !a.Wired {
 			return errors.New("Codex 未接入")
+		}
+		if a.needsRepair() {
+			return errors.New("Codex 接入仍存在配置或连接异常，请检查登录模式、代理及高级配置")
 		}
 		for _, change := range changes {
 			found := false

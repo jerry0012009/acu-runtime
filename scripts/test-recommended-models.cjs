@@ -17,6 +17,7 @@ fs.mkdirSync(output, { recursive: true });
       page.on('pageerror', error => errors.push(error.message));
       const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5', 'claude-fable-5-1','claude-fable-5-2','gemini-4-carbon','gemini-4-hydrogen','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
       const agent = { id: agentId, name: agentId, detected: true, connected, wired: connected, model: connected ? 'acu-runtime/claude-fable-5' : '', modelOptions: choice.models.map(model=>({value:'acu-runtime/'+model,ref:'acu-runtime/'+model})) };
+      if (agentId === 'codex' && connected) { agent.needsRepair = true; agent.driftKind = 'unwired'; }
       const catalog = { models: [
         { id: 'acu-runtime/acu-auto' },
         { id: 'acu-runtime/gpt-6.2-sol', hidden: true },
@@ -48,6 +49,7 @@ fs.mkdirSync(output, { recursive: true });
         if (url.pathname === '/runtime/agents/configure') {
           const body = request.postDataJSON();
           configurations.push(body);
+          if (agentId === 'codex' && connected) { assert.equal(body.preserve,true); agent.needsRepair=false; }
           catalog.models = catalog.models.map(model => model.id === `acu-runtime/${body.model}` ? { ...model, hidden: false } : model);
           return route.fulfill({ json: { agents: [{ id: agentId, wired: true }] } });
         }
@@ -81,6 +83,7 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(configurations.length, 1);
       assert.equal(configurations[0].model, !connected && agentId !== 'workbuddy' ? (theme === 'light' ? 'gpt-6.2-sol' : 'gpt-6.2-astra') : 'acu-auto');
       assert.equal(configurations[0].preserve === true, connected);
+      if (agentId === 'codex' && connected) assert.equal(agent.model,'acu-runtime/claude-fable-5');
       assert.deepEqual(changes, [{ agent:agentId, hidden: [] }]);
       assert.deepEqual(errors, []);
       await page.close();

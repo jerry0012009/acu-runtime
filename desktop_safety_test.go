@@ -11,7 +11,7 @@ import (
 )
 
 func TestOldServingKernelBlocksWritesBeforeForwarding(t *testing.T) {
-	for _, path := range []string{"/api/set", "/kernel/api/agents/connect/codex", "/kernel/api/agents/disconnect/codex", "/kernel/api/agents/disconnect-offline/codex", "/kernel/api/agents/stage/codex", "/kernel/api/agents/restart/codex", "/kernel/api/agent-models/codex"} {
+	for _, path := range []string{"/api/set", "/kernel/api/agents/reapply/codex", "/kernel/api/agents/connect/codex", "/kernel/api/agents/disconnect/codex", "/kernel/api/agents/disconnect-offline/codex", "/kernel/api/agents/stage/codex", "/kernel/api/agents/restart/codex", "/kernel/api/agent-models/codex"} {
 		t.Run(path, func(t *testing.T) {
 			host, _ := testServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("unsafe request reached kernel") }))
 			host.desktop = true

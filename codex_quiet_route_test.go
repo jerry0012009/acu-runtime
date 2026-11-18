@@ -171,6 +171,44 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	if !strings.Contains(string(b), `name = "ACU"`) {
 		t.Fatal("native provider display name was not branded after restart")
 	}
+	// An external tool can leave the model unchanged while replacing its route.
+	// Reapply through the same paused-watcher transaction, then read drift back.
+	broken := strings.Replace(string(b), "http://"+address+"/v1", "http://127.0.0.1:1/v1", 1)
+	if broken == string(b) {
+		t.Fatal("fixture did not find the managed provider URL")
+	}
+	if err := os.WriteFile(filepath.Join(codex, "config.toml"), []byte(broken), 0600); err != nil {
+		t.Fatal(err)
+	}
+	repairHost := &server{kernel: k, desktop: true}
+	state, err = repairHost.repairPreservedCodex(ctx, codexFieldChange{"model", "acu-runtime/acu-auto"})
+	if err != nil {
+		t.Fatal("preserved Codex drift repair", err)
+	}
+	if err := verifyCodexRouteState(state, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(codex, "config.toml"))
+	if !strings.Contains(string(b), "preserved-test-marker") {
+		t.Fatal("repair lost existing MCP")
+	}
+	// A replaced default is repaired by the already-confirmed one-click model,
+	// never by restoring whatever historical model was last recorded.
+	replaced := strings.Replace(string(b), `model = "acu-runtime/acu-auto"`, `model = "unregistered-external-model"`, 1)
+	if replaced == string(b) {
+		t.Fatal("fixture did not replace model")
+	}
+	if err := os.WriteFile(filepath.Join(codex, "config.toml"), []byte(replaced), 0600); err != nil {
+		t.Fatal(err)
+	}
+	state, err = repairHost.repairPreservedCodex(ctx, codexFieldChange{"model", "acu-runtime/acu-auto"})
+	if err != nil {
+		t.Fatal("one-click replaced model recovery", err)
+	}
+	if err := verifyCodexRouteState(state, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(codex, "config.toml"))
 	before := append([]byte(nil), b...)
 	assertLogin := func(state map[string]json.RawMessage, want string) {
 		t.Helper()

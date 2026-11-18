@@ -39,7 +39,7 @@ func (host *server) allowDesktopMutation(w http.ResponseWriter, r *http.Request,
 	if !host.desktop || r.Method == http.MethodGet || r.Method == http.MethodHead {
 		return true
 	}
-	for _, prefix := range []string{"/api/agents/connect/", "/api/agents/disconnect/", "/api/agents/disconnect-offline/", "/api/agents/stage/", "/api/agents/restart/", "/api/agent-models/"} {
+	for _, prefix := range []string{"/api/agents/connect/", "/api/agents/reapply/", "/api/agents/disconnect/", "/api/agents/disconnect-offline/", "/api/agents/stage/", "/api/agents/restart/", "/api/agent-models/"} {
 		if path == prefix+"codex" {
 			return host.allowCodexDesktopChange(w)
 		}
@@ -73,6 +73,16 @@ func (host *server) handleQuietCodexMutation(w http.ResponseWriter, r *http.Requ
 	var changes []codexFieldChange
 	disconnect := false
 	switch path {
+	case "/api/agents/reapply/codex":
+		ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+		defer cancel()
+		state, err := host.repairPreservedCodex(ctx)
+		if err != nil {
+			host.json(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		} else {
+			host.json(w, http.StatusOK, state)
+		}
+		return true
 	case "/api/agents/restart/codex":
 		host.json(w, 409, map[string]string{"error": "请保存工作后手动重新打开 ChatGPT，使新配置生效。"})
 		return true
