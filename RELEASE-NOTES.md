@@ -1,4 +1,6 @@
-# ACU Runtime 0.1.124
+# ACU Runtime 0.1.125
+
+一键配置自动提供当前 Key 可用的最新旗舰模型，包括 GPT-6.2 Sol / Astra、Claude Fable 5.2、Opus 5.5、Gemini 4 系列等。不需要进入高级配置逐项开启 GPT-6.2；同时保留常用 GPT-6 / 6.1 系列。已有上位型号可用时，从所选 ACU 来源的应用模型列表移出旧型号，例如 Opus 4.8；旧默认及辅助角色自动迁移到对应上位型号，写入后回读核验。不更改原生登录、其他来源、Key 权限、云端价格或供给。
 
 修复一键配置 Codex 时“保留现有模型”反复返回“未确认配置成功”的问题：现有配置确实偏离网关时，通过官方内核重新应用接入并回读核验。Windows 修复在原有暂停空闲网关、验证和失败回滚事务中完成，不关闭 ChatGPT，不删除登录、会话或 MCP；macOS 仍要求先退出客户端。
 
@@ -14,7 +16,7 @@
 
 ## 保留 0.1.121 的一键配置来源开放
 
-一键配置现会将当前 ACU Key 可用的 GPT‑6.2 Sol／Astra 与 Gemini 4 Carbon／Argon／Hydrogen 推荐项同步到应用模型目录；覆盖 Codex、Claude Code、Hermes 与 WorkBuddy。保留现有主模型，不静默替换默认选择，也不改变供应商启用状态。受 Magpie 来源过滤保护的模型通过其官方 widen 接口显式放开。
+一键配置会将当前 ACU Key 可用的 GPT‑6.2 Sol／Astra 与 Gemini 4 Carbon／Argon／Hydrogen 推荐项同步到应用模型目录；覆盖 Codex、Claude Code、Hermes 与 WorkBuddy。0.1.125 在此基础上新增旧型号自动迁移和列表精简，其他现有主模型继续保留。受 Magpie 来源过滤保护的模型通过其官方 widen 接口显式放开。
 
 点击管理页里的“显示全部”或“开关”修改后，点击“保存”并完整重启相应应用，确保应用重新读取生成的模型目录。可列出不代表上游当前有可用账号或请求一定成功。
 

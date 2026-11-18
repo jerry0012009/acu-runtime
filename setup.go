@@ -204,11 +204,12 @@ func (host *server) prepareCodexSetupRoute(ctx context.Context, provider string,
 
 func (host *server) configureAgent(response http.ResponseWriter, request *http.Request) {
 	var input struct {
-		Agent     string `json:"agent"`
-		Provider  string `json:"provider"`
-		Model     string `json:"model"`
-		Auxiliary bool   `json:"auxiliary"`
-		Preserve  bool   `json:"preserve"`
+		Agent      string            `json:"agent"`
+		Provider   string            `json:"provider"`
+		Model      string            `json:"model"`
+		Auxiliary  bool              `json:"auxiliary"`
+		Preserve   bool              `json:"preserve"`
+		Migrations map[string]string `json:"migrations"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(response, request.Body, 4096)).Decode(&input) != nil {
 		host.json(response, 400, map[string]string{"error": "无法读取配置"})
@@ -230,11 +231,13 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		return
 	}
 	available := false
+	availableModels := map[string]bool{}
 	for _, choice := range host.connection(ctx).Choices {
 		if choice.ID != input.Provider {
 			continue
 		}
 		for _, model := range choice.Models {
+			availableModels[model] = true
 			if model == input.Model {
 				available = true
 			}
@@ -264,6 +267,11 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		host.json(response, 400, map[string]string{"error": "未检测到此 Agent"})
 		return
 	}
+	migrations, migrationErr := setupMigrations(target.Fields, input.Provider, input.Migrations, availableModels)
+	if migrationErr != nil {
+		host.json(response, 400, map[string]string{"error": migrationErr.Error()})
+		return
+	}
 	if err := host.prepareAgentComponents([]string{input.Agent}); err != nil {
 		host.json(response, 400, map[string]string{"error": "PDF 组件路径同步失败：" + err.Error()})
 		return
@@ -284,7 +292,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 			host.json(response, http.StatusConflict, map[string]string{"error": "当前 Key 无可用 Codex 模型，自动配置未写入"})
 			return
 		}
-		result, repairErr := host.repairPreservedCodex(ctx, codexFieldChange{"model", model})
+		result, repairErr := host.repairPreservedCodex(ctx, append([]codexFieldChange{{"model", model}}, migrations...)...)
 		if repairErr != nil {
 			host.json(response, http.StatusConflict, map[string]string{"error": "Codex 自动修复未通过核验，原配置已保留，可重试本次一键配置"})
 			return
@@ -307,7 +315,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 			}
 		}
 	}
-	if input.Preserve && target.Wired {
+	if input.Preserve && target.Wired && len(migrations) == 0 {
 		if err := host.ensureACUContext(ctx, input.Provider); err != nil {
 			host.json(response, 400, map[string]string{"error": err.Error()})
 			return
@@ -316,6 +324,13 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		return
 	}
 	main := pickACU(target.Fields, "model", input.Provider, input.Model)
+	if input.Preserve && target.Wired {
+		for _, field := range target.Fields {
+			if field.Key == "model" {
+				main = field.Value
+			}
+		}
+	}
 	if input.Agent != "workbuddy" && main == "" {
 		host.json(response, 400, map[string]string{"error": "此 Agent 暂不支持所选 ACU 模型，请更换模型"})
 		return
@@ -332,10 +347,20 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		}
 		changes := []codexFieldChange{}
 		for _, field := range fields {
+			if _, migrating := input.Migrations[field]; migrating {
+				continue
+			}
+			if input.Preserve && target.Wired {
+				if field == "model" {
+					changes = append(changes, codexFieldChange{field, main})
+				}
+				continue
+			}
 			if value := pickACU(target.Fields, field, input.Provider, input.Model); value != "" {
 				changes = append(changes, codexFieldChange{field, value})
 			}
 		}
+		changes = append(changes, migrations...)
 		result, err = host.kernel.changeCodexQuietly(ctx, changes, false)
 		if err != nil {
 			host.json(response, 409, map[string]string{"error": err.Error()})
@@ -356,16 +381,27 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		fields = append(fields, "small", "opus", "sonnet", "haiku", "fable", "subagent", "subagent_model")
 	}
 	auxiliaryApplied := 0
+	changes := []codexFieldChange{}
 	for _, field := range fields {
+		if _, migrating := input.Migrations[field]; migrating {
+			continue
+		}
+		if input.Preserve && target.Wired {
+			continue
+		}
 		value := pickACU(target.Fields, field, input.Provider, input.Model)
 		if value == "" {
 			continue
 		}
-		if err := host.kernel.exchange(ctx, "POST", "/api/set", map[string]string{"agent": input.Agent, "field": field, "value": value}, &result); err != nil {
+		changes = append(changes, codexFieldChange{field, value})
+	}
+	changes = append(changes, migrations...)
+	for _, change := range changes {
+		if err := host.kernel.exchange(ctx, "POST", "/api/set", map[string]string{"agent": input.Agent, "field": change.Field, "value": change.Value}, &result); err != nil {
 			host.json(response, 400, map[string]string{"error": "部分配置已写入，请重试：" + err.Error()})
 			return
 		}
-		if field != "model" {
+		if change.Field != "model" {
 			auxiliaryApplied++
 		}
 	}
@@ -389,6 +425,15 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 					confirmed = true
 				}
 			}
+			for _, change := range changes {
+				matched := false
+				for _, field := range agent.Fields {
+					if field.Key == change.Field && field.Value == change.Value {
+						matched = true
+					}
+				}
+				confirmed = confirmed && matched
+			}
 		}
 	}
 	if !confirmed {
@@ -397,4 +442,34 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 	}
 	result["runtimeSetup"], _ = json.Marshal(map[string]int{"auxiliaryApplied": auxiliaryApplied})
 	host.json(response, 200, result)
+}
+
+func setupMigrations(fields []setupField, provider string, requested map[string]string, available map[string]bool) ([]codexFieldChange, error) {
+	var changes []codexFieldChange
+	for _, field := range fields {
+		model, ok := requested[field.Key]
+		if !ok {
+			continue
+		}
+		switch field.Key {
+		case "small", "opus", "sonnet", "haiku", "fable", "subagent", "subagent_model", "memories":
+		default:
+			return nil, errors.New("不支持迁移此模型角色")
+		}
+		owned := false
+		for _, option := range field.Options {
+			if option.Value == field.Value && strings.HasPrefix(option.Ref, provider+"/") {
+				owned = true
+			}
+		}
+		value := pickACU(fields, field.Key, provider, model)
+		if !owned || !available[model] || value == "" {
+			return nil, errors.New("辅助模型已变化或上位模型不可用，未写入迁移")
+		}
+		changes = append(changes, codexFieldChange{field.Key, value})
+	}
+	if len(changes) != len(requested) {
+		return nil, errors.New("无法找到要迁移的模型角色")
+	}
+	return changes, nil
 }

@@ -270,6 +270,24 @@ func TestPrepareModelsRejectsUnknownOrForeignProviders(t *testing.T) {
 	}
 }
 
+func TestPrepareModelsDoesNotEnableSupersededCandidate(t *testing.T) {
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/providers":
+			io.WriteString(w, setupProviders)
+		case "/api/provider/models":
+			io.WriteString(w, `{"provider":{"models":[{"id":"claude-fable-5-1","on":false},{"id":"claude-fable-5-2","on":true}]}}`)
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	}))
+	w := httptest.NewRecorder()
+	host.prepareModels(w, httptest.NewRequest("POST", "/runtime/models/prepare", strings.NewReader(`{"provider":"acu-runtime","models":["claude-fable-5-1","claude-fable-5-2"],"superseded":{"claude-fable-5-1":"claude-fable-5-2"}}`)))
+	if w.Code != 200 {
+		t.Fatalf("attempted to enable superseded candidate: %d %s", w.Code, w.Body)
+	}
+}
+
 func TestModelSyncUsesNativeVisibilityAndRejectsUnknownAgent(t *testing.T) {
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/agent-models/workbuddy" {

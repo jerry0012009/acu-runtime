@@ -760,7 +760,7 @@ test('DeepSeek V4.1 Flash variants are recommended while legacy V4 Flash is omit
 test('Fable 5.2 is recommended ahead of 5.1 and respects the account model list', async () => {
   const instance = await setup({ ready: true, agents: [codex()] });
   assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5", "claude-fable-5-1", "claude-opus-5-5"] }).join(",")'), 'claude-opus-5-5,claude-fable-5-1');
-  assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5-1", "claude-fable-5-2"] }).join(",")'), 'claude-fable-5-2,claude-fable-5-1');
+  assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5-1", "claude-fable-5-2"] }).join(",")'), 'claude-fable-5-2');
   assert.equal(instance.run('recommendedModels({ models: ["claude-fable-5"] }).length'), 0);
   const options = [
     {value:'acu-runtime/claude-fable-5',ref:'acu-runtime/claude-fable-5',label:'Fable 5'},
@@ -819,6 +819,41 @@ test('existing Agent setup reveals available recommended models without replacin
   assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{agent:'codex',hidden:[]});
   assert.equal(instance.run('ui.status.agents[0].model'),native.model);
   assert.equal(result,undefined);
+});
+
+for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) {
+  test(`${agentID} one-click retires superseded ACU models and migrates saved defaults and roles`, async () => {
+    const models = ['acu-auto','gpt-6.2-sol','gpt-6.2-astra','gpt-6-sol','gpt-6.1-sol','claude-opus-4-8','claude-opus-5-5','gpt-5.6-sol'];
+    const agent = { id:agentID, name:agentID, detected:true, connected:true,
+      model: agentID === 'workbuddy' ? '' : 'old-native-option',
+      modelOptions:[{value:'old-native-option',ref:'acu-runtime/claude-opus-4-8'}],
+      roles:agentID === 'claude' ? [{key:'opus',ref:'acu-runtime/claude-opus-4-8'}] : [],
+    };
+    const catalog = { models:models.map(id=>({id:'acu-runtime/'+id,hidden:id.startsWith('gpt-6')})).concat([
+      {id:'other/claude-opus-4-8'}, {id:'codex/claude-opus-4-8',own:true},
+    ]) };
+    const instance = await setup({ready:true, connection:{...connected(),choices:[{id:'acu-runtime',models}]}, agents:[agent]}, async(route,options)=>{
+      if(route==='/runtime/agents/configure') return {body:{agents:[{id:agentID,wired:true}]}};
+      if(route===`/kernel/api/agent-models/${agentID}`&&!options.method)return {body:structuredClone(catalog)};
+    });
+    instance.run(`ui.selected = new Set(["${agentID}"])`);
+    await instance.run('applyAgents()'); instance.run('ui.setup.tools=false'); await instance.run('confirmSetup()');
+    const config=JSON.parse(posts(instance).find(call=>call.route==='/runtime/agents/configure').body);
+    assert.equal(config.model,agentID==='workbuddy'?'acu-auto':'claude-opus-5-5');
+    assert.equal(config.preserve===true,agentID==='workbuddy');
+    if(agentID==='claude')assert.deepEqual(config.migrations,{opus:'claude-opus-5-5'});
+    const visibility=JSON.parse(posts(instance).find(call=>call.route==='/runtime/agents/models').body);
+    assert.deepEqual(visibility.hidden,['acu-runtime/claude-opus-4-8','acu-runtime/gpt-5.6-sol']);
+    assert.equal(instance.run('ui.results[0].ok'),true);
+    assert.equal(instance.run('recommendedModels(ui.status.connection.choices[0]).includes("claude-opus-4-8")'),false);
+  });
+}
+
+test('supersession requires the successor in the Key', async () => {
+  const choice={id:'acu-runtime',models:['acu-auto','claude-opus-4-8']};
+  const instance=await setup({ready:true,connection:{...connected(),choices:[choice]},agents:[codex()]});
+  assert.equal(instance.run('successorACUModel(ui.status.connection.choices[0],"claude-opus-4-8")'),'');
+  assert.equal(instance.run('successorACUModel({models:["claude-opus-5-5"]},"claude-opus-4-8")'),'claude-opus-5-5');
 });
 
 for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const only of [false, true]) {

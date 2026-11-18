@@ -1,4 +1,4 @@
-# Codex Preserved-Configuration Repair
+# One-Click Flagships and Codex Repair
 
 The reported one-click failure has a confirmed Runtime control-flow defect:
 preserve mode returned a wired Agent's unchanged state even when native drift
@@ -7,7 +7,7 @@ rejecting unresolved drift, leaving the UI to emit a generic failure. Native
 `bypassed` (old app still on previous configuration) was also rendered as broken
 configuration rather than a restart notice.
 
-Runtime 0.1.124 reads native drift and uses official Magpie reapply for unwired
+Runtime 0.1.125 reads native drift and uses official Magpie reapply for unwired
 Codex under preserve mode. The retained available ACU model or already-confirmed
 setup model must read back correctly and the native wiring error must disappear.
 Windows performs reapply inside the existing
@@ -28,7 +28,7 @@ Verification:
 
 - Pre-fix regressions demonstrated preserve returning unresolved drift without
   repair, and verification accepting unresolved wiring. Regressions now pass.
-- Go test/vet and 170 Node tests cover repair, failed repair, automatic recovery
+- Go test/vet and Node tests cover repair, failed repair, automatic recovery
   from an externally replaced model, restart-only state and summary deduplication.
 - Official Magpie v0.1.4350 plus installed Codex isolation test:
   temporary model provider URL corrupted and repaired through native reapply,
@@ -47,5 +47,17 @@ No account, auth.json or session deletion.
 
 The v0.1.123 candidate workflow was cancelled before publication when final
 review found that model preparation precedes per-Agent configuration. Version
-0.1.124 repairs existing Codex drift before the Windows catalog transaction,
+0.1.125 repairs existing Codex drift before the Windows catalog transaction,
 so the initial one-click model preparation cannot be blocked by the old route.
+
+The v0.1.124 candidate was cancelled before publication to include automatic
+model curation. One-click exposes all available recommended flagships, including
+both GPT-6.2 models, and keeps common GPT-6/6.1 models. If an available successor
+exists in the selected Key, superseded ACU entries are hidden in each configured
+Agent, after migrating the saved default and auxiliary role references using
+official native options. Main and auxiliary writes and hidden entries are read
+back. Source widening remains automatic. Provider preparation no longer newly
+enables superseded candidates. Other providers, native entries, Key permissions,
+cloud supply, prices, auth and sessions are untouched. Tests cover fresh and
+existing Codex/Claude/Hermes/WorkBuddy, restricted inventory, native preservation,
+role scoping, retained GPT-6/6.1 and retirement of Opus 4.8 and GPT-5.6 Sol.

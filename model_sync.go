@@ -99,9 +99,10 @@ type syncProvider struct {
 
 func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Provider      string   `json:"provider"`
-		Models        []string `json:"models"`
-		ModelPrefixes []string `json:"modelPrefixes"`
+		Provider      string            `json:"provider"`
+		Models        []string          `json:"models"`
+		ModelPrefixes []string          `json:"modelPrefixes"`
+		Superseded    map[string]string `json:"superseded"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&input) != nil || input.Provider == "" || len(input.Models) > 100 {
 		host.json(w, 400, map[string]string{"error": "无法读取模型同步配置"})
@@ -163,7 +164,14 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 			wanted[id] = true
 		}
 		args := []string{"provider", "models", input.Provider}
+		available := map[string]bool{}
 		for _, m := range refreshed.Provider.Models {
+			available[m.ID] = true
+		}
+		for _, m := range refreshed.Provider.Models {
+			if successor := input.Superseded[m.ID]; successor != "" && available[successor] {
+				continue
+			}
 			matches := wanted[m.ID]
 			for _, prefix := range input.ModelPrefixes {
 				if prefix == "gemini-4-" && strings.HasPrefix(m.ID, prefix) {

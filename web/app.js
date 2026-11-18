@@ -179,9 +179,27 @@ function activeChoice() {
 }
 
 // Recommended candidates are intersected with the account's current model list.
-const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra', 'gemini-4-carbon', 'gemini-4-hydrogen', 'claude-opus-5-5', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
+const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-4-argon', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
+const supersedingACUModels = {
+  'claude-opus-4-8': 'claude-opus-5-5', 'claude-opus-4.8': 'claude-opus-5-5', 'claude-opus-5': 'claude-opus-5-5', 'claude-opus-5.5': 'claude-opus-5-5',
+  'claude-fable-5': 'claude-fable-5-2', 'claude-fable-5-1': 'claude-fable-5-2',
+  'claude-sonnet-5': 'claude-sonnet-5-5', 'claude-haiku-4-5': 'claude-haiku-5-5', 'claude-haiku-4-5-20251001': 'claude-haiku-5-5',
+  'kimi-k3': 'kimi-k3.1-pro', 'grok-4.6': 'grok-4.7', 'glm-5.1': 'glm-5.3', 'glm-5.2': 'glm-5.3',
+  'gemini-3.8-flash': 'gemini-4-hydrogen',
+  'claude-opus-4-6': 'claude-opus-5-5', 'claude-opus-4-7': 'claude-opus-5-5',
+  'claude-sonnet-4-6': 'claude-sonnet-5-5',
+  'gpt-5.4': 'gpt-6.2-sol', 'gpt-5.5': 'gpt-6.2-sol', 'gpt-5.6': 'gpt-6.2-sol',
+  'gpt-5.6-sol': 'gpt-6.2-sol', 'gpt-5.6-sol-fast': 'gpt-6.2-sol',
+  'gpt-5.6-terra': 'gpt-6.1-terra', 'gpt-5.6-terra-fast': 'gpt-6.1-terra',
+  'gpt-5.6-luna': 'gpt-6-luna', 'gpt-5.6-luna-fast': 'gpt-6-luna',
+  'deepseek-v4-flash': 'deepseek-v4.1-flash',
+};
+function successorACUModel(choice, model) {
+  const successor = supersedingACUModels[model];
+  return successor && choice?.models?.includes(successor) ? successor : '';
+}
 function recommendedModels(choice) {
-  return [...recommendedACUModels.filter(model => choice?.models?.includes(model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))];
+  return [...recommendedACUModels.filter(model => choice?.models?.includes(model) && !successorACUModel(choice, model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))];
 }
 
 function agentRecommendation(agent, choice, selectedModel, settings) {
@@ -1151,7 +1169,7 @@ async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-']})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-'],superseded:supersedingACUModels})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1166,7 +1184,7 @@ async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-']})}); }
+    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-'],superseded:supersedingACUModels})}); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1211,21 +1229,26 @@ function renderSetup() {
   document.body.classList.add('overlay-open');
 }
 
-async function applyRecommendedVisibility(agentId, provider, selectedModel, preserveVisibility = false) {
+async function applyRecommendedVisibility(agentId, provider, selectedModel) {
   const catalog = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`);
   if (!Array.isArray(catalog?.models)) throw new Error('接入已保存，但无法读取模型清单，请重试推荐配置');
   const prefix = provider + '/';
+  const choice = ui.status?.connection?.choices?.find(item => item.id === provider);
   const models = catalog.models.map(model => {
     if (!model.id.startsWith(prefix) || model.own) return model;
     const id = model.id.slice(prefix.length);
-    if (!model.hidden || !(recommendedACUModels.includes(id) || id.startsWith('gemini-4-'))) return model;
+    if (successorACUModel(choice, id)) {
+      if (model.inUse || model.id === prefix + selectedModel) throw new Error('默认模型尚未迁移到上位模型，自动配置未完成');
+      return { ...model, hidden: true };
+    }
+    if (!model.hidden || !recommendedModels(choice).includes(id)) return model;
     return { ...model, hidden: false };
   });
   if (!models.some((model, index) => model.hidden !== catalog.models[index].hidden)) return;
   const body = visibilityPayload({ catalog: { ...catalog, models } });
   await request('/runtime/agents/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({agent:agentId,...body}) });
   const verified = await requestKernel(`/kernel/api/agent-models/${encodeURIComponent(agentId)}`);
-  if (!Array.isArray(verified?.models) || models.some(model => !model.hidden && !model.own && !verified.models.some(current => current.id === model.id && !current.hidden && !current.kept))) throw new Error('模型列表尚未同步完成，请重试配置');
+  if (!Array.isArray(verified?.models) || models.some(model => !model.own && !verified.models.some(current => current.id === model.id && !!current.hidden === !!model.hidden && (model.hidden || !current.kept)))) throw new Error('模型列表尚未同步完成，请重试配置');
 }
 
 async function confirmSetup() {
@@ -1241,12 +1264,19 @@ async function confirmSetup() {
       ui.progress = `配置中 ${index + 1}/${setup.agents.length}`;
       render();
       try {
-        const preserve = setup.mode !== 'single' && !setup.replace && ui.status?.agents?.some(agent => agent.id === id && agent.connected);
-        const result = await request('/runtime/agents/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: setup.provider, model: setup.model, auxiliary: setup.auxiliary, ...(preserve ? { preserve: true } : {}) }) });
+        const agent = ui.status?.agents?.find(agent => agent.id === id);
+        const choice = ui.status?.connection?.choices?.find(item => item.id === setup.provider);
+        const current = agent?.modelOptions?.find(option => option.value === agent.model)?.ref || agent?.roles?.find(role => role.key === 'model')?.ref || agent?.model;
+        const currentId = current?.startsWith(setup.provider + '/') ? current.slice(setup.provider.length + 1) : '';
+        const replacement = successorACUModel(choice, currentId);
+        const preserve = setup.mode !== 'single' && !setup.replace && agent?.connected && !replacement;
+        const requestedModel = replacement && setup.mode !== 'single' && !setup.replace ? replacement : setup.model;
+        const migrations = Object.fromEntries((agent?.roles || []).filter(role => role.key !== 'model' && role.ref?.startsWith(setup.provider + '/')).map(role => [role.key, successorACUModel(choice, role.ref.slice(setup.provider.length + 1))]).filter(([,model]) => model));
+        const result = await request('/runtime/agents/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: setup.provider, model: requestedModel, auxiliary: setup.auxiliary, ...(preserve ? { preserve: true } : {}), ...(Object.keys(migrations).length ? { migrations } : {}) }) });
         const configured = result.agents?.find(current => current.id === id);
         if (!configured?.wired || configured.drift && configured.drift.kind !== 'bypassed') throw new Error('自动配置未通过核验，原配置已保留');
         connectedAgents.push(id);
-        await applyRecommendedVisibility(id, setup.provider, setup.model, preserve);
+        await applyRecommendedVisibility(id, setup.provider, preserve ? currentId : requestedModel);
         ui.selected?.delete(id);
         ui.results.push({ id, ok: true, message: configured.drift?.kind === 'bypassed' ? '配置已保存 · 保存工作后完全重开应用' : result.runtimeSetup?.reopenDesktop ? '配置已核验 · 重新打开 ChatGPT 后生效' : preserve ? '已接入 · 保留现有模型' : setup.auxiliary && !result.runtimeSetup?.auxiliaryApplied ? '已配置 · 无可同步的辅助项' : '已配置' });
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }

@@ -143,6 +143,11 @@ func TestAgentSetupUsesExactNativeModelAndPreservesOtherSettings(t *testing.T) {
 					if input["field"] == "model" && !current.ignored {
 						selected = input["value"]
 					}
+					for index := range fields {
+						if fields[index].Key == input["field"] && !current.ignored {
+							fields[index].Value = input["value"]
+						}
+					}
 				case "/api/state":
 				default:
 					t.Errorf("unexpected Agent request: %s", request.URL.Path)
@@ -192,6 +197,61 @@ func TestAgentSetupUsesExactNativeModelAndPreservesOtherSettings(t *testing.T) {
 				if write["agent"] != current.agent || write["field"] == "model" && write["value"] != "exact-native-model" || write["field"] == "subagent_model" && write["value"] != "exact-native-aux" {
 					t.Fatalf("did not use the selected provider's native option: %+v", write)
 				}
+			}
+		})
+	}
+}
+
+func TestSetupMigrationsAreScopedToAvailableACURoles(t *testing.T) {
+	fields := []setupField{{Key: "opus", Value: "old", Options: []setupOption{{Value: "old", Ref: "acu-runtime/claude-opus-4-8"}, {Value: "latest", Ref: "acu-runtime/claude-opus-5-5"}}}}
+	available := map[string]bool{"claude-opus-5-5": true}
+	changes, err := setupMigrations(fields, "acu-runtime", map[string]string{"opus": "claude-opus-5-5"}, available)
+	if err != nil || len(changes) != 1 || changes[0] != (codexFieldChange{"opus", "latest"}) {
+		t.Fatalf("migration did not use native successor option: %+v %v", changes, err)
+	}
+	for _, requested := range []map[string]string{{"opus": "absent"}, {"login": "claude-opus-5-5"}, {"missing": "claude-opus-5-5"}} {
+		if _, err := setupMigrations(fields, "acu-runtime", requested, available); err == nil {
+			t.Fatalf("accepted invalid migration: %v", requested)
+		}
+	}
+	fields[0].Options[0].Ref = "other/claude-opus-4-8"
+	if _, err := setupMigrations(fields, "acu-runtime", map[string]string{"opus": "claude-opus-5-5"}, available); err == nil {
+		t.Fatal("rewrote a different provider's role")
+	}
+}
+
+func TestPreservedSetupMigratesAuxiliaryWithoutReplacingMain(t *testing.T) {
+	for _, ignored := range []bool{false, true} {
+		t.Run(fmt.Sprint(ignored), func(t *testing.T) {
+			fields := []setupField{{Key: "model", Value: "native/main"}, {Key: "opus", Value: "old", Options: []setupOption{{Value: "old", Ref: "acu-runtime/old"}, {Value: "new", Ref: "acu-runtime/acu-auto"}}}}
+			writes := 0
+			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/providers":
+					io.WriteString(w, setupProviders)
+					return
+				case "/api/provider/models":
+					io.WriteString(w, `{}`)
+					return
+				case "/api/set":
+					var input map[string]string
+					json.NewDecoder(r.Body).Decode(&input)
+					writes++
+					if input["field"] != "opus" || input["value"] != "new" {
+						t.Errorf("unexpected write: %v", input)
+					}
+					if !ignored {
+						fields[1].Value = "new"
+					}
+				case "/api/state":
+				default:
+					t.Errorf("unexpected request %s", r.URL.Path)
+				}
+				json.NewEncoder(w).Encode(map[string]any{"agents": []setupAgent{{ID: "claude", Wired: true, Fields: fields}}})
+			}))
+			response := setupRequest(host, `{"agent":"claude","provider":"acu-runtime","model":"acu-auto","preserve":true,"migrations":{"opus":"acu-auto"}}`)
+			if (response.Code == 200) == ignored || writes != 1 || fields[0].Value != "native/main" {
+				t.Fatalf("migration/readback failure: %d %s", response.Code, response.Body)
 			}
 		})
 	}
