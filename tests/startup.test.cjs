@@ -707,11 +707,33 @@ test('Fable 5.2 is recommended ahead of 5.1 and respects the account model list'
 
 test('new frontier Gemini models and Fable 5.2 are recommended in the saved deterministic order', async () => {
   const instance = await setup({ready:true,agents:[codex()]});
-  const models=['acu-auto','claude-fable-5-2','gpt-6.1-sol','gpt-6-astra','gemini-4-carbon','gemini-4-hydrogen','claude-opus-5-5'];
+  const models=['acu-auto','claude-fable-5-2','gpt-6.2-sol','gpt-6.2-astra','gpt-6.1-sol','gpt-6-astra','gemini-4-carbon','gemini-4-hydrogen','claude-opus-5-5'];
   assert.equal(instance.run('recommendedModels({models:'+JSON.stringify(models.slice().reverse())+'}).join(",")'),models.join(','));
   assert.equal(instance.run('recommendedModels({models:["gemini-4-hydrogen","gpt-6-astra","claude-fable-5-2"]}).join(",")'),'claude-fable-5-2,gpt-6-astra,gemini-4-hydrogen');
   assert.equal(instance.run('recommendedModels({models:["gemini-4-argon","gemini-4-future","unknown"]}).join(",")'),'gemini-4-argon,gemini-4-future');
 });
+
+for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) {
+  test(`${agentID} one-click configuration exposes and saves exact ${model} without offering models absent from the Key`, async () => {
+    const choice = { id: 'acu-runtime', name: 'ACU', models: ['acu-auto', model, 'gpt-6.1-sol'] };
+    const agent = { id: agentID, name: agentID, detected: true, connected: false, modelOptions: choice.models.map(id => ({ value: `acu-runtime/${id}`, ref: `acu-runtime/${id}` })) };
+    const instance = await setup({ ready: true, connection: { known: true, configured: true, provider: choice.id, choices: [choice] }, agents: [agent] }, async (route, options) => {
+      if (route === '/runtime/agents/configure') return { body: { agents: [{ id: agentID, wired: true }] } };
+      if (route === `/kernel/api/agent-models/${agentID}` && !options.method) return { body: { models: choice.models.map(id => ({ id: `acu-runtime/${id}`, hidden: id === 'gpt-6.1-sol' })) } };
+      if (route === '/runtime/capabilities') return { body: capabilityFixture() };
+    });
+    await instance.run(`configureAgent("${agentID}")`);
+    assert(instance.elements.overlay.innerHTML.includes(model));
+    const other = model === 'gpt-6.2-sol' ? 'gpt-6.2-astra' : 'gpt-6.2-sol';
+    assert(!instance.elements.overlay.innerHTML.includes(other));
+    if (agentID !== 'workbuddy') instance.listeners.overlay.change({ target: { id: 'setup-model', value: model } });
+    await instance.run('confirmSetup()');
+    const configured = JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/configure').body);
+    assert.equal(configured.model, agentID === 'workbuddy' ? 'acu-auto' : model);
+    const visibility = JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/models').body);
+    assert.deepEqual(visibility, { agent: agentID, hidden: [] });
+  });
+}
 
 test('existing Agent setup reveals available recommended models without replacing saved model', async () => {
   const native={...codex(),connected:true,wired:true,modelOptions:[

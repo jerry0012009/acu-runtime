@@ -179,7 +179,7 @@ function activeChoice() {
 }
 
 // Recommended candidates are intersected with the account's current model list.
-const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'gemini-4-carbon', 'gemini-4-hydrogen', 'claude-opus-5-5', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
+const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra', 'gemini-4-carbon', 'gemini-4-hydrogen', 'claude-opus-5-5', 'gpt-6-luna', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
 function recommendedModels(choice) {
   return [...recommendedACUModels.filter(model => choice?.models?.includes(model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))];
 }
@@ -469,12 +469,12 @@ function agentModelSummary(agent, advanced = '') {
   const native = shown.filter(model => model.own).length || (agent.modelOptions || []).filter(option => !option.ref || option.ref.startsWith('native/')).length;
   const other = shown.filter(model => !model.own && !model.id.startsWith('acu-runtime/')).length;
   const exampleRanks = {
-    codex: ['claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'acu-auto'],
-    claude: ['claude-fable-5-2', 'claude-opus-5-5', 'acu-auto'],
-    workbuddy: ['claude-fable-5-2', 'gemini-4-carbon', 'gpt-6-luna', 'acu-auto'],
-    hermes: ['claude-fable-5-2', 'gemini-4-hydrogen', 'deepseek-v4-pro', 'acu-auto'],
+    codex: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'acu-auto'],
+    claude: ['claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'claude-opus-5-5', 'acu-auto'],
+    workbuddy: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-carbon', 'gpt-6-luna', 'acu-auto'],
+    hermes: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-hydrogen', 'deepseek-v4-pro', 'acu-auto'],
   };
-  const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.1-sol', 'gpt-6-astra'];
+  const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra'];
   const examples = shown.filter(model => !model.own && rank.includes(model.id.split('/').slice(1).join('/'))).sort((a, b) => rank.indexOf(a.id.split('/').slice(1).join('/')) - rank.indexOf(b.id.split('/').slice(1).join('/'))).slice(0, 3).map(model => `<span class="model-example">${escapeHTML(model.name || model.id.split('/').pop())}</span>`).join('');
   const stateHint = !agent.connected ? '<span class="model-example muted">可添加</span>' : agent.needsRepair ? '<span class="model-example muted">待核对</span>' : '';
   const nativeHint = agent.id === 'workbuddy' ? '<span class="model-example muted">WorkBuddy 原生模型 · 保留</span>' : '';

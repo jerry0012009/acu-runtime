@@ -15,10 +15,12 @@ fs.mkdirSync(output, { recursive: true });
       const page = await browser.newPage({ viewport: { width, height: 950 }, colorScheme: theme });
       const errors = [], changes = [], configurations = [];
       page.on('pageerror', error => errors.push(error.message));
-      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'claude-fable-5', 'claude-fable-5-1','claude-fable-5-2','gemini-4-carbon','gemini-4-hydrogen','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
-      const agent = { id: agentId, name: agentId, detected: true, connected, wired: connected, modelOptions: choice.models.map(model=>({value:'acu-runtime/'+model,ref:'acu-runtime/'+model})) };
+      const choice = { id: 'acu-runtime', name: 'ACU', masked: 'fixture', models: ['acu-auto', 'gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5', 'claude-fable-5-1','claude-fable-5-2','gemini-4-carbon','gemini-4-hydrogen','kimi-k3.1-pro','grok-4.7','gemini-3.8-flash'] };
+      const agent = { id: agentId, name: agentId, detected: true, connected, wired: connected, model: connected ? 'acu-runtime/claude-fable-5' : '', modelOptions: choice.models.map(model=>({value:'acu-runtime/'+model,ref:'acu-runtime/'+model})) };
       const catalog = { models: [
         { id: 'acu-runtime/acu-auto' },
+        { id: 'acu-runtime/gpt-6.2-sol', hidden: true },
+        { id: 'acu-runtime/gpt-6.2-astra', hidden: true },
         { id: 'acu-runtime/claude-fable-5-1', hidden: true },
         { id: 'acu-runtime/claude-fable-5-2', hidden: true },
         { id: 'acu-runtime/gemini-4-carbon', hidden: true },
@@ -34,14 +36,19 @@ fs.mkdirSync(output, { recursive: true });
         const url = new URL(request.url());
         if (url.pathname === '/runtime/status') return route.fulfill({ json: { ready: true, desktop: false, agents: [agent], connection: { known: true, configured: true, provider: choice.id, choices: [choice] } } });
         if (url.pathname === '/kernel/api/provider/models') return route.fulfill({json:{}});
-        if (url.pathname === '/runtime/models/prepare') return route.fulfill({json:{ok:true}});
+        if (url.pathname === '/runtime/models/prepare') {
+          for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) assert(request.postDataJSON().models.includes(model));
+          return route.fulfill({json:{ok:true}});
+        }
         if (url.pathname === '/runtime/agents/models') {
           const body = request.postDataJSON(); changes.push(body);
           catalog.models = catalog.models.map(model=>({...model,hidden:body.hidden.includes(model.id)}));
           return route.fulfill({json:catalog});
         }
         if (url.pathname === '/runtime/agents/configure') {
-          configurations.push(request.postDataJSON());
+          const body = request.postDataJSON();
+          configurations.push(body);
+          catalog.models = catalog.models.map(model => model.id === `acu-runtime/${body.model}` ? { ...model, hidden: false } : model);
           return route.fulfill({ json: { agents: [{ id: agentId, wired: true }] } });
         }
         if (url.pathname === '/kernel/api/agent-models/'+agentId) {
@@ -60,21 +67,24 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-1"]').count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-2"]').count(), 1);
       assert.equal(await page.locator('#setup-model option[value="gemini-4-carbon"]').count(), 1);
+      for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5"]').count(), 0);
       for (const model of ['kimi-k3.1-pro','grok-4.7','gemini-3.8-flash']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
       assert.equal(await page.locator('#setup-model').inputValue(), 'acu-auto');
+      if (!connected && agentId !== 'workbuddy') await page.locator('#setup-model').selectOption(theme === 'light' ? 'gpt-6.2-sol' : 'gpt-6.2-astra');
       assert(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth));
-      await page.screenshot({ path: path.join(output, `${connected ? 'existing' : 'fresh'}-${theme}-${width}.png`), fullPage: true });
+      assert(await page.locator('.setup-modal').evaluate(modal => modal.scrollWidth <= modal.clientWidth));
+      await page.screenshot({ path: path.join(output, `${agentId}-${connected ? 'existing' : 'fresh'}-${theme}-${width}.png`), fullPage: true });
       const visibilitySaved = page.waitForResponse(response => response.url().endsWith('/runtime/agents/models') && response.request().method() === 'POST');
       await page.locator('[data-confirm-setup]').click();
       await visibilitySaved;
       assert.equal(configurations.length, 1);
-      assert.equal(configurations[0].model, 'acu-auto');
+      assert.equal(configurations[0].model, !connected && agentId !== 'workbuddy' ? (theme === 'light' ? 'gpt-6.2-sol' : 'gpt-6.2-astra') : 'acu-auto');
       assert.equal(configurations[0].preserve === true, connected);
       assert.deepEqual(changes, [{ agent:agentId, hidden: [] }]);
       assert.deepEqual(errors, []);
       await page.close();
     }
-    console.log('PASS: Fable 5.2/5.1 recommendations and fresh/existing WorkBuddy setup across both themes and widths.');
+    console.log('PASS: GPT-6.2 recommendations, explicit model selection and preserved existing setup for four Agents across both themes and widths.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
