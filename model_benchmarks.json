@@ -572,6 +572,62 @@
         "name": "Qwen4 Max",
         "score": 42.8914543287565
       }
+    ],
+    "gpt-6-2-sol": [
+      {
+        "name": "GPT-6.2 Sol (Max)",
+        "score": 57.2576209885477
+      },
+      {
+        "name": "GPT-6.2 Sol (Xhigh)",
+        "score": 55.7351067246438
+      },
+      {
+        "name": "GPT-6.2 Sol (High)",
+        "score": 54.8898658241942
+      },
+      {
+        "name": "GPT-6.2 Sol (Medium)",
+        "score": 52.6777305876603
+      },
+      {
+        "name": "GPT-6.2 Sol (Low)",
+        "score": 40.552508943285
+      }
+    ],
+    "gpt-6-2-astra": [
+      {
+        "name": "GPT-6.2 Astra (Max)",
+        "score": 62.1387990593969
+      },
+      {
+        "name": "GPT-6.2 Astra (Xhigh)",
+        "score": 61.5602325371388
+      },
+      {
+        "name": "GPT-6.2 Astra (High)",
+        "score": 60.0882280338247
+      },
+      {
+        "name": "GPT-6.2 Astra (Medium)",
+        "score": 56.9986252138657
+      },
+      {
+        "name": "GPT-6.2 Astra (Low)",
+        "score": 45.6504174923967
+      }
     ]
+  },
+  "modelSources": {
+    "gpt-6-2-sol": {
+      "observedAt": "2026-11-18",
+      "sourceUrl": "https://artificialanalysis.ai/leaderboards/models",
+      "sourceSha256": "8b718fb5c869a261e29293675f8452bda822da52dd4e8f9408c6e5319baf6632"
+    },
+    "gpt-6-2-astra": {
+      "observedAt": "2026-11-18",
+      "sourceUrl": "https://artificialanalysis.ai/leaderboards/models",
+      "sourceSha256": "8b718fb5c869a261e29293675f8452bda822da52dd4e8f9408c6e5319baf6632"
+    }
   }
 }

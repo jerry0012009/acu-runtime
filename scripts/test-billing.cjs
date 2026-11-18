@@ -220,6 +220,44 @@ async function main() {
       await page.locator('[data-billing-sort]').selectOption('capability_desc');
       const sorted = await page.locator('#billing-price-rows tr').evaluateAll(rows => rows.map(row=>row.querySelector('strong').textContent));
       assert(sorted[0].includes('Fable 5.2') || sorted[0].includes('claude-fable-5-2'));
+      if (process.env.ACU_GPT62_PRICE_CHECK === '1') {
+        const names = await page.locator('#billing-price-rows tr').evaluateAll(rows => rows.map(row=>row.querySelector('td:first-child').textContent));
+        const astraIndex = names.findIndex(name=>name.includes('gpt-6.2-astra'));
+        const solIndex = names.findIndex(name=>name.includes('gpt-6.2-sol'));
+        const oldAstraIndex = names.findIndex(name=>name.includes('gpt-6-astra') && !name.includes('fast'));
+        assert(astraIndex > 0 && astraIndex < solIndex && solIndex < oldAstraIndex, 'new models must join capability ranking above their predecessors');
+        for (const [slug,score,multiplier,standard,long] of [
+          ['gpt-6.2-astra','62.1','0.040×',['¥10.784','¥2.1568','¥0.10784','¥2.696'],['¥16.176','¥4.3136','¥0.21568','¥5.392']],
+          ['gpt-6.2-sol','57.3','0.050×',['¥3.37','¥0.674','¥0.0337','¥0.8425'],['¥5.055','¥1.348','¥0.0674','¥1.685']],
+        ]) {
+          const row = page.getByRole('row').filter({has:page.getByText(slug,{exact:true})});
+          assert.equal(await row.count(),1,slug);
+          assert((await row.locator('.billing-benchmark summary').innerText()).includes(score));
+          assert(!(await row.innerText()).includes('暂无同榜评分'));
+          assert.equal(await row.locator('.billing-price-multiplier > span').innerText(),multiplier);
+          for (const [index,field] of ['output','input','cached','write'].entries()) {
+            const values = await row.locator(`[data-price="${field}"]`).innerText();
+            assert(values.includes(standard[index]),`${slug} ${field} standard`);
+            assert(values.includes(long[index]),`${slug} ${field} long`);
+          }
+          assert.equal(await row.getByText(/272,000/).count(),1);
+          await row.locator('.billing-benchmark summary').click();
+          assert((await row.locator('.billing-benchmark').innerText()).includes('Medium'));
+        }
+        await page.getByRole('searchbox').fill('gpt-6.2');
+        assert.equal(await page.locator('#billing-price-rows tr').count(),2);
+        await page.getByRole('button',{name:'刷新价格',exact:true}).click();
+        await page.getByRole('button',{name:'刷新价格',exact:true}).waitFor();
+        assert.equal(await page.getByRole('searchbox').inputValue(),'gpt-6.2');
+        assert.equal(await page.locator('#billing-price-rows tr').count(),2);
+        for (const theme of ['light','dark']) for (const width of [390,1440]) {
+          await page.emulateMedia({colorScheme:theme});
+          await page.setViewportSize({width,height:960});
+          assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+          await page.screenshot({path:path.join(workspace,`.build/billing-gpt62-${theme}-${width}.png`),fullPage:true});
+        }
+        await page.getByRole('searchbox').fill('');
+      }
       await page.locator('.billing-benchmark summary').first().click();
       for (const theme of ['light', 'dark']) {
         await page.emulateMedia({ colorScheme: theme });

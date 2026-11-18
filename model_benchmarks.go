@@ -25,10 +25,13 @@ type modelBenchmark struct {
 
 var publicBenchmarks = func() map[string]modelBenchmark {
 	var snapshot struct {
-		Benchmark  string                        `json:"benchmark"`
-		ObservedAt string                        `json:"observedAt"`
-		Selection  string                        `json:"selection"`
-		Models     map[string][]benchmarkVariant `json:"models"`
+		Benchmark    string                        `json:"benchmark"`
+		ObservedAt   string                        `json:"observedAt"`
+		Selection    string                        `json:"selection"`
+		Models       map[string][]benchmarkVariant `json:"models"`
+		ModelSources map[string]struct {
+			ObservedAt string `json:"observedAt"`
+		} `json:"modelSources"`
 	}
 	if err := json.Unmarshal(benchmarkSnapshot, &snapshot); err != nil {
 		panic(err)
@@ -38,8 +41,12 @@ var publicBenchmarks = func() map[string]modelBenchmark {
 		if len(variants) == 0 {
 			continue
 		}
+		observedAt := snapshot.ObservedAt
+		if source := snapshot.ModelSources[slug]; source.ObservedAt != "" {
+			observedAt = source.ObservedAt
+		}
 		result[slug] = modelBenchmark{Benchmark: snapshot.Benchmark, Score: variants[0].Score,
-			SourceURL: "https://artificialanalysis.ai/models/" + slug, ObservedAt: snapshot.ObservedAt,
+			SourceURL: "https://artificialanalysis.ai/models/" + slug, ObservedAt: observedAt,
 			Selection: snapshot.Selection, Variants: variants}
 	}
 	return result
