@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -30,6 +32,45 @@ func TestRouteSnapshotRestoresFilesAndRemovesOnlyNewFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(added); !os.IsNotExist(err) {
 		t.Fatal("new catalog not removed")
+	}
+}
+
+func TestCodexCommandOutcomeRequiresExactFinalState(t *testing.T) {
+	for _, current := range []struct {
+		name, state         string
+		disconnect, success bool
+	}{
+		{"persisted", `{"agents":[{"id":"codex","wired":true,"fields":[{"key":"model","value":"acu/gpt-6.2-sol"}]}]}`, false, true},
+		{"unchanged", `{"agents":[{"id":"codex","wired":true,"fields":[{"key":"model","value":"acu/gpt-6.1-sol"}]}]}`, false, false},
+		{"drift", `{"agents":[{"id":"codex","wired":true,"drift":{"kind":"unwired"},"fields":[{"key":"model","value":"acu/gpt-6.2-sol"}]}]}`, false, false},
+		{"disconnected", `{"agents":[{"id":"codex","wired":false}]}`, true, true},
+		{"still-connected", `{"agents":[{"id":"codex","wired":true}]}`, true, false},
+	} {
+		t.Run(current.name, func(t *testing.T) {
+			host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				io.WriteString(w, current.state)
+			}))
+			changes := []codexFieldChange{{"model", "acu/gpt-6.2-sol"}}
+			if current.disconnect {
+				changes = nil
+			}
+			err := verifyCodexCommandOutcome(context.Background(), host.kernel, changes, current.disconnect)
+			if (err == nil) != current.success {
+				t.Fatalf("unexpected final outcome: %v", err)
+			}
+			if err := verifyCodexCommandOutcome(context.Background(), host.kernel, nil, false); err == nil {
+				t.Fatal("accepted unspecified mutation")
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			if err := verifyCodexCommandOutcome(ctx, host.kernel, changes, current.disconnect); err == nil {
+				t.Fatal("ignored cancellation")
+			}
+		})
+	}
+	err := codexRollbackCompleted(errors.New("Codex 本次修改未完成"))
+	if strings.Contains(err.Error(), "正在") || !strings.Contains(err.Error(), "本次修改未生效") || !strings.Contains(err.Error(), "已恢复此前配置") {
+		t.Fatalf("ambiguous final recovery message: %v", err)
 	}
 }
 func TestQuietCodexNativeIsolation(t *testing.T) {
@@ -318,6 +359,14 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 	}
 	if _, err = k.readState(ctx); err != nil {
 		t.Fatal("gateway not recovered after rollback", err)
+	}
+	_, err = k.changeCodexQuietlyWith(ctx, nil, false, func(string) error { return errors.New("synthetic catalog failure") })
+	if err == nil || !strings.Contains(err.Error(), "已恢复此前配置") || strings.Contains(err.Error(), "正在恢复") {
+		t.Fatalf("failed mutation did not report terminal rollback: %v", err)
+	}
+	b, _ = os.ReadFile(filepath.Join(codex, "config.toml"))
+	if string(b) != string(before) {
+		t.Fatal("failed catalog mutation changed config")
 	}
 	short, stop := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer stop()

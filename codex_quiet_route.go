@@ -85,9 +85,12 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 	defer cancel()
 	restored := false
 	defer func() {
+		rolledBack := false
 		if resultErr != nil && !restored {
 			if e := snapshot.restore(); e != nil {
 				resultErr = errors.New("配置验证失败，自动恢复未完成；Codex 接入未通过验收")
+			} else {
+				rolledBack = true
 			}
 		}
 		// Wait is already owned by start's goroutine; never call Cmd.Wait twice.
@@ -138,6 +141,9 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 			resultErr = errors.New("内核尚未恢复连接，已恢复原配置；请重新打开 Runtime")
 			return
 		}
+		if rolledBack {
+			resultErr = codexRollbackCompleted(resultErr)
+		}
 		if resultErr == nil {
 			// Signed-in Codex reads Magpie's live /models endpoint. Validate
 			// only after the replacement gateway serves the complete route.
@@ -180,7 +186,7 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 					resultErr = errors.New("配置已恢复，内核恢复连接失败，请重新打开 Runtime")
 					return
 				}
-				resultErr = errors.New(resultErr.Error() + "；已恢复原配置")
+				resultErr = codexRollbackCompleted(resultErr)
 			}
 		}
 	}()
@@ -225,14 +231,24 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 		}
 	}
 	if err != nil {
-		return nil, errors.New("Codex 配置未完成，正在恢复原配置")
+		// A CLI may exit unsuccessfully after persisting an idempotent change.
+		// Only explicit field/disconnect operations have a complete readback
+		// contract here; arbitrary catalog mutations must still roll back.
+		if mutation != nil || ctx.Err() != nil || len(changes) == 0 && !disconnect {
+			return nil, errors.New("Codex 本次修改未完成")
+		}
+		if readErr := nativeCatalogManagement(ctx, executable, func(control *kernelState) error {
+			return verifyCodexCommandOutcome(ctx, control, changes, disconnect)
+		}); readErr != nil {
+			return nil, errors.New("Codex 本次修改未完成")
+		}
 	}
 	if !disconnect {
 		if err = brandCodexProvider(); err != nil {
 			return nil, errors.New("无法保存 Codex 显示名称，请重试")
 		}
 		if err = configureCodexGeminiTools(); err != nil {
-			return nil, errors.New("无法保存 Gemini 工具配置，正在恢复原配置")
+			return nil, errors.New("无法保存 Gemini 工具配置")
 		}
 	}
 	if err = verifyCodexAuthUnchanged(authPath, authBefore, authErr); err != nil {
@@ -240,6 +256,24 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 	}
 	restored = true
 	return nil, nil
+}
+
+func codexRollbackCompleted(cause error) error {
+	return errors.New(cause.Error() + "；已恢复此前配置，本次修改未生效")
+}
+
+func verifyCodexCommandOutcome(ctx context.Context, control *kernelState, changes []codexFieldChange, disconnect bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(changes) == 0 && !disconnect {
+		return errors.New("缺少可核验的 Codex 修改目标")
+	}
+	state, err := control.readState(ctx)
+	if err != nil {
+		return err
+	}
+	return verifyCodexRouteState(state, changes, disconnect)
 }
 
 func verifyCodexRouteState(state map[string]json.RawMessage, changes []codexFieldChange, disconnect bool) error {
