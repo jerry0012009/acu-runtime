@@ -288,6 +288,25 @@ func TestPrepareModelsDoesNotEnableSupersededCandidate(t *testing.T) {
 	}
 }
 
+func TestPrepareModelsDoesNotWidenExcludedModel(t *testing.T) {
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/providers":
+			io.WriteString(w, setupProviders)
+		case "/api/provider/models":
+			io.WriteString(w, `{"provider":{"models":[{"id":"gemini-4-carbon","on":false},{"id":"gemini-4-hydrogen","on":true}]}}`)
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	}))
+	w := httptest.NewRecorder()
+	body := `{"provider":"acu-runtime","models":["gemini-4-carbon"],"modelPrefixes":["gemini-4-"],"excludedModels":["gemini-4-carbon"]}`
+	host.prepareModels(w, httptest.NewRequest("POST", "/runtime/models/prepare", strings.NewReader(body)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("attempted to enable excluded model: %d %s", w.Code, w.Body)
+	}
+}
+
 func TestModelSyncUsesNativeVisibilityAndRejectsUnknownAgent(t *testing.T) {
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/agent-models/workbuddy" {

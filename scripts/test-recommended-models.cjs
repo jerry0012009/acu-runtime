@@ -43,6 +43,7 @@ fs.mkdirSync(output, { recursive: true });
         if (url.pathname === '/kernel/api/provider/models') return route.fulfill({json:{}});
         if (url.pathname === '/runtime/models/prepare') {
           for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) assert(request.postDataJSON().models.includes(model));
+          assert(request.postDataJSON().excludedModels.includes('gemini-4-carbon'));
           return route.fulfill({json:{ok:true}});
         }
         if (url.pathname === '/runtime/agents/models') {
@@ -75,7 +76,8 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(await page.locator('#setup-model option[value="claude-opus-4-8"]').count(), 0);
       for (const model of ['claude-opus-5-5','gpt-6-sol','gpt-6.1-sol']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(),1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5-2"]').count(), 1);
-      assert.equal(await page.locator('#setup-model option[value="gemini-4-carbon"]').count(), 1);
+      assert.equal(await page.locator('#setup-model option[value="gemini-4-carbon"]').count(), 0);
+      assert.equal(await page.locator('#setup-model option[value="gemini-4-hydrogen"]').count(), 1);
       for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
       assert.equal(await page.locator('#setup-model option[value="claude-fable-5"]').count(), 0);
       for (const model of ['kimi-k3.1-pro','grok-4.7']) assert.equal(await page.locator(`#setup-model option[value="${model}"]`).count(), 1);
@@ -91,7 +93,7 @@ fs.mkdirSync(output, { recursive: true });
       assert.equal(configurations[0].model, connected ? 'claude-fable-5-2' : agentId !== 'workbuddy' ? (theme === 'light' ? 'gpt-6.2-sol' : 'gpt-6.2-astra') : 'acu-auto');
       assert.equal(configurations[0].preserve === true, false);
       if (connected && agentId !== 'workbuddy') assert.equal(agent.model,'acu-runtime/claude-fable-5-2');
-      assert.deepEqual(changes, [{ agent:agentId, hidden: ['acu-runtime/claude-fable-5-1','acu-runtime/gemini-3.8-flash','acu-runtime/claude-fable-5','acu-runtime/claude-opus-4-8'] }]);
+      assert.deepEqual(changes, [{ agent:agentId, hidden: ['acu-runtime/claude-fable-5-1','acu-runtime/gemini-4-carbon','acu-runtime/gemini-3.8-flash','acu-runtime/claude-fable-5','acu-runtime/claude-opus-4-8'] }]);
       assert.deepEqual(errors, []);
       await page.close();
     }

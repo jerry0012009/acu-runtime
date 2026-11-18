@@ -119,7 +119,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
 
   function priceRows() {
     const search = state.query.toLowerCase();
-    const models = (state.prices?.models || []).filter(model => `${model.model_name} ${model.display_name || ''}`.toLowerCase().includes(search));
+    const models = (state.prices?.models || []).filter(model => model.model_name !== 'gemini-4-carbon' && `${model.model_name} ${model.display_name || ''}`.toLowerCase().includes(search));
     const outputPrice = model => {
       const value = model.payable?.output_cny_per_million;
       return value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;

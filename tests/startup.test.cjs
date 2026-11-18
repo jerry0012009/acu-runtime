@@ -779,10 +779,25 @@ test('Fable 5.2 is recommended ahead of 5.1 and respects the account model list'
 
 test('new frontier Gemini models and Fable 5.2 are recommended in the saved deterministic order', async () => {
   const instance = await setup({ready:true,agents:[codex()]});
-  const models=['acu-auto','claude-fable-5-2','gpt-6.2-sol','gpt-6.2-astra','gpt-6.1-sol','gpt-6-astra','gemini-4-carbon','gemini-4-hydrogen','claude-opus-5-5'];
+  const models=['acu-auto','claude-fable-5-2','gpt-6.2-sol','gpt-6.2-astra','gpt-6.1-sol','gpt-6-astra','gemini-4-hydrogen','claude-opus-5-5'];
   assert.equal(instance.run('recommendedModels({models:'+JSON.stringify(models.slice().reverse())+'}).join(",")'),models.join(','));
   assert.equal(instance.run('recommendedModels({models:["gemini-4-hydrogen","gpt-6-astra","claude-fable-5-2"]}).join(",")'),'claude-fable-5-2,gpt-6-astra,gemini-4-hydrogen');
-  assert.equal(instance.run('recommendedModels({models:["gemini-4-argon","gemini-4-future","unknown"]}).join(",")'),'gemini-4-argon,gemini-4-future');
+  assert.equal(instance.run('recommendedModels({models:["gemini-4-carbon","gemini-4-argon","gemini-4-future","unknown"]}).join(",")'),'gemini-4-argon,gemini-4-future');
+});
+
+test('Carbon can be enabled manually from all models and stays outside recommendations', async () => {
+  const carbon = 'acu-runtime/gemini-4-carbon';
+  const choice = { ...connected().choices[0], models: ['acu-auto', 'gemini-4-carbon'] };
+  const agent = { ...codex(), connected: true, catalog: { models: [
+    { id: 'acu-runtime/acu-auto' }, { id: carbon, hidden: true, kept: true },
+  ] }, modelOptions: [...codex().modelOptions, { value: carbon, ref: carbon }] };
+  const instance = await setup({ready:true,connection:{...connected(),choices:[choice]},agents:[agent]});
+  const select = instance.run('agentModelSelect(ui.status.agents[0])');
+  assert.match(select, /<optgroup label="手动选用 · ACU"><option value="acu-runtime\/gemini-4-carbon"/);
+  instance.run('openModelInventory("codex"); toggleModelVisibility("codex","acu-runtime/gemini-4-carbon")');
+  assert.equal(instance.run('ui.inventoryEditor.catalog.models[1].hidden'), false);
+  await instance.run('saveInventoryDraft()');
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body).operations, [{ hidden: [], widen: [carbon] }]);
 });
 
 for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) {
@@ -816,7 +831,7 @@ test('existing Agent setup reveals available recommended models without replacin
   ]};
   const instance=await setup({ready:true,connection:{...connected(),choices:[{id:'acu-runtime',name:'ACU',masked:'fixture',models:['acu-auto','claude-fable-5-2','gemini-4-carbon']}]},agents:[native]},async(route,options)=>route==='/kernel/api/agent-models/codex'&&!options.method?{body:{models:[{id:'acu-runtime/acu-auto'},{id:'acu-runtime/claude-fable-5-2',hidden:true},{id:'acu-runtime/gemini-4-carbon',hidden:true}]}}:undefined);
   const result=await instance.run('applyRecommendedVisibility("codex","acu-runtime","acu-auto",true)');
-  assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{agent:'codex',hidden:[]});
+  assert.deepEqual(JSON.parse(posts(instance).at(-1).body),{agent:'codex',hidden:['acu-runtime/gemini-4-carbon']});
   assert.equal(instance.run('ui.status.agents[0].model'),native.model);
   assert.equal(result,undefined);
 });
@@ -858,13 +873,14 @@ test('supersession requires the successor in the Key', async () => {
 
 for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const only of [false, true]) {
   test(`${agentID} one-click reveals all GPT-6.2 and Gemini4 choices including native source filters, only=${only}`, async () => {
-    const targets = ['gpt-6.2-sol', 'gpt-6.2-astra', 'gemini-4-carbon', 'gemini-4-argon', 'gemini-4-hydrogen'];
-    const models = ['acu-auto', ...targets];
+    const targets = ['gpt-6.2-sol', 'gpt-6.2-astra', 'gemini-4-argon', 'gemini-4-hydrogen'];
+    const models = ['acu-auto', ...targets, 'gemini-4-carbon'];
     const current = 'acu-runtime/acu-auto';
     const agent = { ...codex(), id: agentID, name: agentID, connected: true, model: current };
     const catalog = { only, ownHidden: true, models: [
       { id: current, inUse: true },
       ...targets.map(id => ({ id: 'acu-runtime/' + id, hidden: true, kept: true })),
+      { id: 'acu-runtime/gemini-4-carbon', hidden: true, kept: true },
       { id: 'acu-runtime/old-hidden', hidden: true },
       { id: 'other/visible' }, { id: 'other/hidden', hidden: true },
       { id: 'codex/native-hidden', own: true, hidden: true },
@@ -875,13 +891,16 @@ for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const onl
     });
     instance.run(`ui.selected = new Set(["${agentID}"])`);
     await instance.run('applyAgents();');
+    const prep = JSON.parse(instance.calls.find(call => call.route === '/runtime/models/prepare').body);
+    assert(!prep.models.includes('gemini-4-carbon'));
+    assert(prep.excludedModels.includes('gemini-4-carbon'));
     instance.run('ui.setup.tools = false');
     await instance.run('confirmSetup()');
     assert.equal(JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/configure').body).preserve, true);
     const payload = JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/models').body);
     assert.deepEqual(payload.widen, targets.map(id => 'acu-runtime/' + id));
     if (only) assert.deepEqual(payload.shown, [current, ...payload.widen, 'other/visible']);
-    else assert.deepEqual(payload.hidden, ['acu-runtime/old-hidden', 'other/hidden', 'codex/native-hidden']);
+    else assert.deepEqual(payload.hidden, ['acu-runtime/gemini-4-carbon', 'acu-runtime/old-hidden', 'other/hidden', 'codex/native-hidden']);
     assert.equal(instance.run('ui.status.agents[0].model'), current);
     assert.equal(instance.run('ui.results[0].ok'), true);
   });

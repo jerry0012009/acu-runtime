@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -99,15 +100,19 @@ type syncProvider struct {
 
 func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Provider      string            `json:"provider"`
-		Models        []string          `json:"models"`
-		ModelPrefixes []string          `json:"modelPrefixes"`
-		Superseded    map[string]string `json:"superseded"`
+		Provider       string            `json:"provider"`
+		Models         []string          `json:"models"`
+		ModelPrefixes  []string          `json:"modelPrefixes"`
+		ExcludedModels []string          `json:"excludedModels"`
+		Superseded     map[string]string `json:"superseded"`
 	}
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&input) != nil || input.Provider == "" || len(input.Models) > 100 {
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384)).Decode(&input) != nil || input.Provider == "" || len(input.Models) > 100 || len(input.ExcludedModels) > 100 {
 		host.json(w, 400, map[string]string{"error": "无法读取模型同步配置"})
 		return
 	}
+	input.Models = slices.DeleteFunc(input.Models, func(id string) bool {
+		return slices.Contains(input.ExcludedModels, id)
+	})
 	if host.desktop && runtime.GOOS == "darwin" && !host.allowCodexDesktopChange(w) {
 		return
 	}
@@ -169,6 +174,9 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 			available[m.ID] = true
 		}
 		for _, m := range refreshed.Provider.Models {
+			if slices.Contains(input.ExcludedModels, m.ID) {
+				continue
+			}
 			if successor := input.Superseded[m.ID]; successor != "" && available[successor] {
 				continue
 			}

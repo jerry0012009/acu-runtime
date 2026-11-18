@@ -179,7 +179,8 @@ function activeChoice() {
 }
 
 // Recommended candidates are intersected with the account's current model list.
-const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-4-argon', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
+const recommendedACUModels = ['acu-auto', 'claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna', 'gemini-4-hydrogen', 'gemini-4-argon', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'glm-5.3-flash', 'glm-5.3', 'deepseek-v4-pro', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017', 'kimi-k3.1-pro', 'kimi-k3', 'grok-4.7', 'gemini-3.8-flash', 'claude-sonnet-5', 'claude-fable-5-1'];
+const manualOnlyACUModels = ['gemini-4-carbon'];
 const supersedingACUModels = {
   'claude-opus-4-8': 'claude-opus-5-5', 'claude-opus-4.8': 'claude-opus-5-5', 'claude-opus-5': 'claude-opus-5-5', 'claude-opus-5.5': 'claude-opus-5-5',
   'claude-fable-5': 'claude-fable-5-2', 'claude-fable-5-1': 'claude-fable-5-2',
@@ -199,7 +200,8 @@ function successorACUModel(choice, model) {
   return successor && choice?.models?.includes(successor) ? successor : '';
 }
 function recommendedModels(choice) {
-  return [...recommendedACUModels.filter(model => choice?.models?.includes(model) && !successorACUModel(choice, model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))];
+  return [...recommendedACUModels.filter(model => choice?.models?.includes(model) && !successorACUModel(choice, model)), ...(choice?.models || []).filter(model => model.startsWith('gemini-4-') && !recommendedACUModels.includes(model))]
+    .filter(model => !manualOnlyACUModels.includes(model));
 }
 
 function agentRecommendation(agent, choice, selectedModel, settings) {
@@ -325,8 +327,10 @@ async function installAgent(id, update = false) {
   if(update) { try { await updateDesktopAgent(id==='codex'?'chatgpt':'workbuddy-desktop'); await checkAgentVersions(); await refresh(); } catch(error){toast(error.message);} return; }
   const choice = activeChoice();
   if (!choice || !ui.status?.ready || ui.applying) return;
+  const model = recommendedModels(choice)[0] || choice.models?.find(id => !manualOnlyACUModels.includes(id));
+  if (!model) { toast('当前 Key 没有可自动配置的模型'); return; }
   try {
-    ui.agentInstall = await request('/runtime/agents/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: choice.id, model: recommendedModels(choice)[0] || choice.models?.[0] }) });
+    ui.agentInstall = await request('/runtime/agents/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent: id, provider: choice.id, model }) });
     render(); refresh();
   } catch (error) { toast(error.message); }
 }
@@ -360,7 +364,7 @@ function modelFacts(agent) {
   const label = role => ({ model: '默认模型', small: '快速任务', opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku', fable: 'Fable', subagent: '子任务模型', subagent_model: '子任务模型', memories: '记忆任务' })[role.key] || role.key;
   const roleRows = roles.map(role => ({ key: role.key, value: role.value, name: role.name, label: label(role), model: role.name || role.ref?.split('/').slice(1).join('/') || role.value, destination: role.group && !role.ref ? role.group : routeName(role.ref), ref: role.ref }));
   const configured = agent.connected && !agent.needsRepair;
-  const enabled = acu.filter(model => !model.hidden && !(model.own && catalog?.ownHidden));
+  const enabled = acu.filter(model => !model.hidden && !(model.own && catalog?.ownHidden) && !manualOnlyACUModels.includes(model.id.split('/').slice(1).join('/')));
   const recommendationRank = model => {const index=recommendedACUModels.indexOf(model.id.split('/').slice(1).join('/'));return index<0?999:index;};
   const top = [...enabled].sort((left, right) => recommendationRank(left)-recommendationRank(right)).slice(0, 3);
   const nativeEntries = [...new Map((agent.modelOptions || []).filter(option => !option.ref && option.value).map(option => [option.value, { id: option.value, name: option.label || option.value, group: `${agent.name} 原生`, own: true, nativeOption: true, inUse: option.value === agent.model }])).values()];
@@ -389,6 +393,7 @@ function modelOptionGroup(option, agent) {
   if (source) {
     const model = ref.slice(source.id.length + 1);
     if (recommendedModels(source).includes(model)) return '推荐模型 · ACU';
+    if (manualOnlyACUModels.includes(model)) return '手动选用 · ACU';
     return '其他来源';
   }
   if (!option.ref) return `${agent.name} 原生`;
@@ -407,9 +412,11 @@ function agentModelSelect(agent, role = null) {
     if (isRoutingGroup(option)) return false;
     const ref = option.ref || option.value || '';
     const choice = (ui.status?.connection?.choices || []).find(item => ref.startsWith(item.id + '/'));
-    return !choice || recommendedModels(choice).includes(ref.slice(choice.id.length + 1));
+    if (!choice) return true;
+    const model = ref.slice(choice.id.length + 1);
+    return recommendedModels(choice).includes(model) || manualOnlyACUModels.includes(model);
   });
-  const groupRank = { '推荐模型 · ACU': 0, [`${agent.name} 原生`]: 1, '其他来源': 2, '高级配置': 3 };
+  const groupRank = { '推荐模型 · ACU': 0, [`${agent.name} 原生`]: 1, '手动选用 · ACU': 2, '其他来源': 3, '高级配置': 4 };
   const acuRank = new Map(recommendedACUModels.map((model, index) => [model, index]));
   options.sort((left, right) => {
     const leftGroup = modelOptionGroup(left, agent);
@@ -422,7 +429,7 @@ function agentModelSelect(agent, role = null) {
     return (acuRank.get(leftModel) ?? 999) - (acuRank.get(rightModel) ?? 999) || String(left.label || left.value).localeCompare(String(right.label || right.value));
   });
   const optionHTML = group => options.filter(option => modelOptionGroup(option, agent) === group).map(option => `<option value="${escapeHTML(option.value)}" ${option.value === current ? 'selected' : ''}>${escapeHTML(modelOptionLabel(option, agent))}</option>`).join('');
-  const groups = ['推荐模型 · ACU', `${agent.name} 原生`, '其他来源', '高级配置'].map(group => {
+  const groups = Object.keys(groupRank).map(group => {
     const content = optionHTML(group);
     return content ? `<optgroup label="${escapeHTML(group)}">${content}</optgroup>` : '';
   }).join('');
@@ -489,7 +496,7 @@ function agentModelSummary(agent, advanced = '') {
   const exampleRanks = {
     codex: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gpt-6.1-sol', 'gpt-6-astra', 'acu-auto'],
     claude: ['claude-fable-5-2', 'gpt-6.2-sol', 'gpt-6.2-astra', 'claude-opus-5-5', 'acu-auto'],
-    workbuddy: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-carbon', 'gpt-6-luna', 'acu-auto'],
+    workbuddy: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-hydrogen', 'gpt-6-luna', 'acu-auto'],
     hermes: ['gpt-6.2-sol', 'gpt-6.2-astra', 'claude-fable-5-2', 'gemini-4-hydrogen', 'deepseek-v4-pro', 'acu-auto'],
   };
   const rank = exampleRanks[agent.id] || ['acu-auto', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra'];
@@ -1165,11 +1172,15 @@ async function connectKernel() {
   }
 }
 
+function prepareRecommendedModels(provider) {
+  return request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-'],excludedModels:manualOnlyACUModels,superseded:supersedingACUModels})});
+}
+
 async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-'],superseded:supersedingACUModels})}); }
+    try { await prepareRecommendedModels(provider); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();
@@ -1184,7 +1195,7 @@ async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
   const provider = activeChoice()?.id;
   if (provider) {
-    try { await request('/runtime/models/prepare', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,models:recommendedACUModels,modelPrefixes:['gemini-4-'],superseded:supersedingACUModels})}); }
+    try { await prepareRecommendedModels(provider); }
     catch(error) { toast(error.message); return; }
   }
   await refresh();

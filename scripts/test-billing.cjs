@@ -17,6 +17,7 @@ async function main() {
   const calls = [];
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
   prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
+  prices.push({model_name:'gemini-4-carbon',display_name:'Gemini 4 Carbon',payable:{output_cny_per_million:5}});
   prices[1].capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:52.5, observed_at:'2026-11-16', source_url:'https://artificialanalysis.ai/models/fixture-sol', variants:[{name:'Fixture Sol (High)',score:52.5},{name:'Fixture Sol (Medium)',score:48}] };
   prices[1].comparison_reference = { input_cny_per_million: 13.48, output_cny_per_million: 67.4, fx_cny_per_usd: 6.74, source_type: 'public', observed_at: '2026-11-16' };
   prices.find(model=>model.model_name==='premium').capability_benchmark = { benchmark:'Artificial Analysis Intelligence Index v5.0.1', score:61.8, observed_at:'2026-11-16', source_url:'javascript:alert(1)', variants:[{name:'Premium <test>',score:61.8}] };
@@ -82,6 +83,8 @@ async function main() {
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     assert.equal(await page.locator('[data-billing-sort]').inputValue(), 'capability_desc');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','ACU Auto','cheap','free','unknown']);
+    await page.getByRole('searchbox').fill('carbon');
+    assert.equal(await page.locator('#billing-price-rows tr').count(), 0);
     await page.getByRole('searchbox').fill('sol');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1);
     delayPrices = true;
