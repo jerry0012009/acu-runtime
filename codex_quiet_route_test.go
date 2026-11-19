@@ -275,6 +275,18 @@ func TestQuietCodexNativeIsolation(t *testing.T) {
 		t.Fatal("missing native login field")
 	}
 	assertLogin(state, "")
+	// Same advanced route, with the Store app present but its standalone
+	// inspector blocked. Exercise the real kernel/catalog without depending
+	// on a particular Windows policy.
+	countingValidate := k.codexValidate
+	k.codexValidate = func(context.Context, string) error { return errDesktopProbeUnavailable }
+	if _, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "acu-runtime/second-model"}}, false); err != nil {
+		t.Fatal("desktop-only model switch", err)
+	}
+	if _, err = k.changeCodexQuietly(ctx, []codexFieldChange{{"model", "acu-runtime/acu-auto"}}, false); err != nil {
+		t.Fatal("desktop-only model restore", err)
+	}
+	k.codexValidate = countingValidate
 	_, err = k.changeCodexQuietlyWith(ctx, nil, false, func(executable string) error {
 		return nativeCatalogManagement(ctx, executable, func(control *kernelState) error {
 			return control.exchange(ctx, "POST", "/api/agent-models/codex", map[string]any{"hidden": []string{"acu-runtime/second-model"}}, nil)

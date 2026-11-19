@@ -1,4 +1,8 @@
-# ACU Runtime 0.1.128
+# ACU Runtime 0.1.129
+
+Windows：已安装官方 ChatGPT 桌面版，但 Windows 无法单独启动 Codex 配置检查时，一键配置和高级设置现在会自动通过 Magpie 核对接入、所选模型、磁盘配置及模型目录。普通模型不需要用户安装 CLI 或更改 Code Mode；配置不一致、Codex 明确拒绝配置、登录配置变化时仍会回滚。Gemini Hydrogen 保留专用组件核验。接入成功后，保存工作并重新打开 ChatGPT，让桌面端加载配置。
+
+## 保留 0.1.128 的配套内核
 
 配套官方 Magpie CLI 更新到 **v0.1.4501**，使用各平台发布包的固定 SHA-256。保留现有 Agent 接入、模型选择和 Gemini Hydrogen 的专用兼容设置。
 

@@ -30,12 +30,9 @@ func configureCodexGeminiTools() error {
 	if config.Catalog == "" {
 		return nil
 	}
-	path := config.Catalog
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(dir, path)
-	}
 	// Never modify a separately managed or user-supplied catalog.
-	if filepath.Clean(path) != filepath.Join(dir, "magpie-models.json") && filepath.Clean(path) != filepath.Join(dir, "magpie-desktop-models.json") {
+	path, managed := managedCodexCatalog(dir, config.Catalog)
+	if !managed {
 		return nil
 	}
 	info, err := os.Lstat(path)
@@ -56,6 +53,14 @@ func configureCodexGeminiTools() error {
 	return (routeSnapshot{{path: path, data: updated, mode: info.Mode().Perm(), exists: true}}).restore()
 }
 
+func managedCodexCatalog(dir, path string) (string, bool) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
+	path = filepath.Clean(path)
+	return path, path == filepath.Join(dir, "magpie-models.json") || path == filepath.Join(dir, "magpie-desktop-models.json")
+}
+
 func codexGeminiToolCatalog(data []byte) ([]byte, bool, error) {
 	var catalog map[string]json.RawMessage
 	if err := json.Unmarshal(data, &catalog); err != nil {
@@ -69,7 +74,7 @@ func codexGeminiToolCatalog(data []byte) ([]byte, bool, error) {
 	for _, model := range models {
 		var slug string
 		json.Unmarshal(model["slug"], &slug)
-		if slug != "acu-runtime/gemini-4-hydrogen" {
+		if slug != codexHydrogenModel {
 			continue
 		}
 		var mode string

@@ -153,6 +153,9 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 			}
 			if model != "" {
 				resultErr = validate(ctx, model)
+				if errors.Is(resultErr, errDesktopProbeUnavailable) {
+					resultErr = k.verifyDesktopCodexWithoutProbe(ctx, model)
+				}
 			}
 			if resultErr == nil {
 				resultErr = verifyCodexAuthUnchanged(authPath, authBefore, authErr)
@@ -256,6 +259,38 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 	}
 	restored = true
 	return nil, nil
+}
+
+// A registered Store app need not allow its embedded CLI to run on its own.
+// Reuse the running kernel's actual route and visible Codex catalog in that
+// case only. A response from a running Codex is always authoritative.
+func (k *kernelState) verifyDesktopCodexWithoutProbe(ctx context.Context, model string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if model == codexHydrogenModel {
+		return errors.New("无法核验 Gemini Hydrogen 的 Code Mode 组件，请在 Runtime 中更新 ChatGPT，或选择其他模型")
+	}
+	if err := verifyDesktopCodexFiles(model); err != nil {
+		return err
+	}
+	state, err := k.readState(ctx)
+	if err != nil {
+		return err
+	}
+	if err := verifyCodexRouteState(state, []codexFieldChange{{"model", model}}, false); err != nil {
+		return err
+	}
+	var catalog agentCatalog
+	if err := k.exchange(ctx, "GET", "/api/agent-models/codex", nil, &catalog); err != nil {
+		return err
+	}
+	for _, entry := range catalog.Models {
+		if entry.ID == model && !entry.Hidden && !entry.Kept {
+			return ctx.Err()
+		}
+	}
+	return errors.New("内核未在 Codex 的可用模型目录中找到所选模型")
 }
 
 func codexRollbackCompleted(cause error) error {

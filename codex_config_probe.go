@@ -10,7 +10,51 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 )
+
+var errCodexProbeStart = errors.New("无法启动 Codex 配置检查，未应用接入")
+var errDesktopProbeUnavailable = errors.New("已安装的 ChatGPT 无法单独启动配置检查")
+
+const codexHydrogenModel = "acu-runtime/gemini-4-hydrogen"
+
+// The kernel catalog describes what it serves. If the desktop is configured
+// to use a catalog file instead, confirm that file actually lists the model.
+func verifyDesktopCodexFiles(model string) error {
+	dir := codexConfigDirectory()
+	var config struct {
+		Model   string `toml:"model"`
+		Catalog string `toml:"model_catalog_json"`
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "config.toml"))
+	if err != nil || toml.Unmarshal(raw, &config) != nil || config.Model != model {
+		return errors.New("ChatGPT 磁盘配置与所选模型不一致")
+	}
+	if config.Catalog == "" {
+		return nil // signed-in route uses the live kernel list
+	}
+	path, managed := managedCodexCatalog(dir, config.Catalog)
+	if !managed {
+		return errors.New("无法独立核验 ChatGPT 的自定义模型目录")
+	}
+	info, err := os.Lstat(path)
+	if err == nil && info.Mode().IsRegular() && info.Size() <= 16<<20 {
+		var catalog struct {
+			Models []struct {
+				Slug string `json:"slug"`
+			} `json:"models"`
+		}
+		if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &catalog) == nil {
+			for _, m := range catalog.Models {
+				if m.Slug == model {
+					return nil
+				}
+			}
+		}
+	}
+	return errors.New("ChatGPT 的本地模型目录未能核实所选模型")
+}
 
 // No threads, tools or paid requests: ask the installed Codex process to parse
 // the complete configuration and list its actual models, then end only this probe.
@@ -34,7 +78,7 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 	}
 	cleanup, err := startOwnedCommand(c)
 	if err != nil {
-		return errors.New("无法启动 Codex 配置检查，未应用接入")
+		return errCodexProbeStart
 	}
 	defer cleanup()
 	defer func() {
@@ -90,7 +134,7 @@ func probeCodexConfiguration(ctx context.Context, executable, model string) erro
 	if model != "" && config.Config.Model != model {
 		return errors.New("Codex 读取的模型与所选模型不一致")
 	}
-	if model == "acu-runtime/gemini-4-hydrogen" {
+	if model == codexHydrogenModel {
 		name := "codex-code-mode-host"
 		if filepath.Ext(executable) == ".exe" {
 			name += ".exe"
