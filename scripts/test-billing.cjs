@@ -258,7 +258,7 @@ async function main() {
             assert(values.includes(standard[index]),`${slug} ${field} standard`);
             assert(values.includes(long[index]),`${slug} ${field} long`);
           }
-          assert.equal(await row.getByText(/272,000/).count(),1);
+          assert.equal(await row.locator('.billing-context-label').filter({hasText:'272,000'}).count(),1);
           await row.locator('.billing-benchmark summary').click();
           assert((await row.locator('.billing-benchmark').innerText()).includes('Medium'));
         }
