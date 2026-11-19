@@ -31,3 +31,33 @@ test('missing public references and invalid values never fall back to profile mu
   }
   assert.equal(globalThis.acuPriceComparison({ payable: { model_multiplier: '0.1' } }).standard, undefined);
 });
+
+test('Opus 5.5 shows the canonical price once and is searchable by either spelling', () => {
+  const canonical = { model_name: 'claude-opus-5-5', display_name: 'Claude Opus 5.5', payable: { output_cny_per_million: 9.436 } };
+  const alias = { model_name: 'claude-opus-5.5', payable: { output_cny_per_million: 22.5 } };
+  const fast = { model_name: 'claude-opus-5-5-fast' };
+  const rows = globalThis.acuPriceCatalogRows;
+  assert.deepEqual(rows([alias, fast, canonical], ''), [fast, canonical]);
+  assert.deepEqual(rows([canonical, alias], '  CLAUDE-OPUS-5.5 '), [canonical]);
+  assert.deepEqual(rows([alias, canonical], 'claude-opus-5-5'), [canonical]);
+  assert.deepEqual(rows([alias], ''), [alias]);
+  assert.equal(alias.payable.output_cny_per_million, 22.5);
+});
+
+test('flat ACU rates can be compared to each official tier without inventing a surcharge', () => {
+  const ref = { ...reference, context_tiers: { thresholdTokens: 200000, longContext: { inputPricePerMillion: 134.8, outputPricePerMillion: 505.5 } } };
+  const payable = { input_cny_per_million: 2, output_cny_per_million: 10 };
+  const result = globalThis.acuPriceComparison({ payable, comparison_reference: ref });
+  assert.equal(result.longThreshold, 200000);
+  assert.equal(result.longInput, 2 / 134.8);
+  assert.equal(result.longOutput, 10 / 505.5);
+  assert.equal(result.long, undefined);
+  assert.equal(globalThis.acuPriceComparison({ payable: { ...payable, context_tiers: { thresholdTokens: 272000 } }, comparison_reference: ref }).longInput, undefined);
+});
+
+test('official links come from published provenance and do not accept executable URLs', () => {
+  const source = globalThis.acuPriceSourceURL;
+  assert.equal(source('https://platform.claude.com/docs/en/about-claude/pricing; Text tariff'), 'https://platform.claude.com/docs/en/about-claude/pricing');
+  assert.equal(source('javascript:alert(1)'), '');
+  assert.equal(source('https://user@platform.claude.com/'), '');
+});

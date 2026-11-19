@@ -209,6 +209,21 @@ async function main() {
         await page.screenshot({ path: path.join(workspace, `.build/billing-prices-${theme}-${width}.png`), fullPage: true });
       }
     }
+    prices.push(
+      { model_name: 'claude-opus-5.5', payable: { output_cny_per_million: 22.5 } },
+      { model_name: 'claude-opus-5-5', display_name: 'Claude Opus 5.5', payable: { input_cny_per_million: 1.8872, output_cny_per_million: 9.436 }, comparison_reference: { source_type: 'official', original_currency: 'USD', source_name: 'https://platform.claude.com/docs/en/about-claude/pricing', input_cny_per_million: 26.96, output_cny_per_million: 134.8, fx_cny_per_usd: 6.74 } },
+    );
+    await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+    await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    await page.getByRole('searchbox').fill('claude-opus-5.5');
+    const opus = page.locator('#billing-price-rows tr');
+    assert.equal(await opus.count(), 1);
+    assert.equal(await opus.locator('strong').innerText(), 'Claude Opus 5.5');
+    assert.equal(await opus.locator('[data-price="output"]').innerText(), '¥9.436');
+    assert.equal(await opus.locator('.billing-price-multiplier').innerText(), '0.070×');
+    await opus.getByText('官方价对照', { exact: true }).click();
+    assert.equal(await opus.getByRole('link', { name: '查看官方定价' }).getAttribute('href'), 'https://platform.claude.com/docs/en/about-claude/pricing');
+    await page.getByRole('searchbox').fill('');
     if (process.env.ACU_PUBLIC_PRICE_FIXTURE) {
       const snapshot = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../model_benchmarks.json'), 'utf8'));
       const fixture = JSON.parse(fs.readFileSync(process.env.ACU_PUBLIC_PRICE_FIXTURE, 'utf8'));

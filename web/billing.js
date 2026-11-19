@@ -118,8 +118,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   }
 
   function priceRows() {
-    const search = state.query.toLowerCase();
-    const models = (state.prices?.models || []).filter(model => model.model_name !== 'gemini-4-carbon' && `${model.model_name} ${model.display_name || ''}`.toLowerCase().includes(search));
+    const models = globalThis.acuPriceCatalogRows(state.prices?.models || [], state.query);
     const outputPrice = model => {
       const value = model.payable?.output_cny_per_million;
       return value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
@@ -153,10 +152,15 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       let comparisonSource = '平台历史参考，非已核验官方价';
       if (comparisonReference?.source_type === 'official') {
         comparisonSource = '官方参考';
-        if (model.model_name.startsWith('gpt-')) comparisonSource = model.model_name.endsWith('-fast') ? '官方 Fast 档参考 · 30 分钟缓存写入' : '官方 Standard 档参考 · 30 分钟缓存写入';
+        if (model.model_name.startsWith('gpt-')) comparisonSource = model.model_name.endsWith('-fast') ? '官方 Fast 档参考' : '官方 Standard 档参考';
       }
+      else if (comparisonReference?.source_type === 'openrouter') comparisonSource = 'OpenRouter 参考，非厂商直售价';
       else if (comparisonReference?.source_type === 'public') comparisonSource = '厂商公开价参考（models.dev）';
-      const comparisonDetails = comparisonReference ? `<details class="billing-price-reference"><summary>价格对照</summary><dl><div><dt>输入参考价</dt><dd>${money(comparisonReference.input_cny_per_million)}</dd></div><div><dt>输出参考价</dt><dd>${money(comparisonReference.output_cny_per_million)}</dd></div><div><dt>输入 / 输出倍率</dt><dd>${multiple(comparison.input)} / ${multiple(comparison.output)}</dd></div>${comparison.long !== undefined ? `<div><dt>长上下文倍率</dt><dd>${multiple(comparison.long)}</dd></div>` : ''}</dl><p>人民币 / 百万 tokens · 目录汇率 USD/CNY ${esc(comparisonReference.fx_cny_per_usd)}<br>${esc(comparisonSource)} · ${esc(comparisonReference.observed_at || '')}${comparisonReference.source_type === 'public' ? '<br><a href="https://models.dev" target="_blank" rel="noopener noreferrer">查看公开参考来源</a>' : ''}${comparisonReference.source_type === 'official' ? '<br><a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noopener noreferrer">查看官方定价</a>' : ''}</p></details>` : '';
+      const sourceName = comparisonReference?.source_name;
+      const officialURL = comparisonReference?.source_type === 'official' ? globalThis.acuPriceSourceURL(sourceName) : '';
+      const sourceNote = officialURL && typeof sourceName === 'string' ? sourceName.split(';').slice(1).map(note => note.trim()).filter(note => note && !note.startsWith('https://')).join(' · ') : '';
+      const longComparison = comparison.longInput !== undefined || comparison.longOutput !== undefined ? `<div><dt>&gt; ${comparison.longThreshold.toLocaleString('zh-CN')} tokens 倍率</dt><dd>${comparison.long !== undefined ? multiple(comparison.long) : `${multiple(comparison.longInput)} / ${multiple(comparison.longOutput)}`}</dd></div>` : '';
+      const comparisonDetails = comparisonReference ? `<details class="billing-price-reference"><summary>${comparisonReference.source_type === 'official' ? '官方价对照' : '参考价对照'}</summary><dl><div><dt>输入参考价</dt><dd>${money(comparisonReference.input_cny_per_million)}</dd></div><div><dt>输出参考价</dt><dd>${money(comparisonReference.output_cny_per_million)}</dd></div><div><dt>输入 / 输出倍率</dt><dd>${multiple(comparison.input)} / ${multiple(comparison.output)}</dd></div>${longComparison}</dl><p>人民币 / 百万 tokens${comparisonReference.original_currency === 'USD' ? ` · USD/CNY ${esc(comparisonReference.fx_cny_per_usd)}` : ''}<br>${esc(comparisonSource)} · ${esc(comparisonReference.observed_at || '')}${sourceNote ? `<br>${esc(sourceNote)}` : ''}${officialURL ? `<br><a href="${esc(officialURL)}" target="_blank" rel="noopener noreferrer">查看官方定价</a>` : ''}</p></details>` : '';
       const benchmark = model.capability_benchmark;
       const score = capabilityScore(model);
       const scoreText = value => Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
