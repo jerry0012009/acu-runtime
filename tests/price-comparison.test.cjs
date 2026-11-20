@@ -61,3 +61,35 @@ test('official links come from published provenance and do not accept executable
   assert.equal(source('javascript:alert(1)'), '');
   assert.equal(source('https://user@platform.claude.com/'), '');
 });
+
+test('model categories recognize open weights, providers and media endpoints', () => {
+  assert.deepEqual(globalThis.acuPriceModelCategories({
+    model_name: 'deepseek-v4-flash',
+    supported_endpoint_types: ['openai']
+  }), {
+    open_source: true, overseas: false, image: false, video: false,
+    openai: false, claude: false, gemini: false, grok: false
+  });
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'gpt-image-2', supported_endpoint_types: ['image-generation'] }).image, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'grok-imagine-video', supported_endpoint_types: ['openai-video'] }).video, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'claude-sonnet-5' }).claude, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'gemini-4-argon' }).gemini, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'gpt-6-sol' }).openai, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'gpt-6-sol' }).overseas, true);
+  assert.equal(globalThis.acuPriceModelCategories({ model_name: 'tencent-hy4' }).overseas, false);
+});
+
+test('price filters combine dimensions and allow multiple selections within one dimension', () => {
+  const models = [
+    { model_name: 'deepseek-v4-flash' },
+    { model_name: 'gpt-image-2', supported_endpoint_types: ['image-generation'] },
+    { model_name: 'gemini-4-argon' },
+    { model_name: 'claude-sonnet-5' },
+    { model_name: 'grok-imagine-video', supported_endpoint_types: ['openai-video'] }
+  ];
+  const filter = globalThis.acuFilterPriceModels;
+  assert.deepEqual(filter(models, ['claude', 'gemini']).map(model => model.model_name), ['gemini-4-argon', 'claude-sonnet-5']);
+  assert.deepEqual(filter(models, ['grok', 'video']).map(model => model.model_name), ['grok-imagine-video']);
+  assert.deepEqual(filter(models, ['open_source', 'image']).map(model => model.model_name), []);
+  assert.deepEqual(filter(models, []).map(model => model.model_name), models.map(model => model.model_name));
+});

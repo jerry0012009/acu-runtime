@@ -10,6 +10,42 @@ globalThis.acuPriceCatalogRows = (models, query) => {
     return `${model.model_name} ${model.display_name || ''} ${alternate}`.toLowerCase().includes(query.trim().toLowerCase());
   });
 };
+globalThis.acuPriceModelCategories = model => {
+  const name = String(model?.model_name || '').toLowerCase();
+  const vendor = String(model?.vendor_name || model?.owner_by || '').toLowerCase();
+  const endpoints = Array.isArray(model?.supported_endpoint_types) ? model.supported_endpoint_types : [];
+  const domestic = /^(deepseek|glm-|kimi-|qwen|tongyi|minimax|hunyuan|hy[34](?:-|$)|tencent-hy|mimo-|doubao|seed(?:ance|ream)|step(?:-|[0-9])|ling-|baichuan|yi-|internlm|telechat|skywork|aquila|pangu|chatglm|baidu-|ernie-)/i.test(name)
+    || /(deepseek|zhipu|moonshot|kimi|alibaba|qwen|minimax|hunyuan|tencent|xiaomi|stepfun|bytedance|doubao|baichuan|01\\.ai)/i.test(vendor);
+  const openSource = /^(deepseek|glm-|qwen|mimo-|mistral|llama|gemma|gpt-oss|nemotron|granite|yi-|step-|internlm|hunyuan|ling-|baichuan|solar-|falcon|olmo|phi-|command-r)/i.test(name);
+  const image = endpoints.some(endpoint => /image-generation/i.test(endpoint)) || /(^|[-/])(gpt-image|dall-e|imagen|imagine-image|[^/]*-image(?:-|$))/i.test(name);
+  const video = endpoints.some(endpoint => /video/i.test(endpoint)) || /(^|[-/])(sora|veo|kling|seedance|hailuo|runway|wanx?|luma|imagine-video)([-/]|$)/i.test(name);
+  return {
+    open_source: openSource,
+    overseas: !domestic && !name.startsWith('acu-'),
+    image,
+    video,
+    openai: /^(gpt-|gpt$|o[1-9](?:-|$)|chatgpt-|codex(?:-|$)|dall-e|gpt-image)/i.test(name) || /openai/i.test(vendor),
+    claude: /^claude-/i.test(name) || /anthropic/i.test(vendor),
+    gemini: /^gemini-/i.test(name) || /google/i.test(vendor),
+    grok: /^grok-/i.test(name) || /x\\.ai|xai/i.test(vendor)
+  };
+};
+globalThis.acuFilterPriceModels = (models, selected) => {
+  const categories = globalThis.acuPriceModelCategories;
+  const filters = new Set(selected || []);
+  const groups = [
+    ['open_source', 'overseas'],
+    ['image', 'video'],
+    ['openai', 'claude', 'gemini', 'grok']
+  ];
+  return models.filter(model => {
+    const values = categories(model);
+    return groups.every(group => {
+      const active = group.filter(key => filters.has(key));
+      return active.length === 0 || active.some(key => values[key]);
+    });
+  });
+};
 globalThis.acuPriceComparison = model => {
   const reference = model.comparison_reference;
   const payable = model.payable;

@@ -1,5 +1,5 @@
 globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, icon }) => {
-  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'capability_desc', identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
+  const state = { tab: 'local', days: 7, page: 1, account: null, prices: null, accountError: '', pricesError: '', accountBusy: false, pricesBusy: false, query: '', sort: 'capability_desc', filters: new Set(), identity: '', generation: 0, localQuery: '', localReady: false, accountAttempt: 0 };
   const money = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : '¥' + new Intl.NumberFormat('zh-CN', Number(value) !== 0 && Math.abs(Number(value)) < 0.000001 ? { maximumSignificantDigits: 4 } : { maximumFractionDigits: 6 }).format(Number(value));
   const priceMoney = value => '¥' + Number(value).toLocaleString('zh-CN', { maximumSignificantDigits: 10 });
   const date = value => value ? new Date(value * 1000).toLocaleString('zh-CN') : '尚未刷新';
@@ -8,6 +8,10 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   let modelOrder = 'charge', showAllModels = false;
   let renderedPriceRows = '';
   let probes = null, probesBusy = false, nextProbeRead = 0;
+  const priceFilterGroups = [
+    { label: '类型', filters: [['open_source', '开源模型'], ['overseas', '海外模型'], ['image', '生图模型'], ['video', '视频模型']] },
+    { label: '系列', filters: [['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini'], ['grok', 'Grok']] }
+  ];
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
   const button = (label, attributes = '') => `<button class="button secondary" ${attributes}>${label}</button>`;
   const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}/${ui.status?.account?.selected || 0}`;
@@ -166,7 +170,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   }
 
   function priceRows() {
-    const models = globalThis.acuPriceCatalogRows(state.prices?.models || [], state.query);
+    const models = filteredPriceModels();
     const outputPrice = model => {
       const value = model.payable?.output_cny_per_million;
       return value != null && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
@@ -230,10 +234,21 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     }).join('');
   }
 
+  function filteredPriceModels() {
+    const searched = globalThis.acuPriceCatalogRows(state.prices?.models || [], state.query);
+    return globalThis.acuFilterPriceModels(searched, [...state.filters]);
+  }
+
+  function priceFilterButton([value, label]) {
+    const active = state.filters.has(value);
+    return `<button type="button" class="billing-price-filter${active ? ' active' : ''}" data-price-filter="${value}" aria-pressed="${active}"><span aria-hidden="true">✓</span>${label}</button>`;
+  }
+
   function pricesPage() {
     const rows = priceRows();
     renderedPriceRows = rows;
     return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 实付单价</p></div><div class="billing-price-controls"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div></div>
+      <div class="billing-price-filterbar">${priceFilterGroups.map(group => `<div class="billing-price-filtergroup"><span>${group.label}</span><div role="group" aria-label="${group.label === '类型' ? '模型类型' : '模型系列'}">${group.filters.map(priceFilterButton).join('')}</div></div>`).join('')}<div class="billing-price-filter-summary"><span id="billing-price-count">${filteredPriceModels().length} 个模型</span><button type="button" class="text-button" data-clear-price-filters ${state.filters.size ? '' : 'hidden'}>清除筛选</button></div></div>
       <div id="billing-price-status">${priceStatus()}</div>
       <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">实付倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th><th scope="col" class="billing-price-probes" title="全池探针 · 6 小时 / 格 · 代表性 Profile 完整响应 P50">48h 探针</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">实付倍率 = 人民币实付价 ÷ 公开参考价折合人民币（输入 / 输出），不是渠道成本倍率。无可靠对照时不显示倍率。<br>— 表示暂无报价或可比参考 · 价格更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
   }
@@ -250,6 +265,16 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       updateProbeCells();
     }
     document.getElementById('billing-price-empty').hidden = !!rows || !state.prices;
+    const total = globalThis.acuPriceCatalogRows(state.prices?.models || [], state.query).length;
+    document.getElementById('billing-price-count').textContent = state.filters.size
+      ? `${filteredPriceModels().length} / ${total} 个模型`
+      : `${filteredPriceModels().length} 个模型`;
+    for (const button of document.querySelectorAll('[data-price-filter]')) {
+      const active = state.filters.has(button.dataset.priceFilter);
+      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('active', active);
+    }
+    document.querySelector('[data-clear-price-filters]').hidden = state.filters.size === 0;
   }
 
   function update(source = '') {
@@ -302,6 +327,19 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     if (tab) { open(tab.dataset.billingTab); return true; }
     const refresh = target.closest('[data-billing-refresh]');
     if (refresh) { refresh.dataset.billingRefresh === 'prices' ? loadPrices(true) : loadAccount(); return true; }
+    const priceFilter = target.closest('[data-price-filter]');
+    if (priceFilter) {
+      const value = priceFilter.dataset.priceFilter;
+      if (state.filters.has(value)) state.filters.delete(value);
+      else state.filters.add(value);
+      updatePriceRows();
+      return true;
+    }
+    if (target.closest('[data-clear-price-filters]')) {
+      state.filters.clear();
+      updatePriceRows();
+      return true;
+    }
     const page = target.closest('[data-billing-page]');
     if (page) { state.page = Math.max(1, state.page + Number(page.dataset.billingPage)); loadAccount(); return true; }
     const rank = target.closest('[data-billing-rank]');

@@ -109,7 +109,7 @@ async function main() {
     await page.screenshot({ path: path.join(workspace, '.build/billing-probe-preview.png') });
     await page.getByRole('searchbox').fill('carbon');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 0);
-    await page.getByRole('searchbox').fill('sol');
+    await page.getByRole('searchbox').fill('fixture-sol');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 1);
     delayPrices = true;
     await page.getByRole('button', { name: '刷新价格', exact: true }).click();
@@ -152,6 +152,43 @@ async function main() {
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['ACU Auto','cheap','测试 Sol','free','premium','unknown']);
     await page.locator('[data-billing-sort]').selectOption('capability_desc');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','ACU Auto','cheap','free','unknown']);
+    prices.push(
+      { model_name: 'deepseek-v4-flash', payable: { output_cny_per_million: 1 }, supported_endpoint_types: ['openai'] },
+      { model_name: 'qwen3.8-max', payable: { output_cny_per_million: 2 }, supported_endpoint_types: ['openai'] },
+      { model_name: 'gpt-image-2', payable: { output_cny_per_million: 3 }, supported_endpoint_types: ['image-generation'] },
+      { model_name: 'gpt-6-sol', payable: { output_cny_per_million: 4 }, supported_endpoint_types: ['openai-response'] },
+      { model_name: 'claude-sonnet-5', payable: { output_cny_per_million: 5 }, supported_endpoint_types: ['anthropic'] },
+      { model_name: 'gemini-4-argon', payable: { output_cny_per_million: 6 }, supported_endpoint_types: ['gemini'] },
+      { model_name: 'grok-imagine-video', payable: { output_cny_per_million: 7 }, supported_endpoint_types: ['openai-video'] }
+    );
+    await page.getByRole('button', { name: '刷新价格', exact: true }).click();
+    await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    await page.locator('[data-price-filter="open_source"]').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('[data-price-filter="open_source"]').getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(), ['deepseek-v4-flash', 'qwen3.8-max']);
+    assert.equal(await page.locator('#billing-price-count').innerText(), '2 / 13 个模型');
+    await page.locator('[data-clear-price-filters]').click();
+    await page.locator('[data-price-filter="image"]').click();
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(), ['gpt-image-2']);
+    await page.locator('[data-clear-price-filters]').click();
+    await page.locator('[data-price-filter="video"]').click();
+    await page.locator('[data-price-filter="grok"]').click();
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(), ['grok-imagine-video']);
+    await page.locator('[data-clear-price-filters]').click();
+    await page.locator('[data-price-filter="claude"]').click();
+    await page.locator('[data-price-filter="gemini"]').click();
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(), ['claude-sonnet-5', 'gemini-4-argon']);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 960 });
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `price filters fit ${width}`);
+      await page.screenshot({ path: path.join(workspace, `.build/billing-price-filters-${width}.png`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 960 });
+    await page.getByRole('searchbox').fill('gemini');
+    assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(), ['gemini-4-argon']);
+    await page.getByRole('searchbox').fill('');
+    await page.locator('[data-clear-price-filters]').click();
     const benchmarkDetails = page.locator('.billing-benchmark').filter({hasText:'Fixture Sol (High)'});
     assert.equal(await benchmarkDetails.getAttribute('open'),null);
     await benchmarkDetails.locator('summary').click();
@@ -164,7 +201,7 @@ async function main() {
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     assert.equal(await page.locator('[data-billing-sort]').inputValue(),'capability_desc');
     await page.locator('[data-billing-sort]').selectOption('name');
-    await page.getByRole('searchbox').fill('sol');
+    await page.getByRole('searchbox').fill('fixture-sol');
     failPrices = true;
     await page.getByRole('button', { name: '刷新价格' }).click();
     await page.getByText(/价格刷新失败/).waitFor();
