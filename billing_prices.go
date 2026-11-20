@@ -90,7 +90,7 @@ func (cache *priceCache) persist() {
 }
 
 func (host *server) fetchPrices(ctx context.Context, site string) (json.RawMessage, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, site+"/api/pricing", nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, site+"/api/pricing?view=runtime", nil)
 	if err != nil {
 		return nil, err
 	}

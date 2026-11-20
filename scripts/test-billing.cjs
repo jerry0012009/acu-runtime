@@ -14,6 +14,9 @@ async function main() {
   page.on('pageerror', error => errors.push(error.message));
   let account = { loggedIn: true, username: '隔离测试账号', site: 'https://console.acucompute.com', selected: 9 };
   let failAccount = false, failPrices = false, localLoads = 0, coldPrices = false, delayPrices = false, comparisonMode = 'official';
+  let releaseProbes;
+  const probeGate = new Promise(resolve => { releaseProbes = resolve; });
+  let probeMode = 'delayed';
   const calls = [];
   const prices = [{ model_name: 'acu-auto', display_name: 'ACU Auto' }, { model_name: 'fixture-sol', display_name: '测试 Sol', payable: { model_multiplier: '0.06', price_version: 'test-static-v1', input_cny_per_million: 0.8088, output_cny_per_million: 4.044, cached_input_cny_per_million: 0.04044, cache_write_cny_per_million: 1.011, context_tiers: { thresholdTokens: 272000, longContext: { inputPricePerMillion: 1.6176, outputPricePerMillion: 6.066 } } }, reference: { source_type: 'platform' } }];
   prices.push({model_name:'cheap',payable:{output_cny_per_million:'0.25'}},{model_name:'premium',payable:{output_cny_per_million:25}},{model_name:'free',payable:{output_cny_per_million:0}},{model_name:'unknown',payable:{output_cny_per_million:'unavailable'}});
@@ -35,6 +38,11 @@ async function main() {
     if (url.pathname === '/runtime/billing/prices') {
       if (delayPrices && !url.searchParams.has('cached')) await new Promise(resolve => setTimeout(resolve, 1000));
       return json({ models: coldPrices ? null : prices, updatedAt: coldPrices ? 0 : 1794490000, warning: failPrices ? '隔离价格刷新失败' : '' });
+    }
+    if (url.pathname === '/runtime/billing/model-probe-summary') {
+      if (probeMode === 'delayed') await probeGate;
+      if (probeMode === 'offline') return json({ models: null });
+      return json({ generatedAt: Math.floor(Date.now() / 1000), models: { 'fixture-sol': { buckets: 'ngrgnngr', latencyMs: 2000, protocol: 'responses' } }, stale: probeMode === 'stale' });
     }
     if (url.pathname === '/runtime/account/logout') { account = {}; return json({ ok: true }); }
     if (url.pathname === '/kernel/') { localLoads++; return route.fulfill({ contentType: 'text/html', body: '<h1>原有本机用量统计</h1><input aria-label="原有筛选" value="今天">' }); }
@@ -83,6 +91,22 @@ async function main() {
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     assert.equal(await page.locator('[data-billing-sort]').inputValue(), 'capability_desc');
     assert.deepEqual(await page.locator('#billing-price-rows tr td:first-child strong').allTextContents(),['premium','测试 Sol','ACU Auto','cheap','free','unknown']);
+    const probeRow = page.getByRole('row').filter({ hasText: '测试 Sol' });
+    assert(await probeRow.locator('[data-price="output"]').isVisible(), 'prices render while the probe request is pending');
+    await probeRow.locator('.billing-benchmark summary').click();
+    await page.locator('[data-billing-sort]').focus();
+    probeMode = 'fresh';
+    releaseProbes();
+    await probeRow.getByText('2.00s', { exact: true }).waitFor();
+    assert.equal(await probeRow.locator('.billing-benchmark[open]').count(), 1);
+    assert(await page.locator('[data-billing-sort]').evaluate(node => node === document.activeElement));
+    assert.equal(await probeRow.locator('.probe-g').count(), 3);
+    assert.equal(await probeRow.locator('.probe-r').count(), 2);
+    assert.equal(await probeRow.locator('.probe-n').count(), 3);
+    assert.equal(await page.locator('[data-probe-model="cheap"] .probe-n').count(), 8);
+    assert.equal(await page.locator('[data-probe-model="acu-auto"] .billing-probe-strip').count(), 0);
+    await probeRow.locator('.billing-benchmark summary').click();
+    await page.screenshot({ path: path.join(workspace, '.build/billing-probe-preview.png') });
     await page.getByRole('searchbox').fill('carbon');
     assert.equal(await page.locator('#billing-price-rows tr').count(), 0);
     await page.getByRole('searchbox').fill('sol');
@@ -108,7 +132,8 @@ async function main() {
     assert.equal(await page.getByRole('searchbox').inputValue(), 'fixture');
     assert(await page.getByRole('searchbox').evaluate(node => node === document.activeElement), 'refresh preserves search focus');
     delayPrices = false;
-    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','实付倍率','输出价格','输入价格','缓存命中','缓存写入']);
+    assert.deepEqual(await page.locator('.billing-prices th').allTextContents(),['模型','实付倍率','输出价格','输入价格','缓存命中','缓存写入','48h 探针']);
+    assert.equal(calls.filter(call => call === '/runtime/billing/model-probe-summary').length, 1, 'search, sort and price refresh reuse the probe snapshot');
     assert(await page.getByText('0.060×', {exact:true}).isVisible());
     const solRow = page.locator('#billing-price-rows tr');
     assert((await solRow.locator('[data-price="output"]').innerText()).startsWith('¥4.044'));
@@ -163,6 +188,7 @@ async function main() {
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     coldPrices = true;
+    probeMode = 'offline';
     await page.reload();
     await page.getByRole('button', { name: '用量与费用', exact: true }).click();
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
@@ -173,13 +199,17 @@ async function main() {
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-probe-model="fixture-sol"]').getAttribute('aria-label'), '探针数据暂不可用');
+    assert.equal(await page.locator('.billing-probe-strip').count(), 0, 'unavailable snapshots do not show false failures');
     // A restarted UI receives disk cache before a slow upstream refresh completes.
     delayPrices = true;
+    probeMode = 'stale';
     await page.reload();
     await page.getByRole('button', { name: '用量与费用', exact: true }).click();
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     assert(await page.getByRole('button', { name: '刷新中…', exact: true }).isVisible());
+    await page.locator('[data-probe-model="fixture-sol"] .billing-probe-latency sup').waitFor();
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();
     prices.push({ model_name: 'fixture-model-with-a-very-long-unbroken-name-for-responsive-pricing', payable: { model_multiplier: 'invalid', input_cny_per_million: -1, output_cny_per_million: 3, cached_input_cny_per_million: 0.0003042, cache_write_cny_per_million: 0, context_tiers: { thresholdTokens: 100000, longContext: { inputPricePerMillion: 2, outputPricePerMillion: 6, cachedInputPricePerMillion: 0.0006084, cacheWritePricePerMillion: 0 } } } });
     await page.getByRole('button', { name: '刷新价格', exact: true }).click();
@@ -205,6 +235,9 @@ async function main() {
         const inputBox = await longRow.locator('[data-price="input"]').boundingBox();
         assert(outputBox.x + outputBox.width <= inputBox.x + 1, `price columns do not overlap at ${width}`);
         assert(await longRow.locator('[data-price="write"]').isVisible());
+        const probeCell = page.locator('[data-probe-model="fixture-sol"]');
+        const probeBox = await probeCell.boundingBox();
+        assert(probeBox.x + probeBox.width <= width, `probe summary fits ${width}`);
         assert(await longRow.locator('[data-price="output"] .billing-price-value').evaluate(node => parseFloat(getComputedStyle(node).fontSize) >= 16), 'prices stay readable');
         await page.screenshot({ path: path.join(workspace, `.build/billing-prices-${theme}-${width}.png`), fullPage: true });
       }

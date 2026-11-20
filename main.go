@@ -100,6 +100,7 @@ type server struct {
 	accountFile      string
 	accountFileMu    sync.Mutex
 	prices           priceCache
+	modelProbes      billingProbeCache
 	loginRequests    chan loginTicket
 	cloudTransport   http.RoundTripper
 	update           updateState
@@ -680,6 +681,8 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.accountPreferences(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/prices":
 			host.modelPrices(response, request)
+		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/model-probe-summary":
+			host.modelProbeSummary(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/account":
 			host.accountBilling(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/account/logout":

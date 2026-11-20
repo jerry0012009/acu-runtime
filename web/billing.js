@@ -7,6 +7,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   const overviewMoney = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value) > 0 && Number(value) < .01 ? '< ¥0.01' : '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let modelOrder = 'charge', showAllModels = false;
   let renderedPriceRows = '';
+  let probes = null, probesBusy = false, nextProbeRead = 0;
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
   const button = (label, attributes = '') => `<button class="button secondary" ${attributes}>${label}</button>`;
   const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}/${ui.status?.account?.selected || 0}`;
@@ -14,6 +15,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   const links = () => `<a class="button secondary" href="${esc(site())}/wallet" target="_blank" rel="noopener noreferrer">前往官网充值</a><a class="text-button" href="${esc(site())}/usage-logs" target="_blank" rel="noopener noreferrer">云端消费详情 ↗</a>`;
 
   function syncAccount() {
+    if (ui.page === 'usage' && state.tab === 'prices' && !document.hidden) loadProbes();
     const current = identity();
     if (current === state.identity) {
       if (ui.page === 'usage' && !document.hidden && !state.accountBusy && Date.now() - state.accountAttempt > 60000) loadAccount();
@@ -71,6 +73,52 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       state.pricesError = result.warning || (!result.models?.length ? '暂时没有可用的价格数据，请稍后重试。' : '');
     } catch (error) { state.pricesError = error.name === 'AbortError' ? '获取价格超时，请稍后重试。' : error.message; }
     finally { clearTimeout(timeout); state.pricesBusy = false; update('prices'); }
+  }
+
+  const probeLabels = { g: '至少一次成功', r: '全部失败', n: '无采样' };
+
+  async function loadProbes() {
+    if (probesBusy || Date.now() < nextProbeRead) return;
+    probesBusy = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    try {
+      const result = await request('/runtime/billing/model-probe-summary', { signal: controller.signal });
+      probes = result.models ? result : null;
+    } catch {
+      if (probes) probes = { ...probes, stale: true };
+    } finally {
+      clearTimeout(timeout);
+      probesBusy = false;
+      nextProbeRead = Date.now() + (probes && !probes.stale ? 5 * 60_000 : 60_000);
+      if (ui.page === 'usage' && state.tab === 'prices') updateProbeCells();
+    }
+  }
+
+  function updateProbeCells() {
+    const snapshot = Date.now() - (probes?.generatedAt || 0) * 1000 < 30 * 60_000 ? probes : null;
+    const updated = snapshot ? date(snapshot.generatedAt) : '';
+    const periods = snapshot ? Array.from({ length: 8 }, (_, index) => {
+      const end = snapshot.generatedAt - (7 - index) * 6 * 3600;
+      return `${date(end - 6 * 3600)} ~ ${date(end)}`;
+    }) : [];
+    const rows = app.querySelectorAll('[data-probe-model]');
+    for (const cell of rows) {
+      const model = cell.dataset.probeModel;
+      const value = snapshot && Object.hasOwn(snapshot.models, model) ? snapshot.models[model] : null;
+      const buckets = model === 'acu-auto' || !snapshot ? '' : /^[gnr]{8}$/.test(value?.buckets) ? value.buckets : 'nnnnnnnn';
+      const latency = Number.isFinite(value?.latencyMs) && value.latencyMs > 0 ? `${(value.latencyMs / 1000).toFixed(2)}s` : '';
+      const status = model === 'acu-auto' ? '自动路由无独立探针' : snapshot ? '过去 48 小时无全池探针采样' : probesBusy ? '正在读取探针' : '探针数据暂不可用';
+      const timing = latency ? `完整响应 P50 ${latency}（近 12 小时代表性 Profile · ${value.protocol || '探针'}）` : '暂无足够延迟样本';
+      const dots = Array.from(buckets, (bucket, index) => `<span aria-hidden="true" class="probe-${bucket}" title="${esc(`${periods[index]}：${probeLabels[bucket]}`)}"></span>`).join('');
+      const stale = snapshot?.stale && value ? ' · 缓存' : '';
+      const label = value && buckets ? `近 48 小时探针：${Array.from(buckets, bucket => probeLabels[bucket]).join('、')}。${timing}${stale}` : status + stale;
+      const html = buckets ? `<span class="billing-probe-strip">${dots}</span><span class="billing-probe-latency" title="${esc(`${timing} · ${updated}${stale}`)}">${latency || '—'}${stale ? '<sup aria-hidden="true">*</sup>' : ''}</span>` : '<span class="billing-probe-latency">—</span>';
+      if (cell.getAttribute('aria-label') === label && cell.innerHTML === html) continue;
+      cell.setAttribute('aria-label', label);
+      cell.title = buckets ? '' : status;
+      cell.innerHTML = html;
+    }
   }
 
   function summary() {
@@ -178,7 +226,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
         const hasTier = Number(tiers?.thresholdTokens) > 0 && longValue != null && longValue !== '' && Number.isFinite(Number(longValue)) && Number(longValue) >= 0;
         return `<td data-price="${key}" data-label="${label}"><span class="billing-price-value">${valid ? priceMoney(value) : '—'}</span>${hasTier ? `<small class="billing-price-long" aria-label="超过 ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} 输入 tokens">${priceMoney(longValue)}</small>` : ''}</td>`;
       }).join('');
-      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}${tiers?.thresholdTokens > 0 ? `<small class="billing-context-label">次行：&gt; ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} 输入 tokens</small>` : ''}<div class="billing-price-meta">${reference}${comparisonDetails}</div></td><td class="billing-price-multiplier" data-label="实付倍率"><span title="人民币实付价 ÷ 同档位公开参考价折合人民币；输入、输出折扣不同时分别列示">${multiplier !== undefined ? multiple(multiplier) : comparison.input !== undefined || comparison.output !== undefined ? `<small>输入 ${multiple(comparison.input)}<br>输出 ${multiple(comparison.output)}</small>` : '—'}</span></td>${cells}</tr>`;
+      return `<tr><td class="billing-price-model"><strong>${esc(model.display_name || model.model_name)}</strong>${model.display_name && model.display_name !== model.model_name ? `<small>${esc(model.model_name)}</small>` : ''}${dynamic ? '<small>按实际选中模型计费</small>' : ''}${tiers?.thresholdTokens > 0 ? `<small class="billing-context-label">次行：&gt; ${Number(tiers.thresholdTokens).toLocaleString('zh-CN')} 输入 tokens</small>` : ''}<div class="billing-price-meta">${reference}${comparisonDetails}</div></td><td class="billing-price-multiplier" data-label="实付倍率"><span title="人民币实付价 ÷ 同档位公开参考价折合人民币；输入、输出折扣不同时分别列示">${multiplier !== undefined ? multiple(multiplier) : comparison.input !== undefined || comparison.output !== undefined ? `<small>输入 ${multiple(comparison.input)}<br>输出 ${multiple(comparison.output)}</small>` : '—'}</span></td>${cells}<td class="billing-price-probes" data-probe-model="${esc(model.model_name)}"></td></tr>`;
     }).join('');
   }
 
@@ -187,7 +235,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     renderedPriceRows = rows;
     return `<section class="billing-prices"><div class="billing-toolbar"><div><h2>模型价格</h2><p>人民币 / 百万 tokens · 实付单价</p></div><div class="billing-price-controls"><input type="search" id="billing-price-search" aria-label="搜索模型价格" placeholder="搜索模型名称" value="${esc(state.query)}"><label>排序 <select data-billing-sort><option value="name" ${state.sort === 'name' ? 'selected' : ''}>模型名称</option><option value="output_asc" ${state.sort === 'output_asc' ? 'selected' : ''}>输出价格从低到高</option><option value="output_desc" ${state.sort === 'output_desc' ? 'selected' : ''}>输出价格从高到低</option><option value="capability_desc" ${state.sort === 'capability_desc' ? 'selected' : ''}>模型能力从高到低</option></select></label>${button(state.pricesBusy ? '刷新中…' : '刷新价格', `data-billing-refresh="prices" ${state.pricesBusy ? 'disabled' : ''}`)}</div></div>
       <div id="billing-price-status">${priceStatus()}</div>
-      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">实付倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">实付倍率 = 人民币实付价 ÷ 公开参考价折合人民币（输入 / 输出），不是渠道成本倍率。无可靠对照时不显示倍率。<br>— 表示暂无报价或可比参考 · 更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
+      <div class="billing-table-scroll"><table class="billing-price-table" aria-label="模型价格"><thead><tr><th scope="col">模型</th><th scope="col">实付倍率</th><th scope="col">输出价格</th><th scope="col">输入价格</th><th scope="col">缓存命中</th><th scope="col">缓存写入</th><th scope="col" class="billing-price-probes" title="全池探针 · 6 小时 / 格 · 代表性 Profile 完整响应 P50">48h 探针</th></tr></thead><tbody id="billing-price-rows">${rows}</tbody></table></div><p class="billing-note" id="billing-price-empty" ${rows || !state.prices ? 'hidden' : ''}>没有匹配的模型价格。</p><p class="billing-note">实付倍率 = 人民币实付价 ÷ 公开参考价折合人民币（输入 / 输出），不是渠道成本倍率。无可靠对照时不显示倍率。<br>— 表示暂无报价或可比参考 · 价格更新于 <span id="billing-price-updated">${esc(date(state.prices?.updatedAt))}</span></p></section>`;
   }
 
   function priceStatus() {
@@ -199,6 +247,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     if (rows !== renderedPriceRows) {
       document.getElementById('billing-price-rows').innerHTML = rows;
       renderedPriceRows = rows;
+      updateProbeCells();
     }
     document.getElementById('billing-price-empty').hidden = !!rows || !state.prices;
   }
@@ -233,6 +282,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     state.localReady = !!ui.status?.ready;
     const tabs = [['local','本机用量'],['account','ACU 账户'],['prices','模型价格']];
     app.innerHTML = `${navigation()}<div class="main-shell billing-shell"><header class="topbar"><span>ACU Runtime / 用量与费用</span></header><main class="content billing-content"><div class="page-heading"><div><h1>用量与费用</h1></div></div><nav class="billing-tabs" aria-label="用量与费用子页面">${tabs.map(([tab,label]) => `<button data-billing-tab="${tab}" ${state.tab === tab ? 'aria-current="page" class="active"' : ''}>${label}</button>`).join('')}</nav>${state.tab === 'local' ? `<div class="billing-summary" id="billing-summary">${summary()}</div><p class="billing-note">本机用量 · 预估费用</p>${ui.status?.ready ? `<iframe class="billing-local-frame" title="本机用量统计" src="/kernel/?view=usage&acu-view=usage${state.localQuery}" sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"></iframe>` : note('正在连接本机内核…')}` : state.tab === 'account' ? accountPage() : pricesPage()}</main></div>`;
+    if (state.tab === 'prices') updateProbeCells();
   }
 
   function open(tab = state.tab, query) {
