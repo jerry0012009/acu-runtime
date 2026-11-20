@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -35,7 +36,10 @@ func configureCatalogFixture(t *testing.T, host *server, edition string, version
 			archives[*version] = tapnowZIP(t, map[string]string{"manifest.json": string(manifest), "popup.js": "fixture"})
 		}
 		body := archives[*version]
-		if r.URL.String() == tapnowCatalogURL {
+		if r.URL.Path == "/jerry0012009/acu-tapnow/main/runtime-channel.json" {
+			if r.URL.Query().Get("refresh") == "" || r.Header.Get("Cache-Control") != "no-cache" {
+				t.Fatal("setup requested a cacheable channel", r.URL, r.Header)
+			}
 			body, _ = json.Marshal(tapnowCatalog{Schema: 1, Packages: map[string]tapnowPackage{
 				"companion": tapnowFixturePackage("companion", *version, body), "backup": tapnowFixturePackage("backup", *version, body),
 			}})
@@ -47,7 +51,7 @@ func configureCatalogFixture(t *testing.T, host *server, edition string, version
 
 func TestTapnowConfigureAlwaysRefreshesAndRequiresPreparedVersion(t *testing.T) {
 	host := nativeFixtureHost(t)
-	version := "0.1.23"
+	version := "0.1.32"
 	calls := []string{}
 	configureCatalogFixture(t, host, "companion", &version, &calls)
 	opened := ""
@@ -63,24 +67,31 @@ func TestTapnowConfigureAlwaysRefreshesAndRequiresPreparedVersion(t *testing.T) 
 	if opened != "about:blank" {
 		t.Fatal(opened)
 	}
-	if g := host.tapnow.grants["companion"]; g.RequiredVersion != "0.1.23" || !g.ReloadRequired {
+	if g := host.tapnow.grants["companion"]; g.RequiredVersion != "0.1.32" || !g.ReloadRequired {
 		t.Fatal(g)
 	}
-	version = "0.1.24"
+	firstCatalogURL := calls[0]
+	version = "0.1.34"
 	calls = nil
 	configure()
-	if len(calls) != 2 || calls[0] != tapnowCatalogURL || !strings.Contains(calls[1], "v0.1.24") {
+	if len(calls) != 2 || calls[0] == firstCatalogURL || !strings.Contains(calls[1], "/v0.1.34/") {
 		t.Fatal(calls)
 	}
-	if readTapnowManifest(filepath.Join(host.tapnow.root, "companion")) != "0.1.24" {
+	if zipURL, err := url.Parse(calls[1]); err != nil || zipURL.RawQuery != "" {
+		t.Fatal("immutable ZIP URL must be unchanged", calls[1])
+	}
+	if view := host.tapnow.snapshot().Editions[0]; view.Prepared != "0.1.34" || view.Latest != "0.1.34" || !view.ReloadRequired {
+		t.Fatal(view)
+	}
+	if readTapnowManifest(filepath.Join(host.tapnow.root, "companion")) != "0.1.34" {
 		t.Fatal("latest files not prepared")
 	}
-	msg := tapnowNativeMessage{Action: "connect", Origin: "chrome-extension://" + tapnowCompanionID + "/", Version: "0.1.23"}
+	msg := tapnowNativeMessage{Action: "connect", Origin: "chrome-extension://" + tapnowCompanionID + "/", Version: "0.1.32"}
 	w := nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
 	if w.Code != 409 || strings.Contains(w.Body.String(), "sk-native") || host.tapnow.grants["companion"].Phase != "waiting" {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	msg.Version = "0.1.24"
+	msg.Version = "0.1.34"
 	w = nativeAPIRequest(host, msg, host.tapnow.nativeToken, "", "")
 	var reply tapnowNativeReply
 	json.Unmarshal(w.Body.Bytes(), &reply)

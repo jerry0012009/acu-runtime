@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -116,6 +118,10 @@ func tapnowRead(ctx context.Context, client *http.Client, address string, limit 
 	if err != nil {
 		return nil, err
 	}
+	return tapnowReadRequest(client, req, limit)
+}
+
+func tapnowReadRequest(client *http.Client, req *http.Request, limit int64) ([]byte, error) {
 	req.Header.Set("User-Agent", "ACU-Runtime/"+appVersion)
 	res, err := client.Do(req)
 	if err != nil {
@@ -130,6 +136,32 @@ func tapnowRead(ctx context.Context, client *http.Client, address string, limit 
 		return nil, errors.New("插件下载不完整或超出大小限制")
 	}
 	return body, nil
+}
+
+func fetchTapnowCatalog(ctx context.Context, client *http.Client, endpoint string) (*tapnowCatalog, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	// Unlike versioned ZIPs, the channel changes in place. Bypass stale CDN
+	// variants even when an intermediary ignores the request's cache directives.
+	query := u.Query()
+	query.Set("refresh", strconv.FormatInt(time.Now().UnixNano(), 10))
+	u.RawQuery = query.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	body, err := tapnowReadRequest(client, req, 64<<10)
+	if err != nil {
+		return nil, err
+	}
+	var catalog tapnowCatalog
+	if json.Unmarshal(body, &catalog) != nil || catalog.Schema != 1 || len(catalog.Packages) != 2 || !validTapnowPackage("backup", catalog.Packages["backup"]) || !validTapnowPackage("companion", catalog.Packages["companion"]) {
+		return nil, errors.New("TapNow 发布清单无效，原版本未变更")
+	}
+	return &catalog, nil
 }
 
 func readTapnowManifest(dir string) string {
@@ -428,17 +460,12 @@ func (host *server) tapnowAPI(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.URL.Path {
 	case "/runtime/tapnow/check":
-		var body []byte
-		body, err = tapnowRead(ctx, client, endpoint, 64<<10)
+		var c *tapnowCatalog
+		c, err = fetchTapnowCatalog(ctx, client, endpoint)
 		if err == nil {
-			var c tapnowCatalog
-			if json.Unmarshal(body, &c) != nil || c.Schema != 1 || len(c.Packages) != 2 || !validTapnowPackage("backup", c.Packages["backup"]) || !validTapnowPackage("companion", c.Packages["companion"]) {
-				err = errors.New("TapNow 发布清单无效，原版本未变更")
-			} else {
-				s.Lock()
-				s.catalog = &c
-				s.Unlock()
-			}
+			s.Lock()
+			s.catalog = c
+			s.Unlock()
 		}
 	case "/runtime/tapnow/prepare":
 		if catalog == nil {

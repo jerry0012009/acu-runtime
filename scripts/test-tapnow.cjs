@@ -11,9 +11,9 @@ const status = { ready: true, desktop: true, agents: [
   { id:'codex', name:'Codex', detected:true, connected:false, modelOptions:[{value:'acu/acu-auto',ref:'acu/acu-auto',label:'acu-auto'}] },
   { id:'workbuddy', name:'WorkBuddy', detected:false },
 ], connection:{ known:true, configured:true, provider:'acu', choices:[{id:'acu',name:'ACU',masked:'sk-***fixture',models:['acu-auto','gpt-6.1-sol']}] }, account:{} };
-let installCount = 0, phase = 'unknown', prepared = false, confirmed = false, checks = 0;
+let installCount = 0, phase = 'unknown', prepared = '', latest = '0.1.32', reloadRequired = false, confirmed = false, checks = 0;
 const calls=[];
-const tapnowState = () => ({editions:['companion','backup'].map(edition => ({edition,installAvailable:true,connection:edition==='companion'?(confirmed?'configured':phase):'unknown',reloadRequired:installCount===1,prepared:prepared&&edition==='companion'?'0.1.25':undefined,path:'/isolated/ACURuntime/用户 插件目录/'+edition,version:confirmed?'0.1.25':undefined,confirmedAt:confirmed?'2026-11-14T18:00:00Z':undefined}))});
+const tapnowState = () => ({editions:['companion','backup'].map(edition => ({edition,installAvailable:true,connection:edition==='companion'?(confirmed?'configured':phase):'unknown',reloadRequired,prepared:edition==='companion'?prepared:undefined,latest,update:edition==='companion'&&!!prepared&&prepared!==latest,path:'/isolated/ACURuntime/用户 插件目录/'+edition,version:confirmed?prepared:undefined,confirmedAt:confirmed?'2026-11-14T18:00:00Z':undefined}))});
 
 async function main() {
   const browser = await chromium.launch({ headless:true, args:['--no-sandbox'] });
@@ -35,7 +35,7 @@ async function main() {
       calls.push(url.pathname);
       let result={};
       if(url.pathname==='/runtime/status') result=status;
-      else if(url.pathname==='/runtime/tapnow/configure') {assert.equal(route.request().postDataJSON().model,'gpt-6.1-sol');installCount++;prepared=true;phase='waiting';confirmed=false;result=tapnowState();}
+      else if(url.pathname==='/runtime/tapnow/configure') {assert.equal(route.request().postDataJSON().model,'gpt-6.1-sol');installCount++;reloadRequired=prepared!==latest;prepared=latest;phase='waiting';confirmed=false;result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/connect') {phase='waiting';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/cancel') {phase='unknown';result=tapnowState();}
       else if(url.pathname==='/runtime/tapnow/check') {checks++;result=tapnowState();}
@@ -88,14 +88,26 @@ async function main() {
     await screenshotStep('step2-load');
     await page.locator('[data-tapnow="open"][data-edition="companion"]').click();
     assert(calls.includes('/runtime/tapnow/open'));
+    await page.getByText('文件已准备 · 0.1.32', { exact:true }).waitFor();
+    latest = '0.1.34';
+    await page.locator('[data-tapnow="check"]').click();
+    await page.getByText('文件已准备 · 0.1.32；可更新至 0.1.34', { exact:true }).waitFor();
+    assert.equal(await page.locator('.tapnow-install-guide').count(),0,'a stale setup must not advance to Chrome loading');
+    await screenshotStep('update-available');
+    await page.getByRole('button',{name:'更新并配置',exact:true}).click();
+    await page.getByRole('heading',{name:'打开 Chrome 扩展页',exact:true}).waitFor();
+    await page.getByText('文件已准备 · 0.1.34', { exact:true }).waitFor();
+    assert.equal(installCount,2,'an unfinished setup may be replaced with the new package');
     await page.locator('[data-tapnow="cancel"][data-edition="companion"]').click();
     await page.locator('.tapnow-state').filter({hasText:'待连接'}).waitFor();
-    await page.locator('[data-tapnow="step-load"][data-edition="companion"]').click();
+    await page.locator('.tapnow-companion').getByRole('button',{name:'一键配置',exact:true}).click();
+    await page.getByRole('heading',{name:'连接 TapNow 插件',exact:true}).waitFor();
+    await page.getByRole('button',{name:'重新加载插件',exact:true}).click();
     await page.locator('[data-tapnow="step-connect"][data-edition="companion"]').click();
     await page.getByRole('heading',{name:'连接 TapNow 插件',exact:true}).waitFor();
     const guideText=await page.locator('.tapnow-agent').innerText();
     for(const removed of ['ERR_BLOCKED_BY_CLIENT','组织策略','不要在地址栏访问插件','已加载后:'])assert(!guideText.includes(removed),removed);
-    assert.equal(installCount,1);
+    assert.equal(installCount,3);
     assert.equal(await other.evaluate(e=>e.open),true,'rerender preserves expansion');
     for(const width of [320,390,768,1440]) for(const theme of ['light','dark']) {
       await page.setViewportSize({width,height:1000});
@@ -111,11 +123,11 @@ async function main() {
     await page.locator('[data-tapnow="canvas"]').click();assert(calls.includes('/runtime/tapnow/canvas'));
     await page.locator('[data-tapnow="check"]').click();
     await page.waitForFunction(()=>!document.querySelector('[data-tapnow="check"]').disabled);
-    assert.equal(checks,1);
+    assert.equal(checks,2);
     await page.locator('[data-tapnow="configure"][data-edition="companion"]').click();
     await page.getByRole('heading',{name:'连接 TapNow 插件',exact:true}).waitFor();
     assert.equal(await page.getByRole('heading',{name:'打开 Chrome 扩展页',exact:true}).count(),0,'same version goes directly to connection');
-    assert.equal(installCount,2,'configured plugin must still check/update on the primary action');
+    assert.equal(installCount,4,'configured plugin must still check/update on the primary action');
     assert.deepEqual(errors,[]);
     console.log('PASS: collapsed opt-in, single-click authorization without extra checkbox, receipt state; 8 viewport/theme screenshots');
   } finally {await browser.close();}

@@ -204,11 +204,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 		}
 	}
 	if install {
-		body, err := tapnowRead(ctx, client, endpoint, 64<<10)
-		var catalog tapnowCatalog
-		if err == nil && (json.Unmarshal(body, &catalog) != nil || catalog.Schema != 1 || len(catalog.Packages) != 2 || !validTapnowPackage("companion", catalog.Packages["companion"]) || !validTapnowPackage("backup", catalog.Packages["backup"])) {
-			err = errors.New("插件发布清单无效")
-		}
+		catalog, err := fetchTapnowCatalog(ctx, client, endpoint)
 		if err == nil {
 			root, dirErr := s.directory()
 			if dirErr != nil {
@@ -227,7 +223,7 @@ func (host *server) tapnowConnect(w http.ResponseWriter, r *http.Request, editio
 			return
 		}
 		s.Lock()
-		s.catalog = &catalog
+		s.catalog = catalog
 		s.Unlock()
 		root, dirErr := s.directory()
 		if dirErr != nil || !tapnowPreparedIdentity(filepath.Join(root, edition), edition) {

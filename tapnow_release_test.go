@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,16 +17,9 @@ func TestTapnowPublishedChannelPreparesBothEditions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	client := tapnowHTTPClient()
-	body, err := tapnowRead(ctx, client, tapnowCatalogURL, 64<<10)
+	catalog, err := fetchTapnowCatalog(ctx, client, tapnowCatalogURL)
 	if err != nil {
 		t.Fatal(err)
-	}
-	var catalog tapnowCatalog
-	if err := json.Unmarshal(body, &catalog); err != nil {
-		t.Fatal(err)
-	}
-	if catalog.Schema != 1 || len(catalog.Packages) != 2 {
-		t.Fatal("unexpected public channel schema or editions")
 	}
 	state := &tapnowState{root: t.TempDir()}
 	for _, edition := range []string{"companion", "backup"} {

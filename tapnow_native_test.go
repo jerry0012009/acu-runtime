@@ -224,7 +224,7 @@ func TestTapnowZIPInstallPreparesOnlyChosenEditionAndOpensChrome(t *testing.T) {
 	catalog := tapnowCatalog{Schema: 1, Packages: map[string]tapnowPackage{"backup": tapnowFixturePackage("backup", "0.1.23", archive), "companion": tapnowFixturePackage("companion", "0.1.23", archive)}}
 	host.tapnow.client = &http.Client{Transport: agentPackageTransport(func(r *http.Request) (*http.Response, error) {
 		body := archive
-		if r.URL.String() == tapnowCatalogURL {
+		if strings.HasPrefix(r.URL.String(), tapnowCatalogURL+"?") {
 			body, _ = json.Marshal(catalog)
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(body)), Header: make(http.Header)}, nil

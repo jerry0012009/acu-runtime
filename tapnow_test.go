@@ -249,7 +249,7 @@ func TestTapnowCheckDoesNotPrepareOrOpen(t *testing.T) {
 	count := 0
 	host.tapnow.client = &http.Client{Transport: agentPackageTransport(func(r *http.Request) (*http.Response, error) {
 		count++
-		if r.URL.String() != tapnowCatalogURL {
+		if !strings.HasPrefix(r.URL.String(), tapnowCatalogURL+"?") || r.URL.Query().Get("refresh") == "" || r.Header.Get("Cache-Control") != "no-cache" {
 			t.Fatal(r.URL)
 		}
 		payload, _ := json.Marshal(catalog)
