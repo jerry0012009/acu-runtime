@@ -19,9 +19,10 @@ import (
 	"time"
 )
 
-const appVersion = "0.1.133"
+const appVersion = "0.1.134"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
+const updateDownloadCDN = "https://cdn.gh-proxy.com/" // Same mirror as the website installer downloads.
 
 var releaseVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -86,10 +87,18 @@ func updateClient(timeout time.Duration) *http.Client {
 	transport.ResponseHeaderTimeout = 12 * time.Second
 	return &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		h := r.URL.Hostname()
-		if len(via) > 5 || r.URL.Scheme != "https" || (h != "github.com" && h != "api.github.com" && h != "release-assets.githubusercontent.com" && h != "objects.githubusercontent.com" && h != "gh-proxy.com" && h != "ghfast.top") {
+		if len(via) > 5 || r.URL.Scheme != "https" || r.URL.User != nil {
 			return errors.New("更新下载重定向地址不受信任")
 		}
-		return nil
+		switch h {
+		case "github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com", "gh-proxy.com", "ghfast.top":
+			return nil
+		case "cdn.gh-proxy.com", "cdn.gh-proxy.org":
+			if len(via) > 0 && strings.HasPrefix(via[0].URL.String(), updateDownloadCDN+updateRepository+"/releases/download/") && (r.URL.Port() == "" || r.URL.Port() == "443") {
+				return nil
+			}
+		}
+		return errors.New("更新下载重定向地址不受信任")
 	}}
 }
 
@@ -135,7 +144,7 @@ func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []s
 }
 
 func updateDownloadSources(officialURL string) []string {
-	return []string{"https://gh-proxy.com/" + officialURL, officialURL, "https://ghfast.top/" + officialURL}
+	return []string{updateDownloadCDN + officialURL, officialURL, "https://ghfast.top/" + officialURL}
 }
 
 func updateProxy(request *http.Request) (*url.URL, error) {

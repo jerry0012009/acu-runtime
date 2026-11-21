@@ -19,7 +19,8 @@ type updateDownloadTransport struct {
 	t          *testing.T
 	content    string
 	calls      []string
-	failMirror bool
+	corruptCDN bool
+	failGitHub bool
 }
 
 func (transport *updateDownloadTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -37,31 +38,65 @@ func (transport *updateDownloadTransport) RoundTrip(request *http.Request) (*htt
 		transport.t.Fatal("healthy mirror download must not be limited to 45 seconds")
 	}
 	body := transport.content
-	if transport.failMirror && request.URL.Host == "gh-proxy.com" {
+	if transport.corruptCDN && request.URL.Host == "cdn.gh-proxy.com" {
 		body = "corrupted mirror installer"
 	}
-	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)),
+	status := http.StatusOK
+	if transport.failGitHub && request.URL.Host == "github.com" {
+		status = http.StatusServiceUnavailable
+	}
+	return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)),
 		Header: make(http.Header), ContentLength: int64(len(body)), Request: request}, nil
 }
 
 func TestUpdatePrefersAcceleratedDownloadAndFallsBackOnDigestMismatch(t *testing.T) {
-	for _, failMirror := range []bool{false, true} {
-		t.Run(fmt.Sprint("corrupt=", failMirror), func(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		corruptCDN, failGitHub bool
+		want                   string
+	}{
+		{"CDN", false, false, "cdn.gh-proxy.com"},
+		{"GitHub fallback", true, false, "cdn.gh-proxy.com,github.com"},
+		{"backup mirror", true, true, "cdn.gh-proxy.com,github.com,ghfast.top"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			content := "official installer bytes"
 			digest := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
-			transport := &updateDownloadTransport{t: t, content: content, failMirror: failMirror}
+			transport := &updateDownloadTransport{t: t, content: content, corruptCDN: tc.corruptCDN, failGitHub: tc.failGitHub}
 			client := &http.Client{Transport: transport}
 			url := updateRepository + "/releases/download/v0.1.99/ACU-Runtime-0.1.99-windows-amd64-Setup.exe"
 			target := filepath.Join(t.TempDir(), "setup.exe")
 			if err := downloadUpdatePackage(context.Background(), client, updateDownloadSources(url), target, digest, nil); err != nil {
 				t.Fatal(err)
 			}
-			want := "gh-proxy.com"
-			if failMirror {
-				want += ",github.com"
-			}
-			if strings.Join(transport.calls, ",") != want || !verifyKernel(target, digest) {
+			if strings.Join(transport.calls, ",") != tc.want || !verifyKernel(target, digest) {
 				t.Fatalf("download source order or verified output incorrect: %v", transport.calls)
+			}
+		})
+	}
+}
+
+func TestUpdateCDNRedirectStaysScopedToRuntimeDownloads(t *testing.T) {
+	official := updateRepository + "/releases/download/v0.1.134/ACU-Runtime-0.1.134-macos-arm64.app.zip"
+	cdn := "https://cdn.gh-proxy.com/" + official
+	moved := "https://cdn.gh-proxy.org/" + official
+	for _, tc := range []struct {
+		name, first, target string
+		want                bool
+	}{
+		{"website CDN redirect", cdn, moved, true},
+		{"release assets", official, "https://release-assets.githubusercontent.com/test", true},
+		{"unrelated request", updateAPI, moved, false},
+		{"unrelated mirror payload", "https://cdn.gh-proxy.com/https://example.com/package.zip", moved, false},
+		{"untrusted host", cdn, "https://cdn.gh-proxy.org.example.com/update.zip", false},
+		{"insecure scheme", cdn, "http://cdn.gh-proxy.org/update.zip", false},
+		{"unexpected port", cdn, "https://cdn.gh-proxy.org:8443/update.zip", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first := httptest.NewRequest(http.MethodGet, tc.first, nil)
+			target := httptest.NewRequest(http.MethodGet, tc.target, nil)
+			if err := updateClient(time.Second).CheckRedirect(target, []*http.Request{first}); (err == nil) != tc.want {
+				t.Fatalf("redirect accepted=%v, want %v: %v", err == nil, tc.want, err)
 			}
 		})
 	}
