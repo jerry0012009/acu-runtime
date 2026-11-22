@@ -318,17 +318,20 @@ func (kernel *kernelState) start(ctx context.Context) error {
 		kernel.exe = executable
 		kernel.mu.Unlock()
 	}
-	if err := kernel.ensureCompatibleGateway(ctx); err != nil {
-		return err
-	}
-	policy, cancelPolicy := context.WithTimeout(ctx, 20*time.Second)
-	err := pauseKernelUpdates(policy, executable)
-	if err == nil {
-		err = prepareKernelDetection(policy, executable)
-	}
-	cancelPolicy()
+	reuseGateway, err := kernel.prepareGateway(ctx)
 	if err != nil {
 		return err
+	}
+	if !reuseGateway {
+		policy, cancelPolicy := context.WithTimeout(ctx, 20*time.Second)
+		err = pauseKernelUpdates(policy, executable)
+		if err == nil {
+			err = prepareKernelDetection(policy, executable)
+		}
+		cancelPolicy()
+		if err != nil {
+			return err
+		}
 	}
 	for _, directory := range kernelConfigDirs(executable) {
 		probe, cancel := context.WithTimeout(ctx, 2*time.Second)

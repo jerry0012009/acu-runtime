@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -101,25 +100,21 @@ func waitGatewayIdleForChange(ctx context.Context) error {
 	return waitGatewayIdle(idle)
 }
 
-func (kernel *kernelState) ensureCompatibleGateway(ctx context.Context) error {
+// prepareGateway reports whether an already-running compatible Magpie owns the
+// gateway. Its settings and process are managed by Magpie.
+func (kernel *kernelState) prepareGateway(ctx context.Context) (reuse bool, err error) {
 	if !kernel.enforceVersion {
-		return nil
+		return false, nil
 	}
 	info, err := readServingKernel(ctx)
 	if err != nil {
-		return nil
+		return false, nil
 	}
 	if !desktopVersionNewer(kernelVersion, info.Version) {
-		kernel.mu.Lock()
-		owned := kernel.process != nil && kernel.process.Process != nil && uint32(kernel.process.Process.Pid) == info.PID
-		kernel.mu.Unlock()
-		if runtime.GOOS == "windows" && !owned {
-			return retireCompatibleGateway(ctx, info)
-		}
-		return nil
+		return true, nil
 	}
 	kernel.mu.Lock()
 	kernel.phase = "正在更新配套内核 " + info.Version + " → " + strings.TrimPrefix(kernelVersion, "v") + "；等待当前请求完成后自动连接"
 	kernel.mu.Unlock()
-	return upgradeOldGateway(ctx, info)
+	return false, upgradeOldGateway(ctx, info)
 }

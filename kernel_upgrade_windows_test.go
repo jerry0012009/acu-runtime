@@ -19,7 +19,7 @@ func TestGatewayProcessHelper(t *testing.T) {
 	}
 	time.Sleep(60 * time.Second)
 }
-func TestCompatibleDefaultGUICanBeRetiredWithoutReplacingItsBinary(t *testing.T) {
+func TestCompatibleDefaultGUIKeepsServingGateway(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("LOCALAPPDATA", root)
 	source, _ := os.Executable()
@@ -49,35 +49,17 @@ func TestCompatibleDefaultGUICanBeRetiredWithoutReplacingItsBinary(t *testing.T)
 	k := &kernelState{enforceVersion: true}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := k.ensureCompatibleGateway(ctx); err != nil {
-		t.Fatal(err)
+	reuse, err := k.prepareGateway(ctx)
+	if err != nil || !reuse {
+		t.Fatalf("expected to use the running Magpie gateway, got reuse=%v, err=%v", reuse, err)
 	}
 	select {
 	case <-done:
-	case <-ctx.Done():
-		t.Fatal("verified GUI did not exit")
+		t.Fatal("Runtime stopped the running Magpie gateway")
+	case <-time.After(100 * time.Millisecond):
 	}
 	after, _ := os.Stat(target)
 	if after.Size() != original.Size() || !after.ModTime().Equal(original.ModTime()) {
 		t.Fatal("newer GUI binary was replaced")
-	}
-}
-func TestCompatibleCustomProcessIsNeverStopped(t *testing.T) {
-	t.Setenv("LOCALAPPDATA", t.TempDir())
-	source, _ := os.Executable()
-	command := exec.Command(source, "-test.run=^TestGatewayProcessHelper$")
-	command.Env = append(os.Environ(), "ACU_GATEWAY_PROCESS_HELPER=1")
-	hideProcess(command)
-	if err := command.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { command.Process.Kill(); command.Wait() }()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := retireCompatibleGateway(ctx, servingKernel{PID: uint32(command.Process.Pid)}); err == nil {
-		t.Fatal("custom process was accepted for takeover")
-	}
-	if command.ProcessState != nil {
-		t.Fatal("custom process was stopped")
 	}
 }
