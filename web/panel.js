@@ -37,7 +37,7 @@
         loading.hidden = true;
         return;
       }
-      loading.textContent = status.error || status.phase || '正在准备 ACU…';
+      loading.textContent = status.routePhase || status.error || (status.starting ? status.phase : 'ACU 暂时无法连接，请在主窗口重试。');
     } catch (failure) { loading.textContent = failure.message; }
     setTimeout(connect, 2000);
   };

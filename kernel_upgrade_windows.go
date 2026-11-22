@@ -30,9 +30,9 @@ func upgradeOldGateway(ctx context.Context, info servingKernel) error {
 	if !strings.EqualFold(filepath.Clean(actual), filepath.Clean(target)) {
 		return errors.New("正在运行的内核位于自定义目录，无法安全完成自动升级")
 	}
-	asset, digest := "magpie-windows-amd64.exe", "6a3762ed01c0e832dee5f03383d77bf1b513fdd8b6802bf0c54e94b800d4269b"
+	asset, digest := "magpie-windows-amd64.exe", "892fdcfca5535effc188832e9399b091d4680a1685735e41ef1e9e9be204aaef"
 	if runtime.GOARCH == "arm64" {
-		asset, digest = "magpie-windows-arm64.exe", "bd5dc9d0c920d95219fafccf696cdd7b757e36ee43431a16ffba10e957434047"
+		asset, digest = "magpie-windows-arm64.exe", "80bcae40a181499bfb548264d1b70f7150e5a75fb2eb969ba7a29eac0dae547a"
 	}
 	cache := filepath.Join(filepath.Dir(managedKernelPath()), asset)
 	if !verifyKernel(cache, digest) {
@@ -46,8 +46,8 @@ func upgradeOldGateway(ctx context.Context, info servingKernel) error {
 			return err
 		}
 	}
-	if err = waitGatewayIdle(ctx); err != nil {
-		return err
+	if err = waitGatewayIdleForChange(ctx); err != nil {
+		return errors.New("无法确认本机网关已空闲。请等现有请求完成或停止卡住的请求，再重试内核更新")
 	}
 	backup := target + ".acu-before-" + strings.TrimPrefix(kernelVersion, "v")
 	if _, err = os.Stat(backup); err == nil {
@@ -92,8 +92,8 @@ func retireCompatibleGateway(ctx context.Context, info servingKernel) error {
 	if !strings.EqualFold(filepath.Clean(windows.UTF16ToString(buffer[:size])), filepath.Clean(target)) {
 		return errors.New("正在运行的内核位于自定义目录，已保留；请退出该内核后重试")
 	}
-	if err = waitGatewayIdle(ctx); err != nil {
-		return err
+	if err = waitGatewayIdleForChange(ctx); err != nil {
+		return errors.New("无法确认独立内核已空闲。请等现有请求完成或停止卡住的请求，再重试连接")
 	}
 	if err = windows.TerminateProcess(process, 0); err != nil {
 		return errors.New("独立内核尚未退出，未改变 Codex 配置")

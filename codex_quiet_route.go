@@ -37,11 +37,15 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 		k.mu.Unlock()
 		return nil, errors.New("内核状态已变化，请重试")
 	}
-	k.starting = true
+	k.routePhase = "等待现有请求结束"
 	k.mu.Unlock()
-	defer func() { k.mu.Lock(); k.starting = false; k.mu.Unlock() }()
-	if err = waitGatewayIdle(ctx); err != nil {
-		return nil, errors.New("当前请求尚未完成，未更改 Codex 配置")
+	defer func() { k.mu.Lock(); k.routePhase = ""; k.mu.Unlock() }()
+	err = waitGatewayIdleForChange(ctx)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, errors.New("本机网关仍有请求或工具在运行。请在对应应用停止卡住的请求或等它完成后重试；未更改 Codex 配置")
+	}
+	if err != nil {
+		return nil, errors.New("无法确认本机网关已空闲，请重试；未更改 Codex 配置")
 	}
 	previous, err := k.readState(ctx)
 	if err != nil {
@@ -78,6 +82,9 @@ func (k *kernelState) changeCodexQuietlyWith(ctx context.Context, changes []code
 	if authErr != nil && !os.IsNotExist(authErr) {
 		return nil, errors.New("无法读取 Codex 登录配置，请重试")
 	}
+	k.mu.Lock()
+	k.routePhase = "正在写入并核验 Codex 配置"
+	k.mu.Unlock()
 	if err = command.Process.Kill(); err != nil {
 		return nil, errors.New("无法暂停内核路由观察，未更改 Codex 配置")
 	}

@@ -39,11 +39,13 @@ const tapnow = globalThis.createACUTapnow?.({ app, ui, request, render: () => re
 
 
 async function request(path, options = {}) {
-  const { allowProfileStateError, ...fetchOptions } = options;
+  const { allowProfileStateError, timeout, ...fetchOptions } = options;
+  if (timeout && !fetchOptions.signal && typeof globalThis.AbortSignal?.timeout === 'function') fetchOptions.signal = AbortSignal.timeout(timeout);
   const response = await fetch(path, { ...fetchOptions, headers: { 'X-ACU-Token': token, ...options.headers } });
   const result = await response.json();
   const savedProfileState = allowProfileStateError && path === '/runtime/preferences/profile' && ['error','queued','generating'].includes(result.status) && (result.profile === null || Array.isArray(result.profile?.rays));
-  if (!response.ok || (result.error && !savedProfileState)) { const error = new Error(result.error || `请求失败（${response.status}）`); error.status = response.status; throw error; }
+  const isStatus = path === '/runtime/status' || path === '/runtime/kernel/start';
+  if (!response.ok || (result.error && !savedProfileState && !isStatus)) { const error = new Error(result.error || `请求失败（${response.status}）`); error.status = response.status; throw error; }
   return result;
 }
 
@@ -65,9 +67,13 @@ function toast(message) {
 }
 
 async function refresh(rescan = false, quiet = false) {
-  if (ui.applying || ui.accountBusy || ui.inventorySaving) return;
-  if (ui.polling) return;
-  ui.polling = true;
+  if (ui.inventorySaving) return;
+  if (ui.polling) return ui.polling;
+  ui.polling = refreshStatus(rescan, quiet);
+  return ui.polling;
+}
+
+async function refreshStatus(rescan, quiet) {
   clearTimeout(refresh.timer);
   if (!quiet) { ui.busy = true; render(); }
   try {
@@ -77,7 +83,13 @@ async function refresh(rescan = false, quiet = false) {
     }
     const previousAccount = ui.status?.account;
     const previousState = JSON.stringify(ui.status);
-    ui.status = await request('/runtime/status');
+    const status = await request('/runtime/status', {timeout: 28000});
+    if (status.ready) ui.lastAgents = status.agents;
+    else if (ui.lastAgents) status.agents = ui.lastAgents;
+    if (!status.connection?.known && (ui.status?.connection?.known || ui.status?.connection?.stale)) {
+      status.connection = { ...ui.status.connection, ...status.connection, choices: ui.status.connection.choices, known: false, stale: true };
+    }
+    ui.status = status;
     if(ui.status.desktop && !ui.startup && !ui.startupLoading){ui.startupLoading=true;try{ui.startup=await request('/runtime/startup');}catch{ui.startup={supported:false,error:'自启动状态暂时无法读取'};}finally{ui.startupLoading=false;}}
     billing?.syncAccount();
     preferences?.syncAccount();
@@ -86,7 +98,7 @@ async function refresh(rescan = false, quiet = false) {
     else if (!ui.toolTaskRestored) {
       ui.toolTaskRestored = true;
       request('/runtime/capabilities/prepare').then(result=>{
-        if (result.id && !['complete','error'].includes(result.phase) && result.provider===activeChoice()?.id) {
+        if (result.id && !ui.toolTask) {
           ui.toolTask=result.id;ui.toolRequest={provider:result.provider,agents:result.agents,videoOnly:false};showToolPreparation(result);
         }
       }).catch(()=>{});
@@ -107,15 +119,15 @@ async function refresh(rescan = false, quiet = false) {
       const info = ui.agentVersions[install.agent === 'codex' ? 'chatgpt' : 'workbuddy-desktop'];
       if (!(install.update && install.phase === 'complete' && info?.installed && info.latest && !info.update && !info.error)) ui.agentInstall = install;
     }
-    if (ui.providerSelection !== null && !(ui.status.connection?.choices || []).some(choice => choice.id === ui.providerSelection)) ui.providerSelection = '';
+    if (ui.status.connection?.known && ui.providerSelection !== null && !(ui.status.connection.choices || []).some(choice => choice.id === ui.providerSelection)) ui.providerSelection = '';
     if (previousAccount?.username !== ui.status.account?.username || previousAccount?.site !== ui.status.account?.site) ui.keySelection = null;
     if (ui.status.ready && ui.selected === null) ui.selected = new Set((ui.status.agents || []).filter(agent => agent.detected && !agent.connected).map(agent => agent.id));
     if (ui.status.desktop && !ui.autoStarted) {
       ui.autoStarted = true;
-      if (!ui.status.ready && !ui.status.starting) ui.status = await request('/runtime/kernel/start', { method: 'POST' });
+      if (!ui.status.ready && !ui.status.starting && !ui.status.routePhase) ui.status = await request('/runtime/kernel/start', { method: 'POST' });
     }
     ui.error = ui.status.error || '';
-    if (ui.status.desktop && ui.status.ready && !ui.applying && !ui.capabilities && !ui.toolsPending) {
+    if (ui.status.desktop && ui.status.ready && !ui.applying && !ui.setup && !ui.capabilities && !ui.toolsPending) {
       const choice = activeChoice();
       const agents = (ui.status.agents || []).filter(agent => agent.detected && agent.connected).map(agent => agent.id);
       const identity = choice && agents.length ? JSON.stringify([choice.id, choice.masked, agents]) : '';
@@ -143,14 +155,18 @@ async function refresh(rescan = false, quiet = false) {
         if (caret !== null) search?.setSelectionRange?.(caret, caret);
       }
     }
-    if (quiet && previousState !== JSON.stringify(ui.status) && ['agents', 'overview', 'settings'].includes(ui.page) && !ui.setup) render();
+    if (quiet && previousState !== JSON.stringify(ui.status) && ['agents', 'overview', 'settings'].includes(ui.page)) render();
     if (ui.status.ready && pendingNative) {
       const view = pendingNative;
       pendingNative = null;
       if (nativeViews.has(view)) openNative(view, '', false, launchQuery.get('tab') || '', '', '', launchQuery);
     }
-  } catch (error) { ui.error = error.message; if (ui.status) ui.status.connection = { known: false, configured: false, choices: [] }; if (quiet && ['agents', 'overview'].includes(ui.page) && !ui.setup) render(); }
-  finally { ui.polling = false; ui.busy = false; if (!quiet) render(); maybeNotifyUpdate(); refresh.timer = setTimeout(() => refresh(false, true), ui.status?.starting || ui.status?.account?.pending ? 1500 : 4000); }
+  } catch (error) {
+    ui.error = error.message;
+    if (ui.status) ui.status = { ...ui.status, ready: false, starting: false, connection: { ...ui.status.connection, known: false, stale: true } };
+    if (quiet && ['agents', 'overview', 'settings'].includes(ui.page) && !ui.setup) render();
+  }
+  finally { ui.polling = false; ui.busy = false; if (!quiet) render(); maybeNotifyUpdate(); refresh.timer = setTimeout(() => refresh(false, true), ui.applying || ui.status?.routePhase || ui.status?.starting || ui.status?.account?.pending ? 1500 : 4000); }
 }
 
 function navigation() {
@@ -166,9 +182,10 @@ function header(eyebrow, title, subtitle, action = '') {
 function kernelBanner() {
   if (ui.status?.ready) return '';
   const status = ui.status;
-  const preparing = !status || status.starting;
+  if (status?.routePhase) return ui.setupProgress ? '' : `<section class="kernel-banner" role="status"><strong>${escapeHTML(status.routePhase)}</strong></section>`;
+  const preparing = status ? status.starting : !ui.error;
   const percent = status?.downloadTotal > 0 ? ` · ${Math.min(100, Math.round(status.downloaded / status.downloadTotal * 100))}%` : '';
-  return `<section class="kernel-banner" role="status"><div class="kernel-glyph">${icon('refresh', preparing ? 'spinning' : '')}</div><div class="banner-copy"><strong>${escapeHTML(preparing ? '正在准备 ACU' + percent : 'ACU 暂时无法连接')}</strong><p>${preparing ? '首次启动可能需要片刻，请稍候。' : '请检查网络后重试，已有 Agent 配置不会被删除。'}</p></div><button class="button secondary" data-action="connect" ${preparing || ui.busy ? 'disabled' : ''}>${preparing ? '准备中' : '重试'}</button></section>`;
+  return `<section class="kernel-banner" role="status"><div class="kernel-glyph">${icon('refresh', preparing ? 'spinning' : '')}</div><div class="banner-copy"><strong>${escapeHTML(preparing ? '正在准备 ACU' + percent : 'ACU 暂时无法连接')}</strong><p>${escapeHTML(preparing ? status?.phase || '正在读取本机状态' : ui.error || '本机内核尚未连接，已有 Agent 配置不会被删除。')}</p></div><button class="button secondary" data-action="connect" ${preparing || ui.busy || ui.applying ? 'disabled' : ''}>${preparing ? '准备中' : '重试'}</button></section>`;
 }
 
 function activeChoice() {
@@ -248,11 +265,13 @@ function compactConnection() {
   const account = ui.status?.account || {};
   const choice = activeChoice();
   const choices = ui.status?.connection?.choices || [];
-  return `<section class="panel quick-connection ${choice ? 'is-connected' : 'needs-connection'}" aria-label="ACU 连接"><div class="connection-identity"><span class="quick-check ${choice ? 'complete' : ''}" aria-label="${choice ? '已连接 ACU' : '尚未连接 ACU'}">${icon(choice ? 'check' : 'link')}</span><div><h2>${choice ? '已连接 ACU' : '连接 ACU'}</h2><p>${choice ? '连接配置已完成' : '登录后自动连接，也可以使用已有 Key。'}</p></div></div>
-    <div class="connection-controls">${account.loggedIn ? `<span class="account-name">${escapeHTML(account.username || 'ACU 账号')}</span>` : `<button class="button ${choice ? 'secondary' : 'primary'} login-button" data-action="account-login" ${ui.accountBusy || account.pending || !ui.status?.desktop ? 'disabled' : ''}>${icon('arrow')}${account.pending ? '登录中…' : '登录 ACU'}</button>`}
+  const saved = ui.status?.connection?.stale || !ui.status?.ready;
+  const connected = choice && !saved;
+  return `<section class="panel quick-connection ${connected ? 'is-connected' : 'needs-connection'}" aria-label="ACU 连接"><div class="connection-identity"><span class="quick-check ${connected ? 'complete' : ''}" aria-hidden="true">${icon(connected ? 'check' : 'link')}</span><div><h2>${connected ? '已连接 ACU' : saved ? choice ? '已保存 ACU 连接' : 'ACU 连接状态待确认' : '连接 ACU'}</h2><p>${connected ? '连接配置已完成' : saved ? '等待本机内核确认连接' : '登录后自动连接，也可以使用已有 Key。'}</p></div></div>
+    <div class="connection-controls">${account.loggedIn && !account.needsLogin ? `<span class="account-name">${escapeHTML(account.username || 'ACU 账号')}</span>` : `<button class="button ${choice ? 'secondary' : 'primary'} login-button" data-action="account-login" ${ui.applying || ui.accountBusy || (account.pending && !account.restoring) || !ui.status?.desktop ? 'disabled' : ''}>${icon('arrow')}${account.restoring ? '重新登录 ACU' : account.pending ? '登录中…' : account.needsLogin ? '重新登录 ACU' : '登录 ACU'}</button>`}
     ${choices.length || account.loggedIn ? `<div class="connection-key-group"><select id="quick-key" aria-label="启用的 API Key" ${ui.applying || ui.accountBusy ? 'disabled' : ''}><option value="" ${!choice ? 'selected' : ''}>选择 API Key</option>${choices.map(current => `<option value="local:${escapeHTML(current.id)}" ${choice?.id === current.id ? 'selected' : ''}>${escapeHTML(current.name || 'ACU')} · ${escapeHTML(current.masked || '已保存 Key')}</option>`).join('')}${account.loggedIn ? (account.keys || []).filter(key => key.available).map(key => `<option value="account:${key.id}">${escapeHTML(key.name || `Key #${key.id}`)}</option>`).join('') : ''}</select><button class="text-button connection-manage" data-action="manage-connection" aria-expanded="${ui.connectionOpen}">${choice ? '更换 Key' : '使用 API Key'}</button></div>` : '<button class="text-button connection-manage" data-action="manage-connection" aria-expanded="false">使用 API Key</button>'}</div>
-    ${account.pending ? '<span class="login-progress" role="status">请在登录窗口完成登录，成功后自动返回。 <button class="text-button" data-action="account-cancel">取消</button></span>' : ''}
-    ${ui.status?.connection?.error || account.error ? `<span class="quick-error" role="alert">${escapeHTML(ui.status.connection?.error || account.error)}</span>` : ''}</section>`;
+    ${account.pending ? `<span class="login-progress" role="status">${account.restoring ? '正在恢复官网登录' : '等待登录窗口确认'} <button class="text-button" data-action="account-cancel">取消</button></span>` : ''}
+    ${[account.error, ui.status?.connection?.error].filter(Boolean).map(message => `<span class="quick-error" role="alert">${escapeHTML(message)}</span>`).join('')}</section>`;
 }
 
 function usageGuide() {
@@ -275,17 +294,20 @@ function agentsPage() {
   const restarting = agents.filter(agent => agent.connected && agent.restartRequired);
   const configured = activeChoice() && detected.some(agent => agent.connected && !agent.needsRepair);
   return `<section class="agent-stage" aria-label="我的 Agent"><div class="workbench-heading"><div><h2>我的 Agent <span class="count-label">${detected.length}</span></h2><p>${configured ? '已接入，可前往 WorkBuddy 等应用选择 ACU 模型试用。' : activeChoice() ? '点击一键配置，自动接入模型与常用工具。' : '先登录或连接 ACU，再一键配置。'}</p></div><div class="workbench-actions"><button class="text-button workbench-utility" data-action="capabilities" ${!ui.status?.ready || !activeChoice() || ui.applying ? 'disabled' : ''}>图片、视频与搜索</button><button class="icon-button workbench-utility" title="重新检测 Agent" aria-label="重新检测 Agent" data-action="refresh" ${ui.busy || ui.applying ? 'disabled' : ''}>${icon('refresh', ui.busy ? 'spinning' : '')}</button><button class="button primary batch-configure" data-action="apply-agents" ${!ui.status?.ready || !activeChoice() || !detected.length || ui.busy || ui.applying || ui.accountBusy ? 'disabled' : ''}>${ui.applying ? escapeHTML(ui.progress) : '一键配置'}${icon('arrow')}</button></div></div>
-    <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length || !ui.status?.ready ? `<div class="agent-grid">${agents.filter(agent => agent.detected || !ui.status?.ready).map(agentCard).join('')}</div>` : ''}
+    <div id="home-updates">${homeUpdates()}</div>${agentInstallPanel(detected.length)}${detected.length ? `<div class="agent-grid">${detected.map(agentCard).join('')}</div>` : ''}
     ${setupResults()}
     <details class="optional-agents" data-agent-section="other" ${ui.otherAgentsOpen ? 'open' : ''}><summary>其他 Agent ${icon('chevron')}</summary>${tapnow?.html() || '<div class="optional-agent"><strong>TapNow</strong><span>Chrome 扩展</span></div>'}</details>
-    <details class="optional-agents" data-agent-section="install" ${ui.installAgentsOpen ? 'open' : ''}><summary>安装其他 Agent ${icon('chevron')}</summary><div class="agent-install-options">${['workbuddy','codex'].filter(id => !detected.some(agent => agent.id === id)).map(id => `<div><strong>${id === 'codex' ? 'ChatGPT 桌面端' : 'WorkBuddy'}</strong><span>${id === 'codex' ? '首次下载约 1 GB' : '国内官方下载'}</span><button class="button secondary" data-action="install-agent" data-agent-id="${id}" ${!ui.status?.desktop || !ui.status?.ready || !activeChoice() || ui.applying || ui.agentInstall && !['complete','error'].includes(ui.agentInstall.phase) ? 'disabled' : ''}>安装并配置 ${id === 'codex' ? 'ChatGPT' : 'WorkBuddy'} ${icon('arrow')}</button></div>`).join('')}</div><button class="workbench-catalog-entry" data-native-view="agents" data-native-focus="agentsInstall" ${!ui.status?.ready ? 'disabled' : ''}><span class="catalog-entry-icon">${icon('terminal')}</span><span><strong>Agent 安装目录</strong><small>Claude Code、Gemini CLI、OpenCode 等</small></span>${icon('arrow')}</button></details>
+    ${ui.status?.ready && !ui.applying ? `<details class="optional-agents" data-agent-section="install" ${ui.installAgentsOpen ? 'open' : ''}><summary>安装其他 Agent ${icon('chevron')}</summary><div class="agent-install-options">${['workbuddy','codex'].filter(id => !detected.some(agent => agent.id === id)).map(id => `<div><strong>${id === 'codex' ? 'ChatGPT 桌面端' : 'WorkBuddy'}</strong><span>${id === 'codex' ? '首次下载约 1 GB' : '国内官方下载'}</span><button class="button secondary" data-action="install-agent" data-agent-id="${id}" ${!ui.status?.desktop || !activeChoice() || ui.agentInstall && !['complete','error'].includes(ui.agentInstall.phase) ? 'disabled' : ''}>安装并配置 ${id === 'codex' ? 'ChatGPT' : 'WorkBuddy'} ${icon('arrow')}</button></div>`).join('')}</div><button class="workbench-catalog-entry" data-native-view="agents" data-native-focus="agentsInstall"><span class="workbench-catalog-icon">${icon('terminal')}</span><span><strong>Agent 安装目录</strong><small>Claude Code、Gemini CLI、OpenCode 等</small></span>${icon('arrow')}</button></details>` : ''}
     <div class="workbench-tool-entry"><button class="workbench-catalog-entry" data-native-view="library" data-native-tab="mcp" ${!ui.status?.ready ? 'disabled' : ''}><span class="catalog-entry-icon">${icon('grid')}</span><span><strong>安装工具与 MCP</strong><small>MCP 服务、技能与应用分配</small></span>${icon('arrow')}</button></div>
     ${restarting.length ? `<div class="restart-summary" role="status">${icon('refresh')}<span>${restarting.map(agent => escapeHTML(agent.name)).join('、')}：保存工作后重新打开，让配置生效。</span></div>` : ''}</section>`;
 }
 
 function setupResults() {
-  return `${ui.results.length ? `<div class="setup-results" aria-live="polite">${ui.results.map(result => `<div class="setup-result ${result.pending ? 'pending' : result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片、视频与搜索' : result.id))}</strong><span>${result.pending ? icon('refresh','spinning') : ''}${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
-    ${ui.results.some(result => !result.ok && result.id !== 'tools') ? '<button class="button secondary" data-action="retry-setup">重试未完成应用</button>' : ''}${ui.results.some(result => !result.ok && !result.pending && result.id === 'tools') ? '<button class="button secondary" data-action="retry-tools">重试未完成工具</button>' : ''}`;
+  const current = ui.setupProgress;
+  const results = current ? [{ ...current, pending: true, message: ui.status?.routePhase || current.message }, ...ui.results] : ui.results;
+  const blocked = !ui.status?.ready || !activeChoice() || ui.applying || ui.accountBusy ? 'disabled' : '';
+  return `${results.length ? `<div class="setup-results" aria-live="polite">${results.map(result => `<div class="setup-result ${result.pending ? 'pending' : result.ok ? '' : 'failed'}"><strong>${escapeHTML(names[result.id] || (result.id === 'tools' ? '图片、视频与搜索' : result.id))}</strong><span>${result.pending ? icon('refresh','spinning') : ''}${escapeHTML(result.message)}</span></div>`).join('')}</div>` : ''}
+    ${ui.results.some(result => !result.ok && names[result.id]) ? `<button class="button secondary" data-action="retry-setup" ${blocked}>重试未完成应用</button>` : ''}${ui.results.some(result => !result.ok && !result.pending && result.id === 'tools') ? `<button class="button secondary" data-action="retry-tools" ${blocked}>重试未完成工具</button>` : ''}`;
 }
 
 app.addEventListener('toggle', event => {
@@ -296,6 +318,7 @@ app.addEventListener('toggle', event => {
 
 function agentInstallPanel(count) {
   const install = ui.agentInstall;
+  if (!install && (!ui.status?.ready || ui.applying || ui.accountBusy)) return '';
   if (install?.update || (count && (!install || install.phase === 'complete'))) return '';
   const running = install && !['complete', 'error'].includes(install.phase);
   const name = install?.agent === 'codex' ? 'ChatGPT' : 'WorkBuddy';
@@ -683,14 +706,14 @@ function agentCard(agent) {
   const inApp = agent.id === 'workbuddy';
   const routed = agent.connected && (selectedModel?.ref || agent.model === 'magpie');
   const acuRoute = routed && (ui.status?.connection?.choices || []).some(choice => selectedModel?.ref?.startsWith(choice.id + '/'));
-  const state = !ready ? '检测中' : !agent.detected ? '未检测到' : agent.needsRepair ? '配置有变化' : !agent.connected ? '原生配置' : inApp ? '模型列表已配置' : acuRoute ? '已接入 ACU' : routed ? '本机路由已配置' : selectedModel ? '原来源已选' : '已接入';
+  const state = !ready ? '上次检测' : !agent.detected ? '未检测到' : agent.needsRepair ? '配置有变化' : !agent.connected ? '原生配置' : inApp ? '模型列表已配置' : acuRoute ? '已接入 ACU' : routed ? '本机路由已配置' : selectedModel ? '原来源已选' : '已接入';
   const disabled = !ready || !agent.detected || ui.applying || ui.accountBusy;
-  const route = !ready ? '正在检测应用' : !agent.detected ? '安装并打开一次应用后，重新检测。' : agent.needsRepair ? '应用配置已变化，请检查后重新接入。' : !agent.connected ? '未接入 ACU · 保留应用当前设置' : inApp ? '已准备模型 · 在应用内选择通道' : acuRoute ? '所选默认模型 → ACU' : routed ? '所选默认模型 → 本机网关' : selectedModel ? '当前模型使用原生通道' : '已保存接入配置 · 在应用内选择';
+  const route = !agent.detected ? '安装并打开一次应用后，重新检测。' : agent.needsRepair ? '应用配置已变化，请检查后重新接入。' : !agent.connected ? '未接入 ACU · 保留应用当前设置' : inApp ? '已准备模型 · 在应用内选择通道' : acuRoute ? '所选默认模型 → ACU' : routed ? '所选默认模型 → 本机网关' : selectedModel ? '当前模型使用原生通道' : '已保存接入配置 · 在应用内选择';
   const routeButton = !agent.detected ? `<button class="route-toggle route-toggle-disabled" disabled title="等待检测此 Agent">${icon('link')}<span><strong>等待检测</strong><small>打开 Agent 后重新检测</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>` : agent.connected ? `<button class="route-toggle route-toggle-on" data-action="agent-toggle" data-agent-id="${agent.id}" aria-pressed="true" title="点击关闭${inApp ? '附加模型列表' : '本地接入'}" ${disabled ? 'disabled' : ''}><span class="route-toggle-icon">${icon('check')}</span><span><strong>${inApp ? '附加模型已开启' : 'ACU 接入已开启'}</strong><small>点击关闭${inApp ? '并预览移除项' : '并还原原配置'}</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>` : `<button class="route-toggle route-toggle-off" data-action="agent-toggle" data-agent-id="${agent.id}" aria-pressed="false" title="点击开启 ACU 接入" ${disabled || !activeChoice() ? 'disabled' : ''}><span class="route-toggle-icon">${icon('link')}</span><span><strong>ACU 接入未开启</strong><small>${!activeChoice() ? '先连接 ACU' : '点击查看推荐配置并开启'}</small></span><span class="route-switch" aria-hidden="true"><span></span></span></button>`;
   const restartNotice = ready && agent.id === 'workbuddy' && agent.restartRequired ? `<div class="agent-restart-notice"><span>重启后生效</span><button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重启</button></div>` : '';
-  const headerState = agent.id === 'workbuddy' && agent.connected ? `<div class="agent-header-actions"><span class="agent-state ${ready && !agent.needsRepair ? 'route-on' : ''}">已连接</span>${restartNotice}</div>` : `<span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span>`;
+  const headerState = ready && agent.id === 'workbuddy' && agent.connected ? `<div class="agent-header-actions"><span class="agent-state ${!agent.needsRepair ? 'route-on' : ''}">已连接</span>${restartNotice}</div>` : `<span class="agent-state ${ready && agent.connected && !agent.needsRepair ? 'route-on' : ''}">${state}</span>`;
   return `<article class="agent-card compact-card routing-card ${agent.connected ? 'is-configured' : ''}" data-agent="${agent.id}"><div class="agent-card-top"><div class="agent-identity"><span class="agent-monogram ${agent.id}" aria-hidden="true">${({ codex: 'C', claude: '✳', workbuddy: 'W', hermes: 'H' })[agent.id] || 'A'}</span><h3>${escapeHTML(agent.name)}</h3></div>${headerState}</div>${routeButton}
-    ${!ready || !agent.detected || agent.needsRepair ? `<p class="agent-route">${route}</p>` : ''}
+    ${ready && (!agent.detected || agent.needsRepair) ? `<p class="agent-route">${route}</p>` : ''}
     ${agentModelSummary(agent, agent.connected ? `<button class="button secondary advanced-link" data-action="agent" data-agent-id="${agent.id}" ${disabled ? 'disabled' : ''}>高级配置</button>` : '')}<div class="agent-routing-actions">${agentUpdateControl(agent.id)}${ready && agent.restartRequired && agent.id !== 'workbuddy' ? `<button class="agent-restart-button" data-action="agent-restart" data-agent-id="${agent.id}">重新打开 ${escapeHTML(agent.name)}</button>` : ''}</div></article>`;
 }
 
@@ -861,7 +884,7 @@ async function reopenAgent(id) {
 function settingsPage() {
   const update = ui.status?.update || {};
   const updateLabel = ({ idle: `当前版本 ${update.current || ui.status?.version || ''}`, checking: '正在检查更新…', current: '已是最新版本', available: `发现 ACU Runtime ${update.release?.version || ''}`, downloading: update.total ? `正在下载 ${Math.round(update.downloaded / update.total * 100)}%` : '正在下载更新…', restarting: '正在更新并重新启动…', error: update.message || '检查更新失败' })[update.phase || 'idle'];
-  return `${header('', '设置', '按你的习惯使用 ACU。')}
+  return `${header('', '设置', '按你的习惯使用 ACU。')}${kernelBanner()}${setupResults()}
     <section class="panel settings-panel"><h2>图片、视频与搜索</h2><div class="setting-row"><div><strong>常用能力</strong><p>为 Agent 准备识图、生图与搜索工具，随时更换对应模型。</p></div><button class="button secondary" data-action="capabilities" ${!ui.status?.ready || !activeChoice() ? 'disabled' : ''}>管理能力</button></div></section>
     <section class="panel settings-panel"><h2>外观</h2><div class="setting-row"><div><strong>跟随系统</strong><p>自动适配浅色与深色模式。</p></div><span class="theme-readout"><span class="theme-swatch" aria-hidden="true"></span><span data-system-theme>跟随系统</span></span></div></section>
     <section class="panel settings-panel"><h2>窗口与托盘</h2><div class="setting-row"><div><strong>关闭窗口后继续运行</strong><p>点击托盘图标打开快捷面板，随时查看或调整 Agent。</p></div>${ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">打开快捷面板</button>' : ''}</div></section>
@@ -1157,7 +1180,7 @@ function showModal(title, body, button, onConfirm) {
 }
 
 async function connectKernel() {
-  if (ui.status?.starting || ui.busy) return;
+  if (ui.status?.starting || ui.status?.routePhase || ui.busy || ui.applying) return;
   ui.autoStarted = true;
   ui.busy = true;
   render();
@@ -1178,12 +1201,6 @@ function prepareRecommendedModels(provider) {
 
 async function applyAgents() {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
-  const provider = activeChoice()?.id;
-  if (provider) {
-    try { await prepareRecommendedModels(provider); }
-    catch(error) { toast(error.message); return; }
-  }
-  await refresh();
   const choice = activeChoice();
   const agents = (ui.status?.agents || []).filter(agent => ui.selected?.has(agent.id) && agent.detected && names[agent.id]);
   if (!choice || !choice.models?.length || !agents.length) { toast('请先选择可用的 ACU Key'); return; }
@@ -1193,12 +1210,6 @@ async function applyAgents() {
 
 async function configureAgent(id) {
   if (ui.applying || ui.accountBusy || ui.busy || !ui.status?.ready) return;
-  const provider = activeChoice()?.id;
-  if (provider) {
-    try { await prepareRecommendedModels(provider); }
-    catch(error) { toast(error.message); return; }
-  }
-  await refresh();
   const agent = (ui.status?.agents || []).find(current => current.id === id);
   const choice = activeChoice();
   if (!agent?.detected || !choice?.models?.length) { toast('请先连接可用的 ACU Key'); return; }
@@ -1263,16 +1274,25 @@ async function applyRecommendedVisibility(agentId, provider, selectedModel) {
 }
 
 async function confirmSetup() {
-  if (ui.applying || !ui.setup || ui.setup.loading || !ui.setup.model) return;
+  if (ui.applying || ui.accountBusy || !ui.status?.ready || !ui.setup || ui.setup.loading || !ui.setup.model || !ui.setup.agents.size) return;
   const setup = { ...ui.setup, agents: [...ui.setup.agents] };
+  ui.lastSetup = setup;
   closeOverlay();
-  clearTimeout(refresh.timer);
   ui.applying = true;
-  ui.results = [];
+  ui.results = ui.results.filter(result => !setup.agents.includes(result.id));
+  ui.progress = '准备模型目录';
+  ui.setupProgress = {id: '一键配置', message: '正在准备模型目录'};
+  render();
   try {
+    await prepareRecommendedModels(setup.provider);
+    if (ui.polling) await ui.polling;
+    await refresh(false, true);
+    if (!ui.status?.ready || !ui.status.connection?.known) throw new Error('本机内核尚未恢复，未开始写入应用配置');
+    if (!ui.status.connection.choices?.some(choice => choice.id === setup.provider && choice.models?.includes(setup.model))) throw new Error('所选 Key 或模型已变化，请重新选择');
     const connectedAgents = [];
     for (const [index, id] of setup.agents.entries()) {
       ui.progress = `配置中 ${index + 1}/${setup.agents.length}`;
+      ui.setupProgress = {id, message: '正在写入并核验接入'};
       render();
       try {
         const agent = ui.status?.agents?.find(agent => agent.id === id);
@@ -1293,12 +1313,14 @@ async function confirmSetup() {
       } catch (error) { ui.results.push({ id, ok: false, message: error.message }); }
     }
     if (setup.tools && connectedAgents.length) {
+      ui.setupProgress = {id: '一键配置', message: '正在提交工具配置'};
+      render();
       try {
         await beginToolPreparation(setup.provider,connectedAgents);
       } catch (error) { ui.results.push({ id: 'tools', ok: false, message: `模型接入已完成，工具需重试：${error.message}` }); }
     }
-  } catch (error) { toast(`模型目录刷新失败：${error.message}`); }
-  finally { ui.applying = false; await refresh(); }
+  } catch (error) { ui.results.push(...setup.agents.map(id => ({id, ok: false, message: `模型目录准备未完成：${error.message}`}))); }
+  finally { ui.applying = false; ui.setupProgress = null; ui.progress = ''; render(); await refresh(); }
 }
 
 async function beginToolPreparation(provider, agents, videoOnly = false) {
@@ -1425,7 +1447,14 @@ app.addEventListener('click', event => {
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'install-agent': () => installAgent(control.dataset.agentId),
     'cancel-agent-install': async () => { try { await request('/runtime/agents/install/cancel', { method: 'POST' }); await refresh(); } catch (error) { toast(error.message); } },
-    'retry-setup': () => { ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id]).map(result => result.id)); applyAgents(); },
+    'retry-setup': () => {
+      const last = ui.lastSetup, choice = activeChoice();
+      ui.selected = new Set(ui.results.filter(result => !result.ok && names[result.id] && ui.status?.agents?.some(agent => agent.id === result.id && agent.detected)).map(result => result.id));
+      if (last && last.provider === choice?.id && choice.models.includes(last.model) && ui.selected.size) {
+        ui.setup = { ...last, agents: new Set(ui.selected) };
+        renderSetup();
+      } else applyAgents();
+    },
     'retry-tools': () => { const task=ui.toolRequest;if(task) beginToolPreparation(task.provider,task.agents,ui.results.find(item=>item.id==='tools')?.basicReady || task.videoOnly).catch(error=>toast(error.message)); },
     'apply-agents': () => { if (!ui.selected?.size) ui.selected = new Set((ui.status?.agents || []).filter(agent => agent.detected).map(agent => agent.id)); applyAgents(); },
     'account-login': () => startAccountLogin(false), 'account-register': () => startAccountLogin(true),
@@ -1541,5 +1570,19 @@ window.addEventListener?.('message', event => {
   const view = query.get('view');
   if (view === 'overview' || !view) { ui.frame = null; ui.page = 'overview'; render(); }
   else if (nativeViews.has(view)) openNative(view, '', false, query.get('tab') || '', '', '', query);
+});
+window.addEventListener?.('acu:show-main', event => {
+  if (ui.setup || ui.inventory || ui.disconnect) return;
+  const query = new URLSearchParams(event.detail || '');
+  const view = query.get('view');
+  if (!ui.applying && !ui.setupProgress && nativeViews.has(view) && view !== 'agents' && ui.status?.ready) {
+    openNative(view, '', false, query.get('tab') || '', '', '', query);
+  } else {
+    ui.frame = null;
+    ui.page = 'overview';
+    app.innerHTML = '';
+    render();
+    refresh(false, true);
+  }
 });
 refresh();

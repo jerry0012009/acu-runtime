@@ -429,7 +429,7 @@ func (host *server) agentInstaller(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host.kernel.mu.Lock()
-	ready := host.kernel.endpoint != nil && !host.kernel.starting
+	ready := host.kernel.endpoint != nil && !host.kernel.starting && host.kernel.routePhase == ""
 	host.kernel.mu.Unlock()
 	if !ready {
 		host.json(w, 409, map[string]string{"error": "请先等待 ACU 内核连接完成"})

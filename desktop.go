@@ -13,7 +13,6 @@ import (
 	"image/png"
 	"log"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -213,14 +212,8 @@ func runDesktop(ctx context.Context, host *server, origin string, inspectPort in
 						panel.Hide()
 					case "main":
 						panel.Hide()
-						query, _ := url.ParseQuery(action.Query)
-						view := query.Get("view")
-						if view == "" || view == "overview" || view == "agents" {
-							window.SetURL(origin + "?page=overview")
-						} else {
-							query.Set("native", view)
-							window.SetURL(origin + "?" + query.Encode())
-						}
+						query, _ := json.Marshal(action.Query)
+						window.ExecJS(`window.dispatchEvent(new CustomEvent('acu:show-main',{detail:` + string(query) + `}))`)
 						window.Restore()
 						window.Show()
 						window.Focus()

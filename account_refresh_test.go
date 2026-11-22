@@ -32,12 +32,15 @@ func refreshMessage(kind string, expired bool) string {
 
 func TestRenewalSurvivesAccessAndInitialLoginTicketExpiry(t *testing.T) {
 	host := refreshFixture(t)
+	if view := host.account.snapshot(); !view.NeedsLogin || !view.Refreshing || view.Error == "" || view.Selected != 9 {
+		t.Fatalf("missing login recovery state: %+v", view)
+	}
 	if !host.account.refreshDue("session-nonce") || host.account.refreshDue("old-window") {
 		t.Fatal("renewal scheduling is not tied to the active native window")
 	}
 	err := host.completeAccountRefresh(context.Background(), "acu-login-session-nonce", "https://acu.best/dashboard", "https://acu.best", refreshMessage("acu-account-refresh", false))
 	view := host.account.snapshot()
-	if err != nil || !view.LoggedIn || view.Refreshing || view.Selected != 9 || len(view.Keys) != 1 || host.account.bearer != "renewed-access" || host.account.refreshDue("session-nonce") {
+	if err != nil || !view.LoggedIn || view.NeedsLogin || view.Refreshing || view.Selected != 9 || len(view.Keys) != 1 || host.account.bearer != "renewed-access" || host.account.refreshDue("session-nonce") {
 		t.Fatalf("renewal failed or rewrote selected Key: %v %+v", err, view)
 	}
 	encoded, _ := json.Marshal(view)

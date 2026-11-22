@@ -87,11 +87,12 @@ func runCatalogCLI(ctx context.Context, executable string, args []string) error 
 }
 
 type syncProvider struct {
-	ID        string `json:"id"`
-	Chat      string `json:"chat"`
-	Responses string `json:"responses"`
-	Anthropic string `json:"anthropic"`
-	Off       bool   `json:"off"`
+	ID        string  `json:"id"`
+	Chat      string  `json:"chat"`
+	Responses string  `json:"responses"`
+	Anthropic string  `json:"anthropic"`
+	Socket    *string `json:"socket"`
+	Off       bool    `json:"off"`
 	Models    []struct {
 		ID string `json:"id"`
 		On bool   `json:"on"`
@@ -144,7 +145,7 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 		if err := k.exchange(ctx, "GET", "/api/providers", nil, &providers); err != nil {
 			return err
 		}
-		found := false
+		found, setTransport := false, false
 		for _, p := range providers.Providers {
 			if p.ID != input.Provider || p.Off {
 				continue
@@ -152,17 +153,30 @@ func (host *server) prepareModels(w http.ResponseWriter, r *http.Request) {
 			for _, address := range []string{p.Chat, p.Responses, p.Anthropic} {
 				if _, err := acuBase(address); err == nil {
 					found = true
+					_, responseErr := acuBase(p.Responses)
+					setTransport = p.ID == "acu-runtime" && (p.Socket == nil || *p.Socket == "") && responseErr == nil
 				}
 			}
 		}
 		if !found {
 			return errors.New("请选择已启用的 ACU Key")
 		}
+		if setTransport {
+			k.mu.Lock()
+			executable := k.exe
+			k.mu.Unlock()
+			if err := runCatalogCLI(ctx, executable, []string{"provider", "set", input.Provider, "socket=off"}); err != nil {
+				return errors.New("无法设置 ACU 流式连接，请重试")
+			}
+		}
 		var refreshed struct {
 			Provider syncProvider `json:"provider"`
 		}
 		if err := k.exchange(ctx, "POST", "/api/provider/models", map[string]string{"id": input.Provider}, &refreshed); err != nil {
 			return err
+		}
+		if setTransport && (refreshed.Provider.Socket == nil || *refreshed.Provider.Socket != "off") {
+			return errors.New("ACU 流式连接未通过核验，请重试")
 		}
 		wanted := map[string]bool{}
 		for _, id := range input.Models {

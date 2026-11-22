@@ -205,3 +205,19 @@ removes the trial prompt and its model picker; native MCP calls remain unchanged
 Release compatibility fixtures now list video models and exercise an old disabled
 video tool across all four Agent configuration writers. Browser checks cover
 light/dark, desktop/mobile, new model recommendations and explicit video enable.
+
+## Runtime 0.1.135 / Magpie 0.1.4667
+
+The packaged gateway is pinned to the official binary digests. The desktop
+Responses WebSocket ends at the local gateway; the managed ACU upstream uses
+HTTP/SSE. The release checks that a 744 KB synthetic history and its next
+incremental turn both produce text and `response.completed`, and that the
+upstream receives the full history without a local `previous_response_id`.
+
+Linux checks passed with the official 0.1.4501 and 0.1.4667 binaries. With a
+dedicated test Key and `gpt-6.1-sol`, the candidate completed a short turn, a
+full-history turn and an incremental turn through both `console.acucompute.com`
+and `acu.best`. The old binary also passed the same live sequence through
+Console. This does not reproduce or establish a fix for a specific Windows
+ChatGPT Desktop session or network path. The release workflow adds the
+isolated Responses regression to the native Windows and macOS checks.

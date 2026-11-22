@@ -25,6 +25,7 @@ func (host *server) accountRestoreError(windowName, sender, top, message string)
 	}
 	host.account.mu.Lock()
 	if input.Expired {
+		host.account.view.NeedsLogin = true
 		host.account.view.Error = "官网登录已过期，请重新登录；已配置的 API Key 不受影响。"
 	} else {
 		host.account.view.Error = "正在重试恢复官网登录；请检查网络，或点击登录完成验证。"

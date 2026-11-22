@@ -45,6 +45,7 @@ type accountView struct {
 	WindowReady bool         `json:"windowReady"`
 	Refreshing  bool         `json:"refreshing"`
 	Restoring   bool         `json:"restoring"`
+	NeedsLogin  bool         `json:"needsLogin,omitempty"`
 	Error       string       `json:"error,omitempty"`
 }
 
@@ -70,6 +71,12 @@ func (account *accountState) snapshot() accountView {
 	view.Refreshing = view.LoggedIn && account.expires <= time.Now().Unix()
 	view.Pending = account.ticket.State != "" && time.Now().Before(account.ticket.Expires)
 	view.Restoring = view.Pending && account.ticket.Restore
+	if view.Refreshing || (!view.Pending && account.ticket.Restore) {
+		view.NeedsLogin = true
+		if view.Error == "" {
+			view.Error = "官网登录已过期或暂未续期，可重新登录；已配置的 API Key 不受影响。"
+		}
+	}
 	return view
 }
 
@@ -492,7 +499,9 @@ func (host *server) saveACUConnection(ctx context.Context, address, key string) 
 	if key == "" || len(key) > 4096 || strings.ContainsAny(key, "\r\n\t ") {
 		return errors.New("请输入完整的 ACU API Key")
 	}
-	connection := map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models"}
+	// ACU's public Responses API serves HTTP/SSE. This does not change
+	// WebSocket transport from ChatGPT Desktop to the local gateway.
+	connection := map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models", "socket": "off"}
 	var listed struct {
 		Models []struct {
 			ID string `json:"id"`

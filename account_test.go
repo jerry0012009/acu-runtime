@@ -183,9 +183,13 @@ func TestAccountLoginAndSelectedKeyStayInNativeBackend(t *testing.T) {
 		}
 		if request.URL.Path == "/api/provider/save" {
 			var body struct {
-				Key string `json:"key"`
+				Key    string `json:"key"`
+				Socket string `json:"socket"`
 			}
 			json.NewDecoder(request.Body).Decode(&body)
+			if body.Socket != "off" {
+				t.Error("ACU Responses must be saved as an HTTP upstream")
+			}
 			savedKey = body.Key
 		}
 		io.WriteString(response, `{"providers":[]}`)

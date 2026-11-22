@@ -12,7 +12,7 @@ async function setup(state, handler) {
   const synced = new Map();
   const calls = [];
   const timers = [];
-  const listeners = { app: {}, overlay: {}, document: {} };
+  const listeners = { app: {}, overlay: {}, document: {}, window: {} };
   const elements = Object.fromEntries(['app', 'overlay', 'toast'].map(name => [name, { innerHTML: '', classList: { add() {}, remove() {} }, querySelector: () => ({ focus() {} }), addEventListener(event, callback) { if (listeners[name]) listeners[name][event] = callback; } }]));
   const context = vm.createContext({
     document: {
@@ -21,7 +21,7 @@ async function setup(state, handler) {
       addEventListener: (event, callback) => { listeners.document[event] = callback; },
       body: { classList: { add() {}, remove() {} } },
     },
-    window: { dispatchEvent() {} }, Event, URLSearchParams, queueMicrotask,
+    window: { dispatchEvent() {}, addEventListener: (event, callback) => { listeners.window[event] = callback; } }, Event, URLSearchParams, queueMicrotask,
     setTimeout: (callback, milliseconds) => { timers.push({ callback, milliseconds }); return timers.length; }, clearTimeout() {},
     fetch: async (route, options = {}) => {
       calls.push({ route, method: options.method || 'GET', body: options.body });
@@ -612,6 +612,46 @@ test('status read failures clear a previously connected indicator', async () => 
   failed = true;
   await instance.run('refresh(false, true)');
   assert(!instance.elements.app.innerHTML.includes('quick-check complete'));
+  assert(instance.elements.app.innerHTML.includes('已保存 ACU 连接'));
+  assert.equal(instance.run('activeChoice().id'), 'acu-runtime');
+});
+
+test('an expired website login is visible even when kernel status includes an error', async () => {
+  const state = { ready: true, desktop: true, agents: [codex()] };
+  const instance = await setup(state);
+  Object.assign(state, { ready: false, error: '内核未连接', agents: [], connection: { known: false },
+    account: { loggedIn: true, needsLogin: true, error: '官网登录已过期；已配置的 API Key 不受影响。' } });
+  await instance.run('refresh(false, true)');
+  const html = instance.elements.app.innerHTML;
+  for (const text of ['内核未连接', '重新登录 ACU', '官网登录已过期', '已保存 ACU 连接', '上次检测']) assert(html.includes(text), text);
+  for (const text of ['正在准备 ACU', '正在检测应用', '安装并配置 ChatGPT']) assert(!html.includes(text), text);
+});
+
+test('confirmed setup keeps progress across tray navigation and leaves a retryable result after a busy gateway', async () => {
+  const state = { ready: true, desktop: true, agents: [codex()] };
+  let release;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const instance = await setup(state, async route => {
+    if (route !== '/runtime/models/prepare') return;
+    await waiting;
+    return { ok: false, status: 409, body: { error: '本机网关仍有请求或工具在运行；未更改 Codex 配置' } };
+  });
+  await instance.run('applyAgents()');
+  assert.equal(instance.calls.filter(c => c.route === '/runtime/models/prepare').length, 0);
+  const run = instance.run('confirmSetup()');
+  const agents = state.agents;
+  Object.assign(state, { ready:false, routePhase:'等待现有请求结束', agents:[], connection:{known:false},
+    account:{loggedIn:false, needsLogin:true, error:'登录已失效'} });
+  await instance.run('refresh(false, true)');
+  instance.listeners.window['acu:show-main']({detail:'view=overview'});
+  const pending = instance.elements.app.innerHTML;
+  for (const text of ['等待现有请求结束', '已保存 ACU 连接', '登录已失效', '上次检测']) assert(pending.includes(text), text);
+  for (const text of ['正在准备 ACU', '正在检测应用', '安装其他 Agent', '首次下载约 1 GB']) assert(!pending.includes(text), text);
+  Object.assign(state, { ready:true, routePhase:'', agents, connection:connected(), account:{loggedIn:true} });
+  release(); await run;
+  assert(instance.elements.app.innerHTML.includes('未更改 Codex 配置'));
+  assert(instance.elements.app.innerHTML.includes('重试未完成应用'));
+  assert(!instance.calls.some(c => c.route === '/runtime/agents/configure'));
 });
 
 test('background polling does not recreate the page when state is unchanged', async () => {
@@ -659,6 +699,7 @@ test('repeated confirmations cannot start concurrent writes', async () => {
   await instance.run('applyAgents()');
   const first = instance.run('confirmSetup()');
   await instance.run('confirmSetup()');
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(posts(instance).length, 1);
   release(); await first;
 });
@@ -891,11 +932,12 @@ for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const onl
     });
     instance.run(`ui.selected = new Set(["${agentID}"])`);
     await instance.run('applyAgents();');
+    assert(!instance.calls.some(call => call.route === '/runtime/models/prepare'), 'preview must not write');
+    instance.run('ui.setup.tools = false');
+    await instance.run('confirmSetup()');
     const prep = JSON.parse(instance.calls.find(call => call.route === '/runtime/models/prepare').body);
     assert(!prep.models.includes('gemini-4-carbon'));
     assert(prep.excludedModels.includes('gemini-4-carbon'));
-    instance.run('ui.setup.tools = false');
-    await instance.run('confirmSetup()');
     assert.equal(JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/configure').body).preserve, true);
     const payload = JSON.parse(posts(instance).find(call => call.route === '/runtime/agents/models').body);
     assert.deepEqual(payload.widen, targets.map(id => 'acu-runtime/' + id));

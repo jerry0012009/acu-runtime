@@ -79,6 +79,7 @@ type kernelState struct {
 	process        *exec.Cmd
 	enforceVersion bool
 	starting       bool
+	routePhase     string
 	lastErr        string
 	phase          string
 	downloaded     int64
@@ -274,7 +275,7 @@ func (kernel *kernelState) readState(ctx context.Context) (map[string]json.RawMe
 
 func (kernel *kernelState) begin(ctx context.Context) {
 	kernel.mu.Lock()
-	if kernel.starting {
+	if kernel.starting || kernel.routePhase != "" {
 		kernel.mu.Unlock()
 		return
 	}
@@ -453,10 +454,11 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 	kernel.mu.Lock()
 	exe, starting, lastErr := kernel.exe, kernel.starting, kernel.lastErr
 	phase, downloaded, total := kernel.phase, kernel.downloaded, kernel.total
+	routePhase := kernel.routePhase
 	attached := kernel.endpoint != nil
 	kernel.mu.Unlock()
 	ready := false
-	if attached && !starting {
+	if attached && !starting && routePhase == "" {
 		ctx, cancel := context.WithTimeout(request.Context(), 12*time.Second)
 		defer cancel()
 		if state, err := kernel.readState(ctx); err == nil {
@@ -487,8 +489,9 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 					} `json:"options"`
 				} `json:"fields"`
 			}
-			if json.Unmarshal(state["agents"], &current) == nil {
+			if json.Unmarshal(state["agents"], &current) == nil && current != nil {
 				ready = true
+				lastErr = ""
 				for index := range agents {
 					for _, native := range current {
 						if native.ID == agents[index].ID {
@@ -543,6 +546,8 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 						}
 					}
 				}
+			} else {
+				lastErr = "内核未返回可识别的 Agent 列表，请检查配套内核版本后重试。"
 			}
 		} else {
 			lastErr = err.Error()
@@ -556,7 +561,10 @@ func (host *server) status(response http.ResponseWriter, request *http.Request) 
 		groups = host.modelInventory(ctx, agents)
 		cancel()
 	}
-	host.json(response, 200, map[string]any{"version": appVersion, "pid": os.Getpid(), "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot(), "update": host.update.snapshot(host.desktop), "agentInstall": host.agentInstall.snapshot()})
+	if routePhase != "" {
+		lastErr = "" // An intentional, temporary pause is not a startup failure.
+	}
+	host.json(response, 200, map[string]any{"version": appVersion, "pid": os.Getpid(), "platform": runtime.GOOS, "desktop": host.desktop, "kernelFound": exe != "", "kernelPath": exe, "ready": ready, "starting": starting, "phase": phase, "routePhase": routePhase, "downloaded": downloaded, "downloadTotal": total, "error": lastErr, "agents": agents, "routingGroups": groups, "connection": connection, "account": host.account.snapshot(), "update": host.update.snapshot(host.desktop), "agentInstall": host.agentInstall.snapshot()})
 }
 
 func (host *server) proxy(response http.ResponseWriter, request *http.Request) {
