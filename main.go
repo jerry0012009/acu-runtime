@@ -693,6 +693,10 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.modelProbeSummary(response, request)
 		case request.Method == http.MethodGet && request.URL.Path == "/runtime/billing/account":
 			host.accountBilling(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/billing/redeem":
+			host.redeemAccountCode(response, request)
+		case request.Method == http.MethodPost && request.URL.Path == "/runtime/billing/store":
+			host.openBillingStore(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/account/logout":
 			host.forgetAccount()
 			host.json(response, 200, map[string]bool{"ok": true})

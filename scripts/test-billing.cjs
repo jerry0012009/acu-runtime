@@ -12,7 +12,8 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  let account = { loggedIn: true, username: '隔离测试账号', site: 'https://console.acucompute.com', selected: 9 };
+  let account = { loggedIn: true, identity: 'fixture-login', username: '隔离测试账号', site: 'https://console.acucompute.com', selected: 9 };
+  let redeemCalls = 0, balanceQuota = 10000000, storeCalls = 0;
   let failAccount = false, failPrices = false, localLoads = 0, coldPrices = false, delayPrices = false, comparisonMode = 'official';
   let releaseProbes;
   const probeGate = new Promise(resolve => { releaseProbes = resolve; });
@@ -28,8 +29,19 @@ async function main() {
   await page.route('http://billing.test/**', async route => {
     const url = new URL(route.request().url());
     calls.push(url.pathname + url.search);
-    const json = body => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
-    if (url.pathname === '/runtime/status') return json({ ready: true, desktop: false, account, agents: [], connection: { known: true, choices: [] } });
+    const json = body => route.fulfill({ json: url.pathname === '/runtime/billing/account' ? { ...body, balanceQuota, topupLink: 'https://store.example.test/acu', redemptionEnabled: true } : body });
+    if (url.pathname === '/runtime/status') return json({ ready: true, desktop: true, account, agents: [], connection: { known: true, choices: [] } });
+    if (url.pathname === '/runtime/billing/store') {
+      assert.equal(route.request().method(), 'POST');
+      storeCalls++;
+      return json({ ok: true });
+    }
+    if (url.pathname === '/runtime/billing/redeem') {
+      assert.deepEqual(route.request().postDataJSON(), { code: 'test-code', identity: 'fixture-login' });
+      if (++redeemCalls === 1) return route.fulfill({ status: 422, json: { error: '兑换未成功，请核对兑换码。' } });
+      balanceQuota += 500000;
+      return json({ addedQuota: 500000 });
+    }
     if (url.pathname === '/runtime/billing/account') {
       if (failAccount) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"隔离网络失败"}' });
       if (comparisonMode !== 'official') return json({loggedIn:true,days:Number(url.searchParams.get('days')),page:Number(url.searchParams.get('page')),balanceQuota:10000000,cnyPerQuota:.00001348,updatedAt:1794490000,overview:{chargeCny:'3',count:1,models:[{model:'sol',count:1,chargeCny:'3'}],comparison:comparisonMode==='missing'?{referenceCny:'0',chargeCny:'0',savedCny:'0',savedPercent:null,count:0,basis:'unavailable'}:{referenceCny:'2',chargeCny:'3',savedCny:'-1',savedPercent:'-50',count:1,basis:'platform'}},logs:[],total:0,warnings:{}});
@@ -86,6 +98,25 @@ async function main() {
     await page.getByText(/刷新失败：隔离网络失败/).waitFor();
     assert(await page.getByText('¥134.80', { exact: true }).isVisible());
     await page.screenshot({ path: path.join(workspace,'.build/billing-account-preview.png'), fullPage: true });
+    failAccount = false;
+    const codeField = page.getByRole('textbox', { name: '输入兑换码' });
+    const redeemButton = page.getByRole('button', { name: '确认兑换' });
+    assert(await redeemButton.isDisabled());
+    await Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/runtime/billing/store')),
+      page.getByRole('button', { name: '打开 ACU 商店' }).click(),
+    ]);
+    assert.equal(storeCalls, 1);
+    await codeField.fill('  test-code  ');
+    await codeField.press('Enter');
+    await page.getByText('兑换未成功，请核对兑换码。').waitFor();
+    assert.equal(await codeField.inputValue(), '  test-code  ');
+    assert.equal(await codeField.getAttribute('aria-invalid'), 'true');
+    await redeemButton.click();
+    await page.getByText('兑换成功，已加入当前账户。').waitFor();
+    await page.getByText('¥141.54', { exact: true }).waitFor();
+    assert.equal(await codeField.inputValue(), '');
+    assert.equal(redeemCalls, 2);
     await page.getByRole('button', { name: '模型价格', exact: true }).click();
     await page.getByText('按实际选中模型计费', { exact: true }).waitFor();
     await page.getByRole('button', { name: '刷新价格', exact: true }).waitFor();

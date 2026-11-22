@@ -98,6 +98,8 @@ func TestBillingUsesCloudHistoricalAmountsAndSanitizesLogs(t *testing.T) {
 			return cloudFixture(`{"success":true,"data":{"quota_per_unit":500000,"usd_exchange_rate":6.74,"price":7.3}}`), nil
 		case "/api/user/self":
 			return cloudFixture(`{"success":true,"data":{"id":42,"quota":100000}}`), nil
+		case "/api/user/topup/info":
+			return cloudFixture(`{"success":true,"data":{"topup_link":"https://pay.ldxp.cn/shop/ACU","enable_redemption":true}}`), nil
 		case "/api/user/self/acu-account-overview":
 			if request.URL.Query().Get("days") != "30" {
 				t.Fatal("overview range lost")
@@ -157,7 +159,7 @@ func TestBillingCloudReadsAreConcurrentAndDoNotRepeatStats(t *testing.T) {
 	host.cloudTransport = accountTransport(func(r *http.Request) (*http.Response, error) {
 		mu.Lock()
 		started[r.URL.Path] = true
-		if len(started) == 4 {
+		if len(started) == 5 {
 			close(ready)
 		}
 		mu.Unlock()
@@ -172,6 +174,8 @@ func TestBillingCloudReadsAreConcurrentAndDoNotRepeatStats(t *testing.T) {
 			return cloudFixture(`{"success":true,"data":{"quota_per_unit":500000,"usd_exchange_rate":6.74}}`), nil
 		case "/api/user/self":
 			return cloudFixture(`{"success":true,"data":{"id":42,"quota":100000}}`), nil
+		case "/api/user/topup/info":
+			return cloudFixture(`{"success":true,"data":{"topup_link":"https://pay.ldxp.cn/shop/ACU","enable_redemption":true}}`), nil
 		case "/api/user/self/acu-account-overview":
 			return cloudFixture(`{"success":true,"data":{"chargeCny":"2","count":1,"exactChargeCount":1,"legacyChargeCount":0,"models":[]}}`), nil
 		case "/api/log/self":

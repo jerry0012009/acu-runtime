@@ -1497,6 +1497,7 @@ app.addEventListener('change', event => {
   document.querySelector(`[data-select-agent="${id}"]`)?.focus();
 });
 app.addEventListener('submit', event => {
+  if (billing?.submit(event)) return;
   if (event.target.matches('[data-capability-model-form]')) { event.preventDefault(); saveCapabilities(); return; }
   if (!event.target.matches('[data-connection-form]')) return;
   event.preventDefault();

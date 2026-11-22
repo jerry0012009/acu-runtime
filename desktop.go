@@ -25,6 +25,10 @@ import (
 
 const desktopEnabled = true
 
+func openBillingBrowser(address string) error {
+	return application.Get().Browser.OpenURL(address)
+}
+
 func desktopIcon() []byte {
 	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
 	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: color.RGBA{R: 32, G: 33, B: 32, A: 255}}, image.Point{}, draw.Src)
