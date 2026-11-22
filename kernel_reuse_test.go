@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -80,6 +81,53 @@ func TestExistingManagementIsAuthenticatedAndNeverOwned(t *testing.T) {
 	kernel.close()
 	if _, err := kernel.readState(context.Background()); err != nil {
 		t.Fatal("closing Runtime stopped external management")
+	}
+}
+
+func TestStartReusesCompatibleMagpieWithoutApplyingRuntimeSettings(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			if r.URL.Query().Get("k") == "local-secret" {
+				return
+			}
+			json.NewEncoder(w).Encode(servingKernel{Name: "magpie", Version: kernelVersion, PID: 1})
+		case "/api/state":
+			fmt.Fprint(w, `{"agents":[]}`)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer remote.Close()
+	t.Setenv("MAGPIE_ADDR", strings.TrimPrefix(remote.URL, "http://"))
+	root := t.TempDir()
+	directory := filepath.Join(root, "data")
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	link := fmt.Sprintf(`{"mode":"local","port":%d,"key":"local-secret"}`, remote.Listener.Addr().(*net.TCPAddr).Port)
+	if err := os.WriteFile(filepath.Join(directory, "web-page.json"), []byte(link), 0600); err != nil {
+		t.Fatal(err)
+	}
+	const settings = `{"noAutoUpdate":false,"autoRestart":true}`
+	settingsFile := filepath.Join(directory, "settings.json")
+	if err := os.WriteFile(settingsFile, []byte(settings), 0600); err != nil {
+		t.Fatal(err)
+	}
+	kernel, _ := newKernel("")
+	kernel.enforceVersion = true
+	// No CLI exists here, so startup would fail if it tried to run settings commands.
+	kernel.exe = filepath.Join(root, "not-installed")
+	if err := kernel.start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if kernel.process != nil || kernel.endpoint == nil || "http://"+kernel.endpoint.Host != remote.URL {
+		t.Fatal("Runtime did not attach to the existing Magpie management endpoint")
+	}
+	got, err := os.ReadFile(settingsFile)
+	if err != nil || string(got) != settings {
+		t.Fatalf("existing Magpie settings were not preserved: %v", err)
 	}
 }
 
