@@ -221,3 +221,28 @@ and `acu.best`. The old binary also passed the same live sequence through
 Console. This does not reproduce or establish a fix for a specific Windows
 ChatGPT Desktop session or network path. The release workflow adds the
 isolated Responses regression to the native Windows and macOS checks.
+
+### Image-heavy Codex history (2026-11-22)
+
+New turns on the same key and model completed, but a resumed chat replayed
+8.9 MB of JSON, including about 8.4 MB across eleven `input_image` blocks inside
+tool results. In one attempt the ingress body read alone took 260 seconds; the
+request then reached model routing before the caller canceled. Other retries
+ended during the body read. The UI's context token meter does not measure bytes
+uploaded. No request contents were needed for this diagnosis.
+
+To resume affected work on Runtime 0.1.135, after stopping the current retry,
+open **Manage saved keys and model providers**, edit ACU, and in **Advanced >
+Images per request** add `gpt-6.2-sol=2` (use the model actually selected in the
+affected chat). Leave any unrelated settings as they are. This opt-in Magpie
+setting replaces oldest images in the request with text markers; it does not
+edit the transcript, and it protects the latest user message's images. Clear
+the model's entry to restore the original behavior. Compact the chat first if
+the desktop exposes `/compact` and can complete it; that avoids a persistent
+image limit.
+
+The packaged-kernel fixture covers twelve synthetic inline images (eleven tool
+results plus the latest user message). Both streams completed locally. The
+per-model limit lowered the upstream HTTP upload from 9.6 MB to 1.6 MB, left
+tool call/output pairs intact and preserved the latest user image. This does
+not change any defaults or establish throughput on the affected Windows link.
