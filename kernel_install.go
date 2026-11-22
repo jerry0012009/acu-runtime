@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const kernelVersion = "v0.1.4501"
+const kernelVersion = "v0.1.4667"
 
 type kernelRelease struct {
 	name   string
@@ -23,10 +23,10 @@ type kernelRelease struct {
 
 func releaseFor(platform, architecture string) (kernelRelease, error) {
 	releases := map[string]kernelRelease{
-		"windows/amd64": {"magpie-cli-windows-amd64.exe", "bbe313253b7bfa778e347ba02d352af4ab00b04b212a9ae9b2bf2a6fa565d79b"},
-		"windows/arm64": {"magpie-cli-windows-arm64.exe", "f0853a0d55b26687c1a65319891df9a319b8ed83f36c52ab76953948dbaf98dd"},
-		"darwin/amd64":  {"magpie-cli-darwin-amd64", "1006a9be7ed9cfe02b5c10ea87c298b8e16818c743aa3f35e0f09d132e2aa850"},
-		"darwin/arm64":  {"magpie-cli-darwin-arm64", "861c6dd4621158986fc21496e13d19045037ce4c5f38e81391cfcaefd0234b4f"},
+		"windows/amd64": {"magpie-cli-windows-amd64.exe", "f40c58a70bc2b4515647fd5bb7f0bbf34a710c2f017958677c4cba48b47a5d18"},
+		"windows/arm64": {"magpie-cli-windows-arm64.exe", "a092cc5b232de2009fa9a7fc984ef8bec78741c8a2296ac3ac4ffaddf42e4921"},
+		"darwin/amd64":  {"magpie-cli-darwin-amd64", "ce362f634cac92fd14e7af1b053afc4151c546bf84325e9ef6050a83bea57abe"},
+		"darwin/arm64":  {"magpie-cli-darwin-arm64", "1f396139c476d69ddd93fdd8614727f75997e21dbff36d7874d24551047ab958"},
 	}
 	release, ok := releases[platform+"/"+architecture]
 	if !ok {

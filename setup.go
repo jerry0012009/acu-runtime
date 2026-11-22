@@ -294,7 +294,7 @@ func (host *server) configureAgent(response http.ResponseWriter, request *http.R
 		}
 		result, repairErr := host.repairPreservedCodex(ctx, append([]codexFieldChange{{"model", model}}, migrations...)...)
 		if repairErr != nil {
-			host.json(response, http.StatusConflict, map[string]string{"error": "Codex 自动修复未通过核验，原配置已保留，可重试本次一键配置"})
+			host.json(response, http.StatusConflict, map[string]string{"error": "Codex 自动修复未完成：" + repairErr.Error()})
 			return
 		}
 		result["runtimeSetup"], _ = json.Marshal(map[string]any{"reopenDesktop": host.desktop})

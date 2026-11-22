@@ -38,6 +38,7 @@ func (host *server) completeAccountRefresh(ctx context.Context, windowName, send
 		if input.Expired {
 			host.forgetAccount()
 			host.account.mu.Lock()
+			host.account.view.NeedsLogin = true
 			host.account.view.Error = "登录已失效，请重新登录；已配置的 API Key 不受影响。"
 			host.account.mu.Unlock()
 			return nil

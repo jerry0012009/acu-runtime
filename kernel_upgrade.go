@@ -94,6 +94,13 @@ func waitGatewayIdle(ctx context.Context) error {
 		}
 	}
 }
+
+func waitGatewayIdleForChange(ctx context.Context) error {
+	idle, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	return waitGatewayIdle(idle)
+}
+
 func (kernel *kernelState) ensureCompatibleGateway(ctx context.Context) error {
 	if !kernel.enforceVersion {
 		return nil

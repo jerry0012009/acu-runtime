@@ -79,6 +79,29 @@ func TestOnboardingStatusProjectsConnectAndRestartFacts(t *testing.T) {
 	}
 }
 
+func TestRouteChangeIsNotKernelStartup(t *testing.T) {
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("status must not probe a controller being replaced")
+	}))
+	host.kernel.routePhase = "waiting for existing requests"
+	host.kernel.lastErr = "previous controller exited"
+	host.kernel.begin(context.Background())
+	out := httptest.NewRecorder()
+	host.status(out, httptest.NewRequest("GET", "/runtime/status", nil))
+	var status struct {
+		Ready      bool
+		Starting   bool
+		RoutePhase string
+		Error      string
+	}
+	if err := json.Unmarshal(out.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Starting || status.Ready || status.RoutePhase == "" || status.Error != "" {
+		t.Fatalf("route transaction confused with kernel startup: %+v", status)
+	}
+}
+
 func TestBypassedAgentReportsRestartNotConfigurationCorruption(t *testing.T) {
 	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `{"agents":[{"id":"codex","wired":true,"drift":{"kind":"bypassed","detail":"private request path"},"fields":[]}]}`)
