@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -22,6 +23,11 @@ type billingLog struct {
 	Output       int64           `json:"completion_tokens"`
 	Charge       json.RawMessage `json:"chargeCny,omitempty"`
 	PriceVersion string          `json:"priceVersion,omitempty"`
+}
+
+type billingTopupInfo struct {
+	TopupLink        string `json:"topup_link"`
+	EnableRedemption *bool  `json:"enable_redemption"`
 }
 
 func (host *server) accountBilling(response http.ResponseWriter, request *http.Request) {
@@ -83,6 +89,15 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 	go func() {
 		defer overviewWait.Done()
 		configErr = host.cloudJSON(request.Context(), http.MethodGet, view.Site+"/api/status", "", &config)
+	}()
+	var topup billingTopupInfo
+	var topupErr error
+	overviewWait.Add(1)
+	go func() {
+		defer overviewWait.Done()
+		ctx, cancel := context.WithTimeout(request.Context(), 4*time.Second)
+		defer cancel()
+		topupErr = host.cloudJSON(ctx, http.MethodGet, view.Site+"/api/user/topup/info", bearer, &topup)
 	}()
 	var user struct {
 		ID    int    `json:"id"`
@@ -154,6 +169,12 @@ func (host *server) accountBilling(response http.ResponseWriter, request *http.R
 			rows = append(rows, row)
 		}
 		result["logs"], result["total"] = rows, logs.Total
+	}
+	if topupErr == nil {
+		result["topupLink"] = billingStoreURL(topup.TopupLink)
+		if topup.EnableRedemption != nil {
+			result["redemptionEnabled"] = *topup.EnableRedemption
+		}
 	}
 	// A response begun under an old login must never populate a new account page.
 	overviewWait.Wait()

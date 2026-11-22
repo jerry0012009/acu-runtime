@@ -6,6 +6,7 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   const quota = value => value == null || !state.account?.cnyPerQuota ? '—' : money(value * state.account.cnyPerQuota);
   const overviewMoney = value => value == null || value === '' || !Number.isFinite(Number(value)) ? '—' : Number(value) > 0 && Number(value) < .01 ? '< ¥0.01' : '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let modelOrder = 'charge', showAllModels = false;
+  let redemption = { code: '', busy: false, error: '', success: '', opening: false, storeError: '' };
   let renderedPriceRows = '';
   let probes = null, probesBusy = false, nextProbeRead = 0;
   const priceFilterGroups = [
@@ -14,9 +15,9 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
   ];
   const note = message => `<p class="billing-note" role="status">${esc(message)}</p>`;
   const button = (label, attributes = '') => `<button class="button secondary" ${attributes}>${label}</button>`;
-  const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}/${ui.status?.account?.selected || 0}`;
+  const identity = () => `${ui.status?.account?.identity || ui.status?.account?.site || ''}/${ui.status?.account?.username || ''}/${!!ui.status?.account?.loggedIn}`;
   const site = () => state.account?.site || ui.status?.account?.site || 'https://console.acucompute.com';
-  const links = () => `<a class="button secondary" href="${esc(site())}/wallet" target="_blank" rel="noopener noreferrer">前往官网充值</a><a class="text-button" href="${esc(site())}/usage-logs" target="_blank" rel="noopener noreferrer">云端消费详情 ↗</a>`;
+  const post = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
   function syncAccount() {
     if (ui.page === 'usage' && state.tab === 'prices' && !document.hidden) loadProbes();
@@ -30,13 +31,16 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     state.account = null;
     state.accountError = '';
     state.accountBusy = false;
+    state.accountReload = false;
+    redemption = { code: '', busy: false, error: '', success: '', opening: false, storeError: '' };
     state.page = 1;
     modelOrder = 'charge'; showAllModels = false;
     if (ui.page === 'usage') { render(); loadAccount(); }
   }
 
-  async function loadAccount() {
-    if (state.accountBusy || !ui.status?.account?.loggedIn) return;
+  async function loadAccount(reload = false) {
+    if (!ui.status?.account?.loggedIn) return;
+    if (state.accountBusy) { if (reload) state.accountReload = true; return; }
     const generation = state.generation;
     const days = state.days, page = state.page;
     state.accountBusy = true;
@@ -57,7 +61,13 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
       state.account = result;
       state.accountError = '';
     } catch (error) { if (generation === state.generation) state.accountError = error.message; }
-    finally { if (generation === state.generation) { state.accountBusy = false; update('account'); } }
+    finally {
+      if (generation === state.generation) {
+        state.accountBusy = false;
+        update('account');
+        if (state.accountReload) { state.accountReload = false; loadAccount(); }
+      }
+    }
   }
 
   async function loadPrices(force = false) {
@@ -131,6 +141,39 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     return `<span>ACU 账户余额 <strong>${quota(state.account?.balanceQuota)}</strong> · ${esc(account.username || '')}${state.account ? ` · ${esc(date(state.account.updatedAt))}` : ''}${state.accountError ? ' · 刷新失败' : ''}</span><button class="text-button" data-billing-tab="account">查看账户 →</button>`;
   }
 
+  function redemptionPanel(login) {
+    const wallet = `${esc(site())}/wallet#wallet-add-funds`;
+    const enabled = state.account?.redemptionEnabled !== false;
+    const needsLogin = login.needsLogin || state.account?.loggedIn === false;
+    const ready = !!login.identity && !needsLogin && enabled;
+    const store = state.account?.topupLink;
+    let storeControl = '';
+    if (store && enabled && !needsLogin) {
+      storeControl = ui.status.desktop
+        ? `<button type="button" id="billing-open-store" class="button secondary" data-billing-store ${redemption.opening ? 'disabled' : ''}>打开 ACU 商店 ${icon('arrow')}</button>`
+        : `<a class="button secondary" href="${esc(store)}" target="_blank" rel="noopener noreferrer">打开 ACU 商店 ${icon('arrow')}</a>`;
+    }
+    return `<section class="billing-redemption" aria-labelledby="billing-redemption-title">
+      <div class="billing-redemption-heading"><h2 id="billing-redemption-title">兑换码充值</h2>${ui.status.desktop ? '' : `<a class="text-button" href="${wallet}" target="_blank" rel="noopener noreferrer">官网钱包 ↗</a>`}</div>
+      <div class="billing-redemption-steps">
+        <div class="billing-redemption-step">
+          <h3>购买兑换码</h3>
+          <p>在浏览器购买后，复制兑换码并返回此处。</p>
+          ${storeControl || (needsLogin ? button('重新登录 ACU', 'data-action="account-login"') : `<small>${enabled ? (state.accountBusy ? '正在读取商店入口…' : '暂时无法获取商店入口，可刷新账户后重试。') : '兑换服务暂不可用。'}</small>`)}
+          ${redemption.storeError ? `<p role="alert">${esc(redemption.storeError)}</p>` : ''}
+        </div>
+        <div class="billing-redemption-step">
+          <h3><label for="billing-redemption-code">输入兑换码</label></h3>
+          <p>兑换至当前账户：<strong>${esc(login.username || 'ACU 账户')}</strong></p>
+          <form data-billing-redeem autocomplete="off">
+            <input id="billing-redemption-code" type="text" maxlength="128" autocapitalize="off" spellcheck="false" required value="${esc(redemption.code)}" ${ready && !redemption.busy ? '' : 'disabled'} ${redemption.error ? 'aria-invalid="true"' : ''} aria-describedby="billing-redemption-feedback" placeholder="粘贴兑换码">
+            <button id="billing-redeem-submit" class="button primary" type="submit" ${!ready || redemption.busy || !redemption.code.trim() ? 'disabled' : ''}>${redemption.busy ? '兑换中…' : '确认兑换'}</button>
+          </form>
+          <div id="billing-redemption-feedback" role="status" tabindex="-1" class="billing-redemption-feedback">${esc(redemption.error || redemption.success || (needsLogin ? '会话已失效，请重新登录 ACU。' : ''))}</div>
+        </div>
+      </div></section>`;
+  }
+
   function accountPage() {
     const login = ui.status?.account;
     if (!login?.loggedIn) return `<section class="panel billing-empty"><h2>${login?.restoring ? '正在恢复登录' : '登录后查看余额与消费'}</h2>${login?.error ? note(login.error) : ''}${button(login?.restoring ? '手动登录' : '登录 ACU', 'data-action="account-login"')}</section>`;
@@ -147,7 +190,8 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     const comparisonTitle = comparable ? `${fullComparison ? '' : '可比用量 · ' }较${basis}${premium ? '多付' : '节省'}` : '费用对比';
     const percent = comparable ? Math.abs(Number(comparison.savedPercent)).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) : '';
     const range = `<select aria-label="消费时段" data-billing-days ${state.accountBusy ? 'disabled' : ''}>${[1,7,30].map(days => `<option value="${days}" ${days === state.days ? 'selected' : ''}>最近 ${days === 1 ? '24 小时' : days + ' 天'}</option>`).join('')}</select>`;
-    return `<div class="billing-account" aria-label="ACU 账户概览"><div class="billing-account-heading"><div><span class="billing-eyebrow">ACU 账户</span><h2>${esc(login.username || 'ACU 账户')}</h2><p>账户全部 Key</p></div><div class="billing-account-actions"><a class="button primary" href="${esc(site())}/wallet" target="_blank" rel="noopener noreferrer">充值 ${icon?.('arrow') || ''}</a><a class="text-button" href="${esc(site())}/usage-logs" target="_blank" rel="noopener noreferrer">消费明细 ${icon?.('link') || ''}</a><details class="billing-account-menu"><summary aria-label="账户菜单" title="账户菜单">${icon?.('settings') || '账户'}</summary><div>${button('退出账号', 'data-billing-logout')}</div></details></div></div>
+    return `<div class="billing-account" aria-label="ACU 账户概览"><div class="billing-account-heading"><div><span class="billing-eyebrow">ACU 账户</span><h2>${esc(login.username || 'ACU 账户')}</h2><p>账户全部 Key</p></div><div class="billing-account-actions"><a class="text-button" href="${esc(site())}/usage-logs" target="_blank" rel="noopener noreferrer">消费明细 ${icon('link')}</a><details class="billing-account-menu"><summary aria-label="账户菜单" title="账户菜单">${icon('settings')}</summary><div>${button('退出账号', 'data-billing-logout')}</div></details></div></div>
+      ${redemptionPanel(login)}
       <div class="billing-account-period">${range}<button class="billing-icon-button" title="刷新账户" aria-label="刷新账户" data-billing-refresh="account" ${state.accountBusy ? 'disabled' : ''}>${icon?.('refresh') || '刷新'}</button><span>${state.accountBusy ? '更新中…' : data ? esc(date(data.updatedAt)) + ' 更新' : ''}</span></div>
       ${state.accountError ? note('刷新失败：' + state.accountError + (data ? '。下方保留上次数据。' : '')) : ''}
       ${warnings.length ? note('部分数据暂不可用：' + [...new Set(warnings)].join('；')) : ''}
@@ -305,9 +349,17 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     }
     if (state.tab === 'local' && document.getElementById('billing-summary') && state.localReady === !!ui.status?.ready) { update(); return; }
     state.localReady = !!ui.status?.ready;
+    const active = document.activeElement;
+    const redemptionFocus = state.tab === 'account' && active?.id?.startsWith('billing-re');
+    const selection = redemptionFocus && active.id === 'billing-redemption-code' ? [active.selectionStart, active.selectionEnd] : null;
     const tabs = [['local','本机用量'],['account','ACU 账户'],['prices','模型价格']];
     app.innerHTML = `${navigation()}<div class="main-shell billing-shell"><header class="topbar"><span>ACU Runtime / 用量与费用</span></header><main class="content billing-content"><div class="page-heading"><div><h1>用量与费用</h1></div></div><nav class="billing-tabs" aria-label="用量与费用子页面">${tabs.map(([tab,label]) => `<button data-billing-tab="${tab}" ${state.tab === tab ? 'aria-current="page" class="active"' : ''}>${label}</button>`).join('')}</nav>${state.tab === 'local' ? `<div class="billing-summary" id="billing-summary">${summary()}</div><p class="billing-note">本机用量 · 预估费用</p>${ui.status?.ready ? `<iframe class="billing-local-frame" title="本机用量统计" src="/kernel/?view=usage&acu-view=usage${state.localQuery}" sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"></iframe>` : note('正在连接本机内核…')}` : state.tab === 'account' ? accountPage() : pricesPage()}</main></div>`;
     if (state.tab === 'prices') updateProbeCells();
+    if (redemptionFocus) {
+      const control = document.getElementById(active.id);
+      control?.focus({ preventScroll: true });
+      if (selection) control?.setSelectionRange(...selection);
+    }
   }
 
   function open(tab = state.tab, query) {
@@ -325,6 +377,18 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     const target = event.target;
     const tab = target.closest('[data-billing-tab]');
     if (tab) { open(tab.dataset.billingTab); return true; }
+    if (target.closest('[data-billing-store]')) {
+      const current = redemption;
+      if (current.opening) return true;
+      current.opening = true;
+      current.storeError = '';
+      update('account');
+      request('/runtime/billing/store', post({})).catch(error => { current.storeError = error.message; }).finally(() => {
+        current.opening = false;
+        if (current === redemption) update('account');
+      });
+      return true;
+    }
     const refresh = target.closest('[data-billing-refresh]');
     if (refresh) { refresh.dataset.billingRefresh === 'prices' ? loadPrices(true) : loadAccount(); return true; }
     const priceFilter = target.closest('[data-price-filter]');
@@ -358,9 +422,39 @@ globalThis.createACUBilling = ({ app, ui, request, navigation, escapeHTML: esc, 
     return false;
   }
   function input(event) {
+    if (event.target.id === 'billing-redemption-code') {
+      redemption.code = event.target.value;
+      redemption.error = redemption.success = '';
+      event.target.removeAttribute('aria-invalid');
+      document.getElementById('billing-redemption-feedback').textContent = '';
+      document.getElementById('billing-redeem-submit').disabled = !redemption.code.trim();
+      return;
+    }
     if (event.target.id !== 'billing-price-search') return;
     state.query = event.target.value;
     updatePriceRows();
   }
-  return { open, render, syncAccount, click, change, input };
+
+  function submit(event) {
+    if (!event.target.matches('[data-billing-redeem]')) return false;
+    event.preventDefault();
+    const current = redemption;
+    const code = current.code.trim(), login = ui.status?.account;
+    if (!code || current.busy || !login?.identity || login.needsLogin || state.account?.loggedIn === false || state.account?.redemptionEnabled === false) return true;
+    current.busy = true;
+    current.error = current.success = '';
+    update('account');
+    request('/runtime/billing/redeem', post({ code, identity: login.identity })).then(() => {
+      current.code = '';
+      current.success = '兑换成功，已加入当前账户。';
+      if (current === redemption) loadAccount(true);
+    }).catch(error => { current.error = error.message; }).finally(() => {
+      current.busy = false;
+      if (current !== redemption) return;
+      update('account');
+      if (ui.page === 'usage' && state.tab === 'account') document.getElementById(current.error ? 'billing-redemption-code' : 'billing-redemption-feedback')?.focus({ preventScroll: true });
+    });
+    return true;
+  }
+  return { open, render, syncAccount, click, change, input, submit };
 };

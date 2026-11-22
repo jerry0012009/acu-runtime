@@ -1,4 +1,20 @@
 .billing-account{letter-spacing:0;max-width:1180px;padding:8px 0 24px}
+.billing-redemption{background:var(--acu-surface-alt);border:1px solid var(--acu-line);border-radius:8px;padding:16px;margin:0 0 20px}
+.billing-redemption-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
+.billing-redemption-heading h2{font-size:16px;font-weight:600;margin:0}
+.billing-redemption-steps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:18px}
+.billing-redemption-step{min-width:0;overflow-wrap:anywhere}
+.billing-redemption-step+ .billing-redemption-step{border-inline-start:1px solid var(--acu-line);padding-inline-start:18px}
+.billing-redemption-step h3{margin:2px 0 4px;font-size:14px;font-weight:600}
+.billing-redemption-step p,.billing-redemption-step small,.billing-redemption-feedback{font-size:12px;line-height:1.6;color:var(--acu-muted);margin:0 0 10px}
+.billing-redemption-step form{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.billing-redemption-step input{flex:1 1 180px;min-width:0;padding:8px 10px;border:1px solid var(--acu-line);background:var(--acu-surface);color:var(--acu-text);border-radius:6px;font:inherit}
+.billing-redemption-feedback:not(:empty){margin:6px 0 0}
+.billing-redemption-feedback:empty{margin:0}
+@media(max-width:700px){
+  .billing-redemption-steps{grid-template-columns:minmax(0,1fr);gap:12px}
+  .billing-redemption-step+ .billing-redemption-step{border-inline-start:0;border-top:1px solid var(--acu-line);padding:12px 0 0}
+}
 .billing-account-heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:22px}
 .billing-eyebrow{font-size:11px;color:var(--acu-muted)}
 .billing-account-heading h2{font-size:21px;line-height:1.5;margin:5px 0 0;overflow-wrap:anywhere}

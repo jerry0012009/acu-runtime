@@ -66,7 +66,7 @@ func (account *accountState) snapshot() accountView {
 	defer account.mu.Unlock()
 	view := account.view
 	if view.LoggedIn {
-		view.Identity = fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprint(account.userID)+"/"+account.session.State+"/"+account.sessionID)))
+		view.Identity = account.loginIdentity()
 	}
 	view.Refreshing = view.LoggedIn && account.expires <= time.Now().Unix()
 	view.Pending = account.ticket.State != "" && time.Now().Before(account.ticket.Expires)
@@ -78,6 +78,11 @@ func (account *accountState) snapshot() accountView {
 		}
 	}
 	return view
+}
+
+// loginIdentity must be called with account.mu held.
+func (account *accountState) loginIdentity() string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprint(account.userID)+"/"+account.session.State+"/"+account.sessionID)))
 }
 
 func (account *accountState) sessionActive(state string) bool {
