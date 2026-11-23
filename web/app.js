@@ -462,11 +462,22 @@ function agentModelSelect(agent, role = null) {
   return `<select id="${inputID}" data-agent-model="${agent.id}"${roleAttribute} aria-label="${escapeHTML(agent.name)} ${escapeHTML(role?.label || '默认模型')}" ${disabled ? 'disabled' : ''}>${groups}</select>`;
 }
 
+const legacyOpusID = 'claude-opus-5.5';
+function replacedOpus(agent, model) {
+  if (model.own || !model.id.endsWith('/' + legacyOpusID)) return false;
+  const provider = model.id.slice(0, -(legacyOpusID.length + 1));
+  const choice = ui.status?.connection?.choices?.find(item => item.id === provider);
+  const successor = successorACUModel(choice, legacyOpusID);
+  return !!successor && agent.catalog?.models?.some(item => item.id === `${provider}/${successor}`);
+}
+function inventoryChoice(agent, model) {
+  return !isRoutingGroup(model) && (model.inUse || !replacedOpus(agent, model));
+}
 function modelFlow(agent, compact = false, inventory = null, summary = false) {
   const facts = modelFacts(agent);
   const entries = [];
-  const add = (key, kind, name, target, badge, detail = '', muted = false, control = '', trailing = '', subtitle = '') => {
-    const search = [name, target, badge, detail].join(' ').toLocaleLowerCase();
+  const add = (key, kind, name, target, badge, detail = '', muted = false, control = '', trailing = '', subtitle = '', keywords = '') => {
+    const search = [name, target, badge, detail, keywords].join(' ').toLocaleLowerCase();
     const hidden = !compact && ui.inventoryQuery && !search.includes(ui.inventoryQuery.trim().toLocaleLowerCase());
     const mark = kind === 'route' ? icon('link') : kind === 'add' ? '+' : icon('shield');
     const line = `<span class="flow-mark ${kind}" aria-label="${kind === 'route' ? '路由' : kind === 'add' ? '新增' : '保留'}">${mark}</span><span class="flow-path"><span class="flow-name" title="${escapeHTML(name)}">${escapeHTML(name)}${subtitle ? `<small class="flow-provider">${escapeHTML(subtitle)}</small>` : ''}</span>${control ? `<span class="flow-arrow" aria-hidden="true">→</span>${control}` : target ? `<span class="flow-arrow" aria-hidden="true">→</span><strong title="${escapeHTML(target)}">${escapeHTML(target)}</strong>` : ''}</span>${badge ? `<span class="flow-badge">${escapeHTML(badge)}</span>` : ''}${trailing}`;
@@ -479,13 +490,13 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
     if (compact && !roles.some(role => role.label === '默认模型') && hasModelChoices) add('role:default', 'route', '默认模型', '', '', '', false, agentModelSelect(agent));
   }
   const previewed = new Set(facts.configured && agent.id !== 'workbuddy' ? facts.roleRows.slice(0, 2).map(role => role.ref) : []);
-  const catalogModels = (facts.catalog?.models || []).filter(model => !isRoutingGroup(model));
+  const catalogModels = (facts.catalog?.models || []).filter(model => inventoryChoice(agent, model));
   const catalogIDs = new Set(catalogModels.map(model => model.id));
   const fallbackNative = facts.nativeEntries.filter(model => !catalogIDs.has(model.id));
   const models = compact ? [...facts.top.filter(model => !previewed.has(model.id)), ...fallbackNative.filter(model => !modelIsHidden(agent, model)).slice(0, 1)] : inventory?.tab === 'order' ? catalogModels.filter(model => !modelIsHidden(agent, model)) : [...catalogModels, ...fallbackNative].sort((left, right) => Number(right.id.endsWith('/acu-auto')) - Number(left.id.endsWith('/acu-auto')));
   if (summary) models.length = 0;
   models.forEach(model => {
-    if (inventory?.tab === 'shown' && modelIsHidden(agent, model)) return;
+    if (!inventoryChoice(agent, model) || inventory?.tab === 'shown' && modelIsHidden(agent, model)) return;
     const group = (ui.status?.routingGroups || []).find(item => item.ref === model.id);
     const source = group ? '自动路由' : facts.routeName(model.id);
     const hidden = modelIsHidden(agent, model);
@@ -494,7 +505,8 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
     const provider = !model.own && !group && model.id.includes('/') ? model.id.split('/')[0] : '';
     const visibility = inventory && inventory.tab !== 'order' && model.inUse ? '<span class="model-in-use" title="请先切换默认模型或子任务模型，再隐藏此模型">使用中 · 保留显示</span>' : inventory && inventory.tab !== 'order' ? `<button type="button" class="model-visibility ${hidden ? '' : 'is-on'}" data-model-visibility data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" role="switch" aria-checked="${!hidden}" ${model.nativeOption || ui.inventorySaving ? 'disabled' : ''} title="${escapeHTML(model.nativeOption ? '原生模型由上方开关控制' : hidden ? '显示此模型' : '隐藏此模型')}"><span aria-hidden="true"></span><span class="sr-only">${hidden ? '隐藏' : '显示'}</span></button>` : '';
     const order = inventory?.tab === 'order' ? `<span class="model-order-actions"><button type="button" data-model-move="up" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === 0 || ui.inventorySaving ? 'disabled' : ''} aria-label="上移">↑</button><button type="button" data-model-move="down" data-agent-id="${escapeHTML(agent.id)}" data-model-id="${escapeHTML(model.id)}" ${models.indexOf(model) === models.length - 1 || ui.inventorySaving ? 'disabled' : ''} aria-label="下移">↓</button></span>` : '';
-    add('model:' + model.id, model.own ? 'native' : 'add', model.name || model.id, '', mode, detail, hidden, '', visibility || order, provider);
+    const canonicalOpus = !model.own && model.id === `${provider}/${supersedingACUModels[legacyOpusID]}` && ui.status?.connection?.choices?.some(choice => choice.id === provider);
+    add('model:' + model.id, model.own ? 'native' : 'add', canonicalOpus ? 'Claude Opus 5.5' : model.name || model.id, '', replacedOpus(agent, model) ? '当前使用旧配置 · 可一键迁移' : mode, detail, hidden, '', visibility || order, provider, canonicalOpus ? `${legacyOpusID} ${model.id}` : '');
   });
   if ((!inventory || inventory.tab !== 'order') && facts.configured && agent.id === 'workbuddy') {
     add('native:workbuddy', 'native', 'WorkBuddy 原生模型', '', '保留');
@@ -508,7 +520,7 @@ function modelFlow(agent, compact = false, inventory = null, summary = false) {
 
 function agentModelSummary(agent, advanced = '') {
   const catalog = agent.catalog;
-  const models = (catalog?.models || []).filter(model => !isRoutingGroup(model));
+  const models = (catalog?.models || []).filter(model => inventoryChoice(agent, model));
   const facts = modelFacts(agent);
   const allModels = [...models, ...facts.nativeEntries.filter(model => !models.some(current => current.id === model.id))];
   const shown = allModels.filter(model => !modelIsHidden(agent, model));
@@ -612,7 +624,7 @@ function visibilityPayload(agent) {
 function toggleModelVisibility(agentId, modelId) {
   const agent = inventoryAgent(agentId);
   const model = agent?.catalog?.models?.find(item => item.id === modelId);
-  if (!agent?.catalog || !model || model.inUse || ui.inventorySaving) return;
+  if (!agent?.catalog || !model || model.inUse || replacedOpus(agent, model) || ui.inventorySaving) return;
   if (model.own && agent.catalog.ownHidden) {
     // The native master switch gates every own model. Preserve that effective
     // selection as per-model hides before revealing just the clicked entry.
@@ -643,7 +655,7 @@ function bulkInventory(agentId, action) {
   ui.inventoryBulk = null;
   for (const model of models) {
     if (model.inUse || model.own || isRoutingGroup(model)) continue;
-    model.hidden = action === 'hide';
+    model.hidden = action === 'hide' || replacedOpus(agent, model);
   }
   redrawInventory();
 }
@@ -651,7 +663,8 @@ function bulkInventory(agentId, action) {
 function moveInventoryModel(agentId, modelId, direction) {
   const agent = inventoryAgent(agentId);
   const models = agent?.catalog?.models || [];
-  const shown = models.filter(model => !modelIsHidden(agent, model) && !isRoutingGroup(model));
+  const movable = model => !modelIsHidden(agent, model) && inventoryChoice(agent, model);
+  const shown = models.filter(movable);
   const index = shown.findIndex(model => model.id === modelId);
   if (!agent?.catalog || index < 0 || ui.inventorySaving) return;
   const target = index + (direction === 'up' ? -1 : 1);
@@ -659,7 +672,7 @@ function moveInventoryModel(agentId, modelId, direction) {
   [shown[index], shown[target]] = [shown[target], shown[index]];
   // Swap only ordinary model slots, retaining advanced entries and hidden entries in place.
   let position = 0;
-  models.splice(0, models.length, ...models.map(model => !modelIsHidden(agent, model) && !isRoutingGroup(model) ? shown[position++] : model));
+  models.splice(0, models.length, ...models.map(model => movable(model) ? shown[position++] : model));
   redrawInventory();
 }
 
@@ -678,7 +691,7 @@ function openModelInventory(id) {
   const warning = agent.needsRepair ? '配置已变化，请重新核对' : !agent.connected ? '接入后可添加以下模型' : '';
   const catalog = agent.catalog;
   const facts = modelFacts(agent);
-  const models = (catalog?.models || []).filter(model => !isRoutingGroup(model));
+  const models = (catalog?.models || []).filter(model => inventoryChoice(agent, model));
   const displayModels = [...models, ...facts.nativeEntries.filter(model => !models.some(current => current.id === model.id))];
   const shown = displayModels.filter(model => !modelIsHidden(agent, model)).length;
   const tab = ui.inventoryTab || 'all';
