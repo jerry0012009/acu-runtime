@@ -8,7 +8,7 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +18,9 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"github.com/jerry0012009/acu-runtime/internal/installfiles"
+	"golang.org/x/sys/windows"
 )
 
 //go:embed payload.zip
@@ -28,42 +31,110 @@ var payload []byte
 var setupKernelVersion string
 var setupKernelName string
 var setupKernelSHA256 string
+var setupAppSHA256 string
+var setupWorkBuddyPackage string
+var setupChatGPTPackage string
 
-type kernelManifest struct {
-	Version string `json:"version"`
-	Name    string `json:"name"`
-	SHA256  string `json:"sha256"`
+func verifyFile(path, digest string) bool {
+	if len(digest) != 64 {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	hash := sha256.New()
+	_, err = io.Copy(hash, file)
+	return err == nil && hex.EncodeToString(hash.Sum(nil)) == digest
 }
 
-func validateKernelManifest(actual, expected kernelManifest) error {
-	if expected.Version == "" || expected.Name == "" || len(expected.SHA256) != 64 {
-		return fmt.Errorf("安装包缺少构建校验清单，请重新构建安装包")
+func installerCommandError(stage string, err error, output []byte) error {
+	var code syscall.Errno
+	if errors.As(err, &code) {
+		stage = fmt.Sprintf("%s（Windows 错误 %d）", stage, code)
 	}
-	if expected.Name != "magpie-cli-windows-amd64.exe" && expected.Name != "magpie-cli-windows-arm64.exe" {
-		return fmt.Errorf("安装包内核架构清单无效")
+	detail := strings.TrimSpace(strings.ReplaceAll(string(output), "\x00", ""))
+	if detail != "" {
+		return fmt.Errorf("%s: %w\n%s", stage, err, detail)
 	}
-	if actual != expected {
-		return fmt.Errorf("安装包清单不一致（打包内核 %s，应用内核 %s），请重新构建安装包", expected.Version, actual.Version)
+	return fmt.Errorf("%s: %w", stage, err)
+}
+
+func createStartMenuShortcut(executable string) error {
+	systemDir, err := windows.GetSystemDirectory()
+	if err != nil {
+		return err
 	}
-	if _, err := hex.DecodeString(expected.SHA256); err != nil {
-		return fmt.Errorf("安装包内核摘要清单无效")
+	powershell := filepath.Join(systemDir, "WindowsPowerShell", "v1.0", "powershell.exe")
+	shortcut := exec.Command(powershell, "-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference='Stop'; $shell=New-Object -ComObject WScript.Shell; $link=$shell.CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath('Programs'),'ACU Runtime.lnk')); $link.TargetPath=$env:ACU_INSTALLED_EXE; $link.WorkingDirectory=[IO.Path]::GetDirectoryName($env:ACU_INSTALLED_EXE); $link.Save()`)
+	shortcut.Env = append(os.Environ(), "ACU_INSTALLED_EXE="+executable)
+	shortcut.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	if output, err := shortcut.CombinedOutput(); err != nil {
+		return installerCommandError("创建开始菜单快捷方式失败", err, output)
 	}
 	return nil
 }
 
-func verifyBundledKernel(path, digest string) bool {
-	if len(digest) != 64 {
-		return false
+func install(waitPID int, requestedTarget string, verifyOnly bool) (warning, failure error) {
+	if err := waitForRuntime(waitPID); err != nil {
+		return nil, err
 	}
-	data, err := os.ReadFile(path)
+	staging, err := os.MkdirTemp("", "acu-setup-*")
 	if err != nil {
-		return false
+		return nil, fmt.Errorf("创建临时安装目录失败: %w", err)
 	}
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:]) == digest
+	defer os.RemoveAll(staging)
+	if err := verifyPayload(staging, payload, setupAppSHA256, setupKernelSHA256); err != nil {
+		return nil, fmt.Errorf("验证安装包失败: %w", err)
+	}
+	if verifyOnly {
+		fmt.Printf("PASS: installer payload verified: %s %s\n", setupKernelVersion, setupKernelName)
+		return nil, nil
+	}
+	defaultTarget := filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "ACU Runtime")
+	target := requestedTarget
+	if target == "" {
+		target = defaultTarget
+	}
+	if !filepath.IsAbs(defaultTarget) {
+		return nil, fmt.Errorf("无法定位当前用户的 LocalAppData 安装目录")
+	}
+	if !filepath.IsAbs(target) || filepath.Clean(target) != filepath.Clean(defaultTarget) {
+		return nil, fmt.Errorf("更新目录不受信任")
+	}
+	if err := installfiles.Install(staging, target, "acu-kernel.exe", nil); err != nil {
+		return nil, installerCommandError("安装 Runtime 文件失败", err, nil)
+	}
+	var warnings []error
+	if executable, err := os.Executable(); err == nil {
+		offline := filepath.Join(filepath.Dir(executable), "agent-packages")
+		if info, err := os.Stat(offline); err == nil && info.IsDir() {
+			if err := installfiles.CopyAgentPackages(offline, target, setupWorkBuddyPackage, setupChatGPTPackage); err != nil {
+				warnings = append(warnings, err)
+			}
+		}
+	}
+	executable := filepath.Join(target, "ACU Runtime.exe")
+	if requestedTarget == "" {
+		if err := createStartMenuShortcut(executable); err != nil {
+			warnings = append(warnings, err)
+		}
+	}
+	command := exec.Command(executable)
+	command.Dir = target
+	if err := command.Start(); err != nil {
+		warnings = append(warnings, installerCommandError("无法自动启动 Runtime", err, nil))
+	} else {
+		_ = command.Process.Release()
+	}
+	if warning := errors.Join(warnings...); warning != nil {
+		return fmt.Errorf("应用已安装。安装位置：%s\n%w", executable, warning), nil
+	}
+	return nil, nil
 }
 
-func install(waitPID int, requestedTarget string, verifyOnly bool) error {
+func waitForRuntime(waitPID int) error {
 	if waitPID > 0 {
 		handle, err := syscall.OpenProcess(0x00100000, false, uint32(waitPID))
 		if err != nil && err != syscall.Errno(87) {
@@ -87,23 +158,20 @@ func install(waitPID int, requestedTarget string, verifyOnly bool) error {
 			}
 		}
 	}
-	staging, err := os.MkdirTemp("", "acu-setup-*")
-	if err != nil {
-		return err
-	}
-	if filepath.Dir(staging) != filepath.Clean(os.TempDir()) || !strings.HasPrefix(filepath.Base(staging), "acu-setup-") {
-		return fmt.Errorf("无效的临时安装目录")
-	}
-	defer os.RemoveAll(staging)
-	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	return nil
+}
+
+func verifyPayload(staging string, data []byte, appDigest, kernelDigest string) error {
+	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return err
 	}
 	allowed := map[string]bool{"ACU Runtime.exe": true, "kernel/acu-kernel.exe": true, "THIRD-PARTY-NOTICES.txt": true}
 	for _, entry := range archive.File {
-		if !allowed[entry.Name] || entry.UncompressedSize64 > 160<<20 {
+		if !allowed[entry.Name] || !entry.Mode().IsRegular() || entry.UncompressedSize64 > 160<<20 {
 			return fmt.Errorf("无效的安装包内容")
 		}
+		delete(allowed, entry.Name)
 		target := filepath.Join(staging, filepath.FromSlash(entry.Name))
 		if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
 			return err
@@ -117,7 +185,7 @@ func install(waitPID int, requestedTarget string, verifyOnly bool) error {
 			input.Close()
 			return err
 		}
-		_, copyErr := io.Copy(output, io.LimitReader(input, (160<<20)+1))
+		written, copyErr := io.Copy(output, io.LimitReader(input, (160<<20)+1))
 		closeErr := output.Close()
 		input.Close()
 		if copyErr != nil {
@@ -126,72 +194,59 @@ func install(waitPID int, requestedTarget string, verifyOnly bool) error {
 		if closeErr != nil {
 			return closeErr
 		}
+		if uint64(written) != entry.UncompressedSize64 {
+			return fmt.Errorf("安装包文件大小不一致: %s", entry.Name)
+		}
 	}
-	stagedApp := filepath.Join(staging, "ACU Runtime.exe")
-	command := exec.Command(stagedApp, "--kernel-release-json")
-	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	manifestBytes, err := command.Output()
-	if err != nil {
-		return fmt.Errorf("安装包校验清单无效")
+	if len(allowed) != 0 {
+		return fmt.Errorf("安装包内容不完整")
 	}
-	var manifest kernelManifest
-	if json.Unmarshal(manifestBytes, &manifest) != nil {
-		return fmt.Errorf("安装包校验清单格式无效")
+	if !verifyFile(filepath.Join(staging, "ACU Runtime.exe"), appDigest) {
+		return fmt.Errorf("安装包应用校验失败")
 	}
-	expected := kernelManifest{setupKernelVersion, setupKernelName, setupKernelSHA256}
-	if err := validateKernelManifest(manifest, expected); err != nil {
-		return err
-	}
-	if !verifyBundledKernel(filepath.Join(staging, "kernel", "acu-kernel.exe"), expected.SHA256) {
+	if !verifyFile(filepath.Join(staging, "kernel", "acu-kernel.exe"), kernelDigest) {
 		return fmt.Errorf("安装包内核校验失败")
 	}
-	if verifyOnly {
-		fmt.Printf("PASS: installer payload verified: %s %s\n", expected.Version, expected.Name)
-		return nil
+	return nil
+}
+
+func reportSetupIssue(err error, failed, showDialog bool) {
+	detail := strings.ReplaceAll(err.Error(), "\x00", "")
+	fmt.Fprintln(os.Stderr, detail)
+	if !showDialog {
+		return
 	}
-	target := requestedTarget
-	if target == "" {
-		target = filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "ACU Runtime")
-	}
-	if !filepath.IsAbs(target) || filepath.Clean(target) != filepath.Clean(filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "ACU Runtime")) {
-		return fmt.Errorf("更新目录不受信任")
-	}
-	args := []string{"--install-to", target}
-	if executable, err := os.Executable(); err == nil {
-		offline := filepath.Join(filepath.Dir(executable), "agent-packages")
-		if info, err := os.Stat(offline); err == nil && info.IsDir() {
-			args = append(args, "--agent-packages-from", offline)
+	if log, err := os.CreateTemp("", "acu-runtime-setup-*.log"); err == nil {
+		_, writeErr := fmt.Fprintln(log, detail)
+		closeErr := log.Close()
+		if writeErr == nil && closeErr == nil {
+			detail += "\n\n诊断日志: " + log.Name()
+		} else {
+			_ = os.Remove(log.Name())
 		}
 	}
-	command = exec.Command(filepath.Join(staging, "ACU Runtime.exe"), args...)
-	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	if output, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s", output)
+	titleText, icon := "ACU Runtime 已安装", uintptr(0x30)
+	if failed {
+		titleText, icon = "ACU Runtime 安装未完成", 0x10
 	}
-	if requestedTarget == "" {
-		shortcut := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", `$shell=New-Object -ComObject WScript.Shell; $link=$shell.CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath('Programs'),'ACU Runtime.lnk')); $link.TargetPath=$env:ACU_INSTALLED_EXE; $link.WorkingDirectory=[IO.Path]::GetDirectoryName($env:ACU_INSTALLED_EXE); $link.Save()`)
-		shortcut.Env = append(os.Environ(), "ACU_INSTALLED_EXE="+filepath.Join(target, "ACU Runtime.exe"))
-		shortcut.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		if err := shortcut.Run(); err != nil {
-			return fmt.Errorf("应用已安装在 %s，但无法创建开始菜单快捷方式", target)
-		}
-	}
-	return exec.Command(filepath.Join(target, "ACU Runtime.exe")).Start()
+	message, _ := syscall.UTF16PtrFromString(detail)
+	title, _ := syscall.UTF16PtrFromString(titleText)
+	syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(message)), uintptr(unsafe.Pointer(title)), icon)
 }
 
 func main() {
 	waitPID := flag.Int("wait-pid", 0, "wait for this Runtime process to exit")
 	target := flag.String("target", "", "existing installation directory")
 	verifyOnly := flag.Bool("verify-only", false, "verify the embedded payload without installing or opening Runtime")
+	noDialog := flag.Bool("no-dialog", false, "write installation diagnostics to stderr instead of showing dialogs")
 	flag.Parse()
-	if err := install(*waitPID, *target, *verifyOnly); err != nil {
-		if *verifyOnly {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		message, _ := syscall.UTF16PtrFromString(err.Error())
-		title, _ := syscall.UTF16PtrFromString("ACU Runtime 安装未完成")
-		syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(message)), uintptr(unsafe.Pointer(title)), 0x10)
+	warning, err := install(*waitPID, *target, *verifyOnly)
+	showDialog := !*verifyOnly && !*noDialog
+	if err != nil {
+		reportSetupIssue(err, true, showDialog)
 		os.Exit(1)
+	}
+	if warning != nil {
+		reportSetupIssue(warning, false, showDialog)
 	}
 }

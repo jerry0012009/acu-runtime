@@ -1,15 +1,16 @@
-package main
+package installfiles
 
 import (
 	"errors"
-	"golang.org/x/sys/windows"
 	"os"
 	"time"
+
+	"golang.org/x/sys/windows"
 )
 
 // Windows may retain an executable image briefly after its process exits.
 // Wait for that handle to close before treating a normal update as failed.
-func replaceInstalledPath(source, target string) error {
+func Replace(source, target string) error {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		err := os.Rename(source, target)
