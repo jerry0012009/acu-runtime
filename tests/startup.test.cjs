@@ -912,6 +912,25 @@ test('supersession requires the successor in the Key', async () => {
   assert.equal(instance.run('successorACUModel({models:["claude-opus-5-5"]},"claude-opus-4-8")'),'claude-opus-5-5');
 });
 
+test('Opus inventory hides the unused spelling only when its ACU replacement exists', async () => {
+  const old = 'claude-opus-5.5', current = 'claude-opus-5-5', provider = 'acu-runtime';
+  for (const [hasCurrent, inUse] of [[true,false],[true,true],[false,false]]) {
+    const ids = hasCurrent ? [old,current] : [old];
+    const models = ids.map(id => ({id:`${provider}/${id}`, name:id, inUse:id===old && inUse, hidden:id===old && !inUse}));
+    models.push({id:`other/${old}`,name:old});
+    const agent = {...codex(),catalog:{models}};
+    const instance = await setup({ready:true,connection:{...connected(),choices:[{id:provider,models:ids}]},agents:[agent]});
+    instance.run('openModelInventory("codex")');
+    const html = instance.elements.overlay.innerHTML;
+    assert.equal(html.includes(`data-model-id="${provider}/${old}"`), !hasCurrent && !inUse);
+    assert.equal(html.includes('当前使用旧配置 · 可一键迁移'), hasCurrent && inUse);
+    assert(html.includes(`data-model-id="other/${old}"`));
+    if (hasCurrent) assert.match(html,/data-flow-search="[^"]*claude-opus-5\.5[^"]*acu-runtime\/claude-opus-5-5[^"]*"[^>]*>.*?Claude Opus 5\.5/s);
+    instance.run('bulkInventory("codex","show"); bulkInventory("codex","show")');
+    assert.equal(instance.run('ui.inventoryEditor.catalog.models[0].hidden'), hasCurrent && !inUse);
+  }
+});
+
 for (const agentID of ['codex', 'claude', 'hermes', 'workbuddy']) for (const only of [false, true]) {
   test(`${agentID} one-click reveals all GPT-6.2 and Gemini4 choices including native source filters, only=${only}`, async () => {
     const targets = ['gpt-6.2-sol', 'gpt-6.2-astra', 'gemini-4-argon', 'gemini-4-hydrogen'];
