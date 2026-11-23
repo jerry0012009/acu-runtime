@@ -22,7 +22,12 @@ try {
                 Start-Sleep -Milliseconds 100
             } while ([datetime]::UtcNow -lt $deadline)
             if ($setup.MainWindowTitle -ne 'ACU Runtime 安装未完成' -or !$probe.Locked) { throw 'Expected installer-owned failure dialog after fault injection' }
-            $body = [InstallerProbe]::ReadDialogBody($setup.MainWindowHandle)
+            $readDeadline = [datetime]::UtcNow.AddSeconds(5)
+            do {
+                $setup.Refresh()
+                try { $body = [InstallerProbe]::ReadDialogBody($setup.MainWindowHandle); break }
+                catch { if ([datetime]::UtcNow -gt $readDeadline) { throw }; Start-Sleep -Milliseconds 300 }
+            } while ($true)
             if ($body.Length -ne 0) { throw "Dialog was not empty: $body" }
             Write-Host "Title='$($setup.MainWindowTitle)'; OK button present; body length=$($body.Length); first staged process exited 0; exclusive lock acquired."
             [InstallerProbe]::Accept($setup.MainWindowHandle)

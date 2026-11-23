@@ -55,27 +55,34 @@ public sealed class InstallerProbe : IDisposable {
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
     [DllImport("user32.dll", EntryPoint="GetWindowLongW")] private static extern int Style(IntPtr hwnd, int index);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, IntPtr max, StringBuilder text, uint flags, uint timeout, out IntPtr result);
-    [DllImport("user32.dll")] private static extern IntPtr GetDlgItem(IntPtr hwnd, int id);
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
 
+    private static IntPtr okButton;
     public static string ReadDialogBody(IntPtr dialog) {
-        if (GetDlgItem(dialog, 1) == IntPtr.Zero) throw new Exception("Missing OK button");
         var lines = new List<string>();
+        var controls = new List<string>();
+        bool unreadable = false;
+        okButton = IntPtr.Zero;
         EnumChildWindows(dialog, (h, _) => {
             var cls = new StringBuilder(128);
             GetClassName(h, cls, cls.Capacity);
-            if (cls.ToString() == "Static" && (Style(h, -16) & 31) != 3) { // skip SS_ICON
+            var kind = cls.ToString();
+            if (kind == "Button" || (kind == "Static" && (Style(h, -16) & 31) != 3)) {
                 var text = new StringBuilder(8192);
                 IntPtr result;
                 if (SendMessageTimeout(h, 13, (IntPtr)text.Capacity, text, 2, 2000, out result) == IntPtr.Zero)
-                    throw new Exception("Could not read dialog text");
-                lines.Add(text.ToString());
-            }
+                    unreadable = true;
+                controls.Add(kind + "='" + text + "'");
+                if (kind == "Static") lines.Add(text.ToString());
+                else if (String.Equals(text.ToString().Replace("&", ""), "OK", StringComparison.OrdinalIgnoreCase) || text.ToString() == "确定") okButton = h;
+            } else controls.Add(kind);
             return true;
         }, IntPtr.Zero);
+        Console.WriteLine("Dialog controls: " + String.Join(", ", controls));
+        if (okButton == IntPtr.Zero || unreadable || lines.Count == 0) throw new Exception("Dialog controls not yet readable");
         return String.Join("\n", lines);
     }
     public static void Accept(IntPtr dialog) {
-        PostMessage(GetDlgItem(dialog, 1), 0x00f5, IntPtr.Zero, IntPtr.Zero); // BM_CLICK
+        PostMessage(okButton, 0x00f5, IntPtr.Zero, IntPtr.Zero); // BM_CLICK
     }
 }
