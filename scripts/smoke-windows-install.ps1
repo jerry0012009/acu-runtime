@@ -1,7 +1,11 @@
-param([Parameter(Mandatory=$true)][string]$Installer, [string]$PreviousInstaller, [string]$PreviousVersion = '0.1.70')
+param([Parameter(Mandatory=$true)][string]$Installer, [string]$PreviousInstaller, [string]$PreviousVersion = '0.1.70', [string]$Version, [switch]$LegacyInstaller)
 $ErrorActionPreference = 'Stop'
 $target = Join-Path $env:LOCALAPPDATA 'Programs/ACU Runtime'
 if (Test-Path -LiteralPath $target) { throw 'Clean runner required: Runtime already exists' }
+$installerPath = (Resolve-Path -LiteralPath $Installer).Path
+$installerError = [IO.Path]::GetTempFileName()
+$launchArgs = @{}
+if (!$LegacyInstaller) { $launchArgs.ArgumentList = @('--no-dialog') }
 function Wait-InstalledRuntime([string]$Version) {
     $deadline = (Get-Date).AddSeconds(90)
     do {
@@ -34,15 +38,29 @@ if ($PreviousInstaller) {
     $html = (Invoke-WebRequest -Uri $old.origin -TimeoutSec 5).Content
     $token = [regex]::Match($html, 'name="acu-token" content="([^"]+)"').Groups[1].Value
     # Exercise the same exact-process handoff used by the in-app updater.
-    $setup = Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList @('--wait-pid', $old.process.Id, '--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
+    $launchArgs.ArgumentList = @($launchArgs.ArgumentList) + @('--wait-pid', $old.process.Id, '--target', ('"' + $target + '"'))
+    $setup = Start-Process -FilePath $installerPath @launchArgs -WindowStyle Hidden -PassThru -RedirectStandardError $installerError
     Invoke-RestMethod -Uri ($old.origin + '/runtime/desktop/quit') -Method Post -Headers @{'X-ACU-Token'=$token;Origin=$old.origin} -ContentType 'application/json' -Body '{}' -TimeoutSec 5 | Out-Null
 } else {
-    $setup = Start-Process -FilePath (Resolve-Path -LiteralPath $Installer).Path -ArgumentList @('--target', ('"' + $target + '"')) -WindowStyle Hidden -PassThru
+    # No --target: exercise the same installation and shortcut path as double-click.
+    $setup = Start-Process -FilePath $installerPath @launchArgs -WindowStyle Hidden -PassThru -RedirectStandardError $installerError
 }
-if (!$setup.WaitForExit(60000) -or $setup.ExitCode -ne 0) { throw 'Runtime first installation failed' }
-$expected = [regex]::Match((Get-Content update.go -Raw), 'const appVersion = "([^"]+)"').Groups[1].Value
+$expected = $Version
+if (!$expected) { $expected = [regex]::Match((Get-Content update.go -Raw), 'const appVersion = "([^"]+)"').Groups[1].Value }
 $origin = $null
 try {
+    if (!$setup.WaitForExit(90000)) {
+        $setup.Kill()
+        throw 'Runtime Setup did not exit within 90 seconds'
+    }
+    $diagnostic = Get-Content -LiteralPath $installerError -Encoding utf8 -Raw
+    if ($setup.ExitCode -ne 0) { throw "Runtime Setup failed (exit $($setup.ExitCode)): $diagnostic" }
+    if (!$PreviousInstaller) {
+        $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'ACU Runtime.lnk'
+        if (!(Test-Path -LiteralPath $shortcut -PathType Leaf)) { throw "Start menu shortcut was not created: $diagnostic" }
+        $shell = New-Object -ComObject WScript.Shell
+        if ($shell.CreateShortcut($shortcut).TargetPath -ne (Join-Path $target 'ACU Runtime.exe')) { throw 'Start menu shortcut points to the wrong target' }
+    }
     $deadline = (Get-Date).AddSeconds(90)
     do {
         $apps = @(Get-Process -Name 'ACU Runtime' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $target 'ACU Runtime.exe') })
@@ -73,4 +91,5 @@ try {
 } finally {
     # Only this disposable runner's freshly installed Runtime is stopped.
     Get-Process -Name 'ACU Runtime' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $target 'ACU Runtime.exe') } | Stop-Process -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $installerError -ErrorAction SilentlyContinue
 }

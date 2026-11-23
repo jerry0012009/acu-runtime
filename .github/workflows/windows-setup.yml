@@ -1,0 +1,71 @@
+name: Windows Setup
+on:
+  pull_request:
+    paths:
+      - 'cmd/setup/**'
+      - 'install*.go'
+      - 'internal/installfiles/**'
+      - 'scripts/*windows*.ps1'
+      - '.github/workflows/windows-setup.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  first-install:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [published, candidate, restricted-temp]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: matrix.package != 'published'
+        with:
+          go-version-file: go.mod
+      - name: Run the published 0.1.137 installer
+        if: matrix.package == 'published'
+        shell: pwsh
+        run: |
+          python scripts/download-release.py jerry0012009/acu-runtime v0.1.137 ACU-Runtime-0.1.137-windows-amd64-Setup.exe 4bcb30faab76da23d7e5275aefd9146525b42dbdfe428d93f23969a2d6fd5cbf dist/published-setup.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/smoke-windows-install.ps1 -Installer dist/published-setup.exe -Version '0.1.137' -LegacyInstaller
+      - name: Build candidate installer
+        if: matrix.package != 'published'
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1
+      - name: Test candidate on a clean Windows profile
+        if: matrix.package == 'candidate'
+        shell: pwsh
+        run: |
+          go test -v -tags setup ./cmd/setup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -v -run '^TestSetupWithLockedInstalledFile$' .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/smoke-windows-install.ps1 -Installer 'dist/windows-amd64/ACU Runtime Setup.exe'
+      - name: Test candidate when Windows denies execution from staging
+        if: matrix.package == 'restricted-temp'
+        shell: pwsh
+        run: |
+          $originalTemp = $env:TEMP
+          $restrictedTemp = Join-Path $env:RUNNER_TEMP '安装临时目录 with spaces'
+          New-Item -ItemType Directory -Path $restrictedTemp | Out-Null
+          # Deny execution of files in staging while preserving directory traversal and writes.
+          $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          icacls.exe $restrictedTemp /deny "*${sid}:(OI)(IO)(X)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            $env:TEMP = $restrictedTemp
+            $probe = Join-Path $restrictedTemp 'execution-probe.exe'
+            Copy-Item -LiteralPath "$env:SystemRoot/System32/whoami.exe" -Destination $probe
+            $blocked = $false
+            try { Start-Process -FilePath $probe -NoNewWindow -Wait -ErrorAction Stop } catch { $blocked = $true }
+            if (!$blocked) { throw 'Fixture should prevent execution from the installer staging directory' }
+            ./scripts/smoke-windows-install.ps1 -Installer 'dist/windows-amd64/ACU Runtime Setup.exe'
+          } finally {
+            $env:TEMP = $originalTemp
+          }

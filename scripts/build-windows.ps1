@@ -12,7 +12,12 @@ try {
     & $GoExecutable build -tags desktop,production -ldflags '-H windowsgui' -o $application .
     if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed' }
     $release = (& $application --kernel-release-json | Out-String | ConvertFrom-Json)
-    if (!$release.sha256 -or $release.sha256 -notmatch '^[0-9a-f]{64}$') { throw 'Invalid kernel manifest' }
+    if ($release.sha256 -notmatch '^[0-9a-f]{64}$' -or $release.name -ne "magpie-cli-windows-$architecture.exe" -or $release.version -notmatch '^v\d+\.\d+\.\d+$') { throw 'Invalid kernel manifest' }
+    $agents = (& $application --agent-packages-json | Out-String | ConvertFrom-Json)
+    foreach ($name in @($agents.workbuddy.Name, $agents.chatgpt.Name)) {
+        if ($name -and $name -notmatch '^[a-zA-Z0-9._-]+$') { throw 'Invalid agent package name' }
+    }
+    $appSHA256 = (Get-FileHash -LiteralPath $application -Algorithm SHA256).Hash.ToLowerInvariant()
     $kernel = Join-Path $kernelDirectory 'acu-kernel.exe'
     if (!(Test-Path -LiteralPath $kernel) -or (Get-FileHash -LiteralPath $kernel -Algorithm SHA256).Hash.ToLowerInvariant() -ne $release.sha256) {
         python scripts/download-release.py yetone/magpie $release.version $release.name $release.sha256 $kernel
@@ -21,7 +26,7 @@ try {
     $payload = Join-Path $root 'cmd/setup/payload.zip'
     Compress-Archive -LiteralPath $application, $kernelDirectory, (Join-Path $root 'web/THIRD-PARTY-NOTICES.txt') -DestinationPath $payload -Force
     $installer = Join-Path $output 'ACU Runtime Setup.exe'
-    $setupLinker = "-H windowsgui -X main.setupKernelVersion=$($release.version) -X main.setupKernelName=$($release.name) -X main.setupKernelSHA256=$($release.sha256)"
+    $setupLinker = "-H windowsgui -X main.setupKernelVersion=$($release.version) -X main.setupKernelName=$($release.name) -X main.setupKernelSHA256=$($release.sha256) -X main.setupAppSHA256=$appSHA256 -X main.setupWorkBuddyPackage=$($agents.workbuddy.Name) -X main.setupChatGPTPackage=$($agents.chatgpt.Name)"
     & $GoExecutable build -tags setup -ldflags $setupLinker -o $installer ./cmd/setup
     if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
     $verifyOutput = Join-Path $output 'installer-verify.stdout.log'
