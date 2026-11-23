@@ -1,0 +1,35 @@
+name: Published Windows installer A-B
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/published-setup-ab.yml'
+      - 'scripts/installer-ab.ps1'
+      - 'scripts/InstallerProbe.cs'
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '0.1.137'
+            digest: 4bcb30faab76da23d7e5275aefd9146525b42dbdfe428d93f23969a2d6fd5cbf
+          - version: '0.1.138'
+            digest: 8ed551e6a9edd5a3e8a667cde642b398924cdd992073c60b553010691ef5e034
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download unmodified release and exercise first installation
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ matrix.version }}
+          SHA256: ${{ matrix.digest }}
+        run: |
+          $asset = "ACU-Runtime-$env:VERSION-windows-amd64-Setup.exe"
+          python scripts/download-release.py jerry0012009/acu-runtime "v$env:VERSION" $asset $env:SHA256 "dist/$asset"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/installer-ab.ps1 -Installer "dist/$asset" -Version $env:VERSION
