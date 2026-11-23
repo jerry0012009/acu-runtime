@@ -29,7 +29,9 @@ public sealed class InstallerProbe : IDisposable {
                     if (!String.Equals(Path.GetDirectoryName(dir), temp, StringComparison.OrdinalIgnoreCase) ||
                         !Path.GetFileName(dir).StartsWith("acu-setup-", StringComparison.OrdinalIgnoreCase)) continue;
                     ObservedManifest = true;
-                    if (!process.WaitForExit(10000) || process.ExitCode != 0)
+                    var handle = process.SafeHandle;
+                    uint exitCode;
+                    if (!process.WaitForExit(10000) || !GetExitCodeProcess(handle, out exitCode) || exitCode != 0)
                         throw new Exception("The first staged process did not exit successfully");
                     using (var locked = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None)) {
                         Locked = true;
@@ -48,6 +50,7 @@ public sealed class InstallerProbe : IDisposable {
     }
 
     private delegate bool Callback(IntPtr hwnd, IntPtr data);
+    [DllImport("kernel32.dll")] private static extern bool GetExitCodeProcess(Microsoft.Win32.SafeHandles.SafeProcessHandle handle, out uint code);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr hwnd, Callback callback, IntPtr data);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
     [DllImport("user32.dll", EntryPoint="GetWindowLongW")] private static extern int Style(IntPtr hwnd, int index);
