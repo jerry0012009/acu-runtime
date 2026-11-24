@@ -104,6 +104,8 @@ type server struct {
 	networkMu        sync.Mutex
 	networkFile      string
 	networkChecked   bool
+	networkChecking  bool
+	networkRevision  uint64
 	networkMessage   string
 	prices           priceCache
 	modelProbes      billingProbeCache

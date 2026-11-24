@@ -545,7 +545,13 @@ func (host *server) saveConnection(ctx context.Context, address, key string, kee
 		return errors.New("请输入完整的 ACU API Key")
 	}
 	host.networkMu.Lock()
-	defer host.networkMu.Unlock()
+	var checkAfterSave bool
+	defer func() {
+		host.networkMu.Unlock()
+		if checkAfterSave && host.lifecycle != nil {
+			host.startNetworkCheck(host.lifecycle)
+		}
+	}()
 	existing, err := host.configuredProvider(ctx)
 	if err != nil {
 		return err
@@ -560,16 +566,8 @@ func (host *server) saveConnection(ctx context.Context, address, key string, kee
 		if keepAddress {
 			route.Base = existingBase
 		}
-	} else if supportedNetworkBase(base) && host.networkFile != "" {
-		if candidate, ok := host.checkNetwork(ctx, route, key); ok {
-			route = candidate
-		}
 	}
 	ids, err := host.listConnectionModels(ctx, route, key)
-	if err != nil && !found && route != (networkRoute{base, ""}) {
-		route = networkRoute{base, ""}
-		ids, err = host.listConnectionModels(ctx, route, key)
-	}
 	if err != nil {
 		return err
 	}
@@ -581,6 +579,7 @@ func (host *server) saveConnection(ctx context.Context, address, key string, kee
 	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/save", body, nil); err != nil {
 		return err
 	}
+	host.networkRevision++
 	if existing.Off {
 		if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/on", map[string]string{"id": "acu-runtime"}, nil); err != nil {
 			return err
@@ -593,7 +592,8 @@ func (host *server) saveConnection(ctx context.Context, address, key string, kee
 	}
 	if !found && supportedNetworkBase(route.Base) && host.networkFile != "" {
 		_ = host.saveNetworkPrefs(networkPrefs{"auto", route})
-		host.networkChecked = true
+		host.networkChecked = false
+		checkAfterSave = true
 	}
 	return nil
 }
