@@ -23,6 +23,69 @@ type updateDownloadTransport struct {
 	failGitHub bool
 }
 
+func TestUpdateSwitchesMirrorWhenBodyStalls(t *testing.T) {
+	const content = "a verified installer"
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
+	stalled := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/stalled" {
+			response.Header().Set("Content-Length", fmt.Sprint(len(content)))
+			io.WriteString(response, content[:1])
+			response.(http.Flusher).Flush()
+			<-request.Context().Done()
+			close(stalled)
+			return
+		}
+		io.WriteString(response, content)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	target := filepath.Join(t.TempDir(), "installer")
+	var progress []int64
+	err := downloadUpdatePackageWithStallTimeout(ctx, server.Client(), []string{server.URL + "/stalled", server.URL + "/healthy"}, target, digest, func(done, _ int64) {
+		progress = append(progress, done)
+	}, 400*time.Millisecond)
+	if err != nil || !verifyKernel(target, digest) {
+		t.Fatalf("fallback did not install verified package: %v", err)
+	}
+	select {
+	case <-stalled:
+	case <-ctx.Done():
+		t.Fatal("stalled download was not canceled")
+	}
+	if len(progress) != 4 || progress[0] != 0 || progress[1] != 1 || progress[2] != 0 || progress[3] != int64(len(content)) {
+		t.Fatalf("unexpected progress: %v", progress)
+	}
+}
+
+func TestUpdateKeepsMirrorWhileBodyMakesProgress(t *testing.T) {
+	const content = "a verified installer"
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		response.Header().Set("Content-Length", fmt.Sprint(len(content)))
+		for _, chunk := range []string{content[:5], content[5:10], content[10:15], content[15:]} {
+			if _, err := io.WriteString(response, chunk); err != nil {
+				return
+			}
+			response.(http.Flusher).Flush()
+			select {
+			case <-request.Context().Done():
+				return
+			case <-time.After(150 * time.Millisecond):
+			}
+		}
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	target := filepath.Join(t.TempDir(), "installer")
+	err := downloadUpdatePackageWithStallTimeout(ctx, server.Client(), []string{server.URL}, target, digest, nil, 350*time.Millisecond)
+	if err != nil || !verifyKernel(target, digest) {
+		t.Fatalf("a progressing download should complete: %v", err)
+	}
+}
+
 func (transport *updateDownloadTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	transport.calls = append(transport.calls, request.URL.Host)
 	deadline, ok := request.Context().Deadline()

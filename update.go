@@ -16,13 +16,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const appVersion = "0.1.142"
+const appVersion = "0.1.143"
 const updateRepository = "https://github.com/jerry0012009/acu-runtime"
 const updateAPI = "https://api.github.com/repos/jerry0012009/acu-runtime/releases/latest"
 const updateDownloadCDN = "https://cdn.gh-proxy.com/" // Same mirror as the website installer downloads.
+const updateStallTimeout = 15 * time.Second
 
 var releaseVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -120,6 +122,10 @@ func checkUpdateWithFallback(ctx context.Context, client *http.Client, endpoints
 }
 
 func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []string, target, digest string, progress func(int64, int64)) error {
+	return downloadUpdatePackageWithStallTimeout(ctx, client, sources, target, digest, progress, updateStallTimeout)
+}
+
+func downloadUpdatePackageWithStallTimeout(ctx context.Context, client *http.Client, sources []string, target, digest string, progress func(int64, int64), stallTimeout time.Duration) error {
 	var err error
 	for _, source := range sources {
 		if ctx.Err() != nil {
@@ -134,10 +140,44 @@ func downloadUpdatePackage(ctx context.Context, client *http.Client, sources []s
 		if progress != nil {
 			progress(0, 0)
 		}
-		_, err = installKernel(attempt, client, source, target, digest, progress)
+		started := time.Now()
+		var lastProgress atomic.Int64
+		var stalled atomic.Bool
+		watchDone := make(chan struct{})
+		go func() {
+			defer close(watchDone)
+			watch := time.NewTicker(stallTimeout / 4)
+			defer watch.Stop()
+			for {
+				select {
+				case <-attempt.Done():
+					return
+				case <-watch.C:
+					if time.Since(started)-time.Duration(lastProgress.Load()) >= stallTimeout {
+						stalled.Store(true)
+						cancel()
+						return
+					}
+				}
+			}
+		}()
+		var previous int64
+		_, err = installKernel(attempt, client, source, target, digest, func(done, total int64) {
+			if done > previous {
+				lastProgress.Store(int64(time.Since(started)))
+				previous = done
+			}
+			if progress != nil {
+				progress(done, total)
+			}
+		})
 		cancel()
+		<-watchDone
 		if err == nil {
 			return nil
+		}
+		if stalled.Load() {
+			err = errors.New("更新下载长时间无进度，请稍后重试")
 		}
 	}
 	return err
