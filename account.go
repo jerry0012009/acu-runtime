@@ -164,6 +164,8 @@ type localProvider struct {
 	Chat      string `json:"chat"`
 	Responses string `json:"responses"`
 	Anthropic string `json:"anthropic"`
+	ModelsURL string `json:"modelsURL"`
+	Proxy     string `json:"proxy"`
 	Off       bool   `json:"off"`
 	Key       struct {
 		Set    bool   `json:"set"`
@@ -484,7 +486,7 @@ func (host *server) useAccountKey(ctx context.Context, selected int) error {
 	if err := host.cloudJSON(ctx, http.MethodPost, site+"/api/token/"+strconv.Itoa(selected)+"/key", bearer, &revealed); err != nil {
 		return err
 	}
-	if err := host.saveACUConnection(ctx, site, revealed.Key); err != nil {
+	if err := host.saveConnection(ctx, site, revealed.Key, true); err != nil {
 		return err
 	}
 	host.account.mu.Lock()
@@ -495,25 +497,21 @@ func (host *server) useAccountKey(ctx context.Context, selected int) error {
 	return nil
 }
 
-func (host *server) saveACUConnection(ctx context.Context, address, key string) error {
-	base, err := acuBase(address)
-	if err != nil {
-		return err
-	}
-	key = strings.TrimSpace(key)
-	if key == "" || len(key) > 4096 || strings.ContainsAny(key, "\r\n\t ") {
-		return errors.New("请输入完整的 ACU API Key")
-	}
+func acuConnectionFields(route networkRoute, key string) map[string]any {
+	base := route.Base
 	// ACU's public Responses API serves HTTP/SSE. This does not change
 	// WebSocket transport from ChatGPT Desktop to the local gateway.
-	connection := map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models", "socket": "off"}
+	return map[string]any{"id": "acu-runtime", "name": "ACU", "key": key, "chat": base + "/v1", "responses": base + "/v1", "anthropic": base, "modelsURL": base + "/v1/models", "socket": "off", "proxy": route.Proxy}
+}
+
+func (host *server) listConnectionModels(ctx context.Context, route networkRoute, key string) ([]string, error) {
 	var listed struct {
 		Models []struct {
 			ID string `json:"id"`
 		} `json:"models"`
 	}
-	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/list", connection, &listed); err != nil {
-		return err
+	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/list", acuConnectionFields(route, key), &listed); err != nil {
+		return nil, err
 	}
 	ids := []string{}
 	seen := map[string]bool{}
@@ -524,37 +522,80 @@ func (host *server) saveACUConnection(ctx context.Context, address, key string) 
 		}
 	}
 	if len(ids) == 0 {
-		return errors.New("此 Key 没有可用模型，请在 ACU 网站检查权限")
+		return nil, errors.New("此 Key 没有可用模型，请在 ACU 网站检查权限")
 	}
-	var existing struct {
-		Providers []localProvider `json:"providers"`
-	}
-	if err := host.kernel.exchange(ctx, http.MethodGet, "/api/providers", nil, &existing); err != nil {
+	return ids, nil
+}
+
+func (host *server) saveACUConnection(ctx context.Context, address, key string) error {
+	return host.saveConnection(ctx, address, key, false)
+}
+
+func validConnectionKey(key string) bool {
+	return key != "" && len(key) <= 4096 && !strings.ContainsAny(key, "\r\n\t ,")
+}
+
+func (host *server) saveConnection(ctx context.Context, address, key string, keepAddress bool) error {
+	base, err := acuBase(address)
+	if err != nil {
 		return err
 	}
-	found, off := false, false
-	for _, provider := range existing.Providers {
-		if provider.ID != "acu-runtime" {
-			continue
-		}
-		if _, err := acuBase(provider.Chat); err != nil {
+	key = strings.TrimSpace(key)
+	if !validConnectionKey(key) {
+		return errors.New("请输入完整的 ACU API Key")
+	}
+	host.networkMu.Lock()
+	defer host.networkMu.Unlock()
+	existing, err := host.configuredProvider(ctx)
+	if err != nil {
+		return err
+	}
+	route := networkRoute{base, existing.Proxy}
+	found := existing.ID != ""
+	if found {
+		existingBase, err := acuBase(existing.Chat)
+		if err != nil {
 			return errors.New("已有同名模型来源，请先在高级配置中检查，未覆盖原配置")
 		}
-		found, off = true, provider.Off
+		if keepAddress {
+			route.Base = existingBase
+		}
+	} else if supportedNetworkBase(base) && host.networkFile != "" {
+		if candidate, ok := host.checkNetwork(ctx, route, key); ok {
+			route = candidate
+		}
 	}
-	body := connection
+	ids, err := host.listConnectionModels(ctx, route, key)
+	if err != nil && !found && route != (networkRoute{base, ""}) {
+		route = networkRoute{base, ""}
+		ids, err = host.listConnectionModels(ctx, route, key)
+	}
+	if err != nil {
+		return err
+	}
+	body := acuConnectionFields(route, key)
+	if found {
+		delete(body, "proxy")
+	}
 	body["models"], body["new"] = ids, !found
 	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/save", body, nil); err != nil {
 		return err
 	}
-	if off {
+	if existing.Off {
 		if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/on", map[string]string{"id": "acu-runtime"}, nil); err != nil {
 			return err
 		}
 	}
 	// The add-form list is chat-only and does not persist the native media
 	// catalog. Refresh the saved provider as the native editor does.
-	return host.kernel.exchange(ctx, http.MethodPost, "/api/provider/models", map[string]string{"id": "acu-runtime"}, nil)
+	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/models", map[string]string{"id": "acu-runtime"}, nil); err != nil {
+		return err
+	}
+	if !found && supportedNetworkBase(route.Base) && host.networkFile != "" {
+		_ = host.saveNetworkPrefs(networkPrefs{"auto", route})
+		host.networkChecked = true
+	}
+	return nil
 }
 
 func (host *server) configureACU(response http.ResponseWriter, request *http.Request) {

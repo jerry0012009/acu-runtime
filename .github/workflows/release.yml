@@ -71,6 +71,7 @@ jobs:
           node scripts/test-billing.cjs
           node scripts/test-install-updates.cjs
           node scripts/test-mac-update-settings.cjs
+          node scripts/test-network-settings.cjs
           node scripts/test-capability-refresh.cjs
           node scripts/test-video-capabilities.cjs
           node scripts/test-conversation-navigation.cjs
