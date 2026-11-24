@@ -974,7 +974,7 @@ async function saveNetworkSettings(draft) {
   renderNetworkSettings();
   try {
     const payload = mode === 'manual' ? { mode, route: { base, proxy } } : { mode };
-    const view = await request('/runtime/network', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 16000 });
+    const view = await request('/runtime/network', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 46000 });
     if (view.checking) {
       ui.network = { ...ui.network, checking: true };
       loadNetworkSettings.timer = setTimeout(loadNetworkSettings, 1000);

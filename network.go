@@ -16,10 +16,12 @@ import (
 )
 
 const (
-	bestNetworkBase     = "https://acu.best"
-	gaNetworkBase       = "https://console.acucompute.com"
-	networkProviderID   = "acu-runtime"
-	networkProbeTimeout = 6 * time.Second
+	bestNetworkBase      = "https://acu.best"
+	gaNetworkBase        = "https://console.acucompute.com"
+	networkProviderID    = "acu-runtime"
+	networkProbeTimeout  = 25 * time.Second
+	networkVerifyTimeout = 12 * time.Second
+	networkCheckTimeout  = networkProbeTimeout + networkVerifyTimeout + 5*time.Second
 )
 
 type networkRoute struct {
@@ -265,8 +267,27 @@ func (host *server) checkNetwork(ctx context.Context, current networkRoute, key 
 		}()
 	}
 	var samples []networkSample
-	for range candidates {
-		samples = append(samples, <-probes)
+	var settle *time.Timer
+	var settled <-chan time.Time
+	defer func() {
+		if settle != nil {
+			settle.Stop()
+		}
+	}()
+	for len(samples) < len(candidates) {
+		select {
+		case sample := <-probes:
+			samples = append(samples, sample)
+			if sample.ok && settle == nil {
+				// A slower incumbent can still win within the margin.
+				settle = time.NewTimer(max(250*time.Millisecond, sample.duration/4))
+				settled = settle.C
+			}
+		case <-settled:
+			return chooseNetwork(samples, current)
+		case <-ctx.Done():
+			return chooseNetwork(samples, current)
+		}
 	}
 	return chooseNetwork(samples, current)
 }
@@ -499,7 +520,7 @@ func (host *server) refreshNetwork(ctx context.Context, mode string, requested n
 	if next != current.route {
 		// Verify availability through the actual gateway and exact candidate
 		// before changing either URL or proxy. Do not refresh the live catalogue.
-		listCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		listCtx, cancel := context.WithTimeout(ctx, networkVerifyTimeout)
 		_, err := host.listConnectionModels(listCtx, next, key)
 		cancel()
 		if err != nil {
@@ -544,7 +565,7 @@ func (host *server) startNetworkCheck(ctx context.Context) {
 		if host.networkChecked {
 			return
 		}
-		ctx, cancel := context.WithTimeout(ctx, 13*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, networkCheckTimeout)
 		defer cancel()
 		p, err := host.configuredProvider(ctx)
 		if err != nil || p.ID == "" {
@@ -575,7 +596,7 @@ func (host *server) networkSettings(response http.ResponseWriter, request *http.
 		return
 	}
 	defer host.networkMu.Unlock()
-	ctx, cancel := context.WithTimeout(request.Context(), 14*time.Second)
+	ctx, cancel := context.WithTimeout(request.Context(), networkCheckTimeout)
 	defer cancel()
 	p, err := host.configuredProvider(ctx)
 	if err != nil {
