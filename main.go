@@ -884,7 +884,12 @@ func main() {
 	host.lifecycle = ctx
 	if dataDirectory, err := os.UserConfigDir(); err == nil && kernel.enforceVersion {
 		host.networkFile = filepath.Join(dataDirectory, "ACURuntime", "network.json")
-		kernel.onReady = host.startNetworkCheck
+		kernel.onReady = func(ctx context.Context) {
+			if err := host.applyClaudeCompacts(ctx); err != nil {
+				log.Print("ACU Claude compact recommendation not refreshed")
+			}
+			host.startNetworkCheck(ctx)
+		}
 	}
 	defer stop()
 	var shutdownOnce sync.Once
