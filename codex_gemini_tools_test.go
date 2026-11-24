@@ -64,6 +64,7 @@ func quoteTOMLForTest(value string) string { b, _ := json.Marshal(value); return
 func TestConfigureCodexGeminiToolsUsesExistingRollbackSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
 	path := filepath.Join(dir, "magpie-models.json")
 	raw := []byte(`{"models":[{"slug":"acu-runtime/gemini-4-hydrogen"}]}`)
 	os.WriteFile(path, raw, 0600)
