@@ -159,21 +159,25 @@ type connectionChoice struct {
 }
 
 type localProvider struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Chat      string `json:"chat"`
-	Responses string `json:"responses"`
-	Anthropic string `json:"anthropic"`
-	ModelsURL string `json:"modelsURL"`
-	Proxy     string `json:"proxy"`
-	Off       bool   `json:"off"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Chat      string         `json:"chat"`
+	Responses string         `json:"responses"`
+	Anthropic string         `json:"anthropic"`
+	ModelsURL string         `json:"modelsURL"`
+	Proxy     string         `json:"proxy"`
+	Off       bool           `json:"off"`
+	Compacts  map[string]int `json:"compacts"`
+	Contexts  map[string]int `json:"contexts"`
 	Key       struct {
 		Set    bool   `json:"set"`
 		Masked string `json:"masked"`
 	} `json:"key"`
 	Models []struct {
-		ID string `json:"id"`
-		On bool   `json:"on"`
+		ID      string `json:"id"`
+		On      bool   `json:"on"`
+		Vendor  string `json:"vendor"`
+		Context int    `json:"context"`
 	} `json:"models"`
 }
 
@@ -588,6 +592,9 @@ func (host *server) saveConnection(ctx context.Context, address, key string, kee
 	// The add-form list is chat-only and does not persist the native media
 	// catalog. Refresh the saved provider as the native editor does.
 	if err := host.kernel.exchange(ctx, http.MethodPost, "/api/provider/models", map[string]string{"id": "acu-runtime"}, nil); err != nil {
+		return err
+	}
+	if err := host.applyClaudeCompactsLocked(ctx); err != nil {
 		return err
 	}
 	if !found && supportedNetworkBase(route.Base) && host.networkFile != "" {

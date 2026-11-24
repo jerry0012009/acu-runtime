@@ -11,6 +11,11 @@ import (
 // omits it. Set only that missing alias; keep each named model's catalog window
 // and all explicit user overrides. Magpie owns persistence and client syncing.
 func (host *server) ensureACUContext(ctx context.Context, provider string) error {
+	if provider == networkProviderID {
+		if err := host.applyClaudeCompacts(ctx); err != nil {
+			return err
+		}
+	}
 	var listed struct {
 		Providers []struct {
 			ID       string         `json:"id"`
