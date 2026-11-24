@@ -561,24 +561,66 @@ func (host *server) startNetworkCheck(ctx context.Context) {
 	}
 	go func() {
 		host.networkMu.Lock()
-		defer host.networkMu.Unlock()
-		if host.networkChecked {
+		if host.networkChecked || host.networkChecking {
+			host.networkMu.Unlock()
 			return
 		}
+		host.networkChecking = true
+		originalPrefs := host.networkPrefs()
+		revision := host.networkRevision
+		host.networkMu.Unlock()
+		var checked bool
+		defer func() {
+			host.networkMu.Lock()
+			host.networkChecking = false
+			retry := revision != host.networkRevision && !host.networkChecked && ctx.Err() == nil
+			host.networkChecked = host.networkChecked || (checked && !retry)
+			host.networkMu.Unlock()
+			if retry {
+				host.startNetworkCheck(ctx)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(ctx, networkCheckTimeout)
 		defer cancel()
 		p, err := host.configuredProvider(ctx)
 		if err != nil || p.ID == "" {
 			return
 		}
-		host.networkChecked = true
-		prefs := host.networkPrefs()
+		checked = true
 		actual := networkRoute{strings.TrimSuffix(p.Responses, "/v1"), p.Proxy}
-		if effectiveNetworkMode(prefs, actual) != "auto" {
+		if effectiveNetworkMode(originalPrefs, actual) != "auto" {
 			return
 		}
-		if err := host.refreshNetwork(ctx, "auto", networkRoute{}, p); err != nil {
+		current, err := host.managedNetwork(p)
+		if err != nil {
+			return
+		}
+		key, err := host.configuredNetworkKey(ctx)
+		if err != nil || key != current.key {
+			return
+		}
+		next, ok := host.checkNetwork(ctx, actual, key)
+		if ok && next != actual {
+			listCtx, stop := context.WithTimeout(ctx, networkVerifyTimeout)
+			_, err = host.listConnectionModels(listCtx, next, key)
+			stop()
+			ok = err == nil
+		}
+		// Network I/O above never holds the connection settings lock. A
+		// competing edit wins and a new route is written only if still current.
+		host.networkMu.Lock()
+		defer host.networkMu.Unlock()
+		if ctx.Err() != nil || host.networkRevision != revision || host.networkPrefs() != originalPrefs || !host.verifyNetworkConfig(ctx, actual, key) {
+			return
+		}
+		if !ok {
 			host.networkMessage = "本次保留当前线路"
+			return
+		}
+		if err := host.applyNetworkConfig(ctx, current, next, networkPrefs{"auto", next}); err != nil {
+			host.networkMessage = "本次保留当前线路"
+		} else {
+			host.networkMessage = "已检查当前网络"
 		}
 	}()
 }
@@ -612,6 +654,10 @@ func (host *server) networkSettings(response http.ResponseWriter, request *http.
 			host.json(response, http.StatusBadRequest, map[string]string{"error": "请选择有效的 ACU 连接方式"})
 			return
 		}
+		if host.networkChecking && input.Mode == "auto" {
+			host.json(response, http.StatusConflict, map[string]string{"error": "正在检查连接，请稍后重试"})
+			return
+		}
 		if err := host.refreshNetwork(ctx, input.Mode, input.NetworkRoute, p); err != nil {
 			host.json(response, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -624,7 +670,7 @@ func (host *server) networkSettings(response http.ResponseWriter, request *http.
 		}
 	}
 	current, err := host.managedNetwork(p)
-	view := networkView{Checked: host.networkChecked, Managed: err == nil, Message: host.networkMessage}
+	view := networkView{Checked: host.networkChecked, Checking: host.networkChecking, Managed: err == nil, Message: host.networkMessage}
 	if current != nil {
 		view.Route = current.route
 		view.Mode = effectiveNetworkMode(host.networkPrefs(), current.route)

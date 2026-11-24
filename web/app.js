@@ -955,7 +955,7 @@ async function loadNetworkSettings() {
   try {
     const view = await request('/runtime/network', { timeout: 16000 });
     // A busy response doesn't include a verified route. Keep the visible one.
-    ui.network = view.checking ? { ...ui.network, checking: true } : view;
+    ui.network = view.checking && !view.managed ? { ...ui.network, checking: true } : view;
     if (view.checking && ui.page === 'settings') loadNetworkSettings.timer = setTimeout(loadNetworkSettings, 1000);
   } catch (error) {
     if (ui.network?.checking) ui.network = { ...ui.network, checking: false };

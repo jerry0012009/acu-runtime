@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -210,13 +212,74 @@ func TestNetworkStartupRunsOnceAndKeepsManual(t *testing.T) {
 				}
 				time.Sleep(time.Millisecond)
 			}
-			var want int32
+			var wantReads, wantChecks int32
 			if !manual {
-				want = 1
+				wantReads, wantChecks = 2, 1
 			}
-			if keyReads.Load() != want || checks.Load() != want {
-				t.Fatalf("startup made %d key reads and %d checks, want %d", keyReads.Load(), checks.Load(), want)
+			if keyReads.Load() != wantReads || checks.Load() != wantChecks {
+				t.Fatalf("startup made %d key reads and %d checks, want %d reads and %d checks", keyReads.Load(), checks.Load(), wantReads, wantChecks)
 			}
 		})
+	}
+}
+
+func TestStartupProbeLeavesConnectionUsableAndDefersToManualEdit(t *testing.T) {
+	path, executable := networkFileFixture(t)
+	probeStarted := make(chan struct{})
+	finishProbe := make(chan struct{})
+	host, _ := testServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/providers":
+			_, _ = w.Write(networkFixtureAPI([]byte(networkConfigFixture)))
+		case "/api/provider/key":
+			_, _ = io.WriteString(w, `{"key":"fixture-secret"}`)
+		case "/api/settings":
+			close(probeStarted)
+			select {
+			case <-finishProbe:
+			case <-r.Context().Done():
+			}
+			_, _ = io.WriteString(w, `{"proxySource":"settings"}`)
+		}
+	}))
+	host.kernel.exe, host.kernel.enforceVersion = executable, true
+	host.networkFile = filepath.Join(filepath.Dir(executable), "prefs.json")
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	host.startNetworkCheck(ctx)
+	select {
+	case <-probeStarted:
+	case <-ctx.Done():
+		t.Fatal("probe did not start")
+	}
+	view := httptest.NewRecorder()
+	host.networkSettings(view, httptest.NewRequest(http.MethodGet, "/runtime/network", nil))
+	var status networkView
+	if view.Code != 200 || json.Unmarshal(view.Body.Bytes(), &status) != nil || !status.Checking || !status.Managed || status.Route != (networkRoute{bestNetworkBase, ""}) {
+		t.Fatalf("current connection unavailable during probe: %s", view.Body.String())
+	}
+	manual := httptest.NewRecorder()
+	host.networkSettings(manual, httptest.NewRequest(http.MethodPost, "/runtime/network", strings.NewReader(`{"mode":"manual","route":{"base":"https://acu.best","proxy":""}}`)))
+	close(finishProbe)
+	if manual.Code != 200 {
+		t.Fatalf("manual edit waited on the probe: %s", manual.Body.String())
+	}
+	for {
+		host.networkMu.Lock()
+		checking, prefs := host.networkChecking, host.networkPrefs()
+		host.networkMu.Unlock()
+		if !checking {
+			if prefs.Mode != "manual" {
+				t.Fatal("the background probe overwrote the manual edit")
+			}
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatal("probe did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if contents, err := os.ReadFile(path); err != nil || string(contents) != networkConfigFixture {
+		t.Fatal("the existing provider changed")
 	}
 }
