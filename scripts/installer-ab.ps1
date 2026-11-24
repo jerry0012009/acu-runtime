@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$Installer, [ValidateSet('0.1.137','0.1.138')][string]$Version)
+param([Parameter(Mandatory)][string]$Installer, [ValidateSet('0.1.137','0.1.138','0.1.139')][string]$Version)
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or !$IsWindows) { throw 'Disposable Windows CI only' }
 $installed = Join-Path $env:LOCALAPPDATA 'Programs/ACU Runtime'
