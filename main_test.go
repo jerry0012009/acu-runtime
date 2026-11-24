@@ -19,6 +19,8 @@ func testServer(t *testing.T, upstream http.Handler) (*server, *httptest.Server)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Mock management endpoints must never run the user's installed CLI.
+	kernel.exe = ""
 	return &server{kernel: kernel, host: "127.0.0.1:4317", token: "test-local-session", web: http.NotFoundHandler()}, remote
 }
 
