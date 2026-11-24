@@ -20,6 +20,8 @@ jobs:
             digest: 4bcb30faab76da23d7e5275aefd9146525b42dbdfe428d93f23969a2d6fd5cbf
           - version: '0.1.138'
             digest: 8ed551e6a9edd5a3e8a667cde642b398924cdd992073c60b553010691ef5e034
+          - version: '0.1.139'
+            digest: 3f96fd06100571b6dcbaaece864aab901494c2ec3f72fd9f5a0dd51ace55b930
     steps:
       - uses: actions/checkout@v4
       - name: Download unmodified release and exercise first installation
