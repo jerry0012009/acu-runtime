@@ -82,6 +82,7 @@ async function refreshStatus(rescan, quiet) {
       if (!response.ok) throw new Error(`内核扫描失败（${response.status}）`);
     }
     const previousAccount = ui.status?.account;
+    const previousReady = ui.status?.ready;
     const previousState = JSON.stringify(ui.status);
     const status = await request('/runtime/status', {timeout: 28000});
     if (status.ready) ui.lastAgents = status.agents;
@@ -90,6 +91,7 @@ async function refreshStatus(rescan, quiet) {
       status.connection = { ...ui.status.connection, ...status.connection, choices: ui.status.connection.choices, known: false, stale: true };
     }
     ui.status = status;
+    if (ui.page === 'settings' && status.desktop && status.ready && (!previousReady || (!ui.network && !ui.networkError))) loadNetworkSettings();
     if(ui.status.desktop && !ui.startup && !ui.startupLoading){ui.startupLoading=true;try{ui.startup=await request('/runtime/startup');}catch{ui.startup={supported:false,error:'自启动状态暂时无法读取'};}finally{ui.startupLoading=false;}}
     billing?.syncAccount();
     preferences?.syncAccount();
@@ -894,11 +896,120 @@ async function reopenAgent(id) {
   }
 }
 
+const networkEndpoints = [
+  { base: 'https://acu.best', label: 'acu.best' },
+  { base: 'https://console.acucompute.com', label: 'console.acucompute.com' },
+];
+
+function networkSettingsContent() {
+  const view = ui.network;
+  if (!ui.status?.ready) return '<div class="setting-row"><p>ACU 连接就绪后可查看网络设置。</p></div>';
+  if (!view && !ui.networkError) return '<div class="setting-row"><p role="status">正在读取当前线路…</p></div>';
+  const endpoint = networkEndpoints.find(item => item.base === view?.route?.base);
+  const waiting = ui.networkSaving || view?.checking;
+  const available = view?.managed && endpoint;
+  const heading = available ? (view.mode === 'manual' ? '手动指定' : '自动选择') : (waiting ? '正在检查线路' : '连接设置');
+  let line = '';
+  if (available) line = `${endpoint.label} · ${view.route.proxy === 'direct' ? '直连' : '跟随全局网络'}`;
+  else if (view && !waiting) line = '连接 ACU 后可在此选线。使用高级连接设置的线路由原设置管理。';
+  const message = ui.networkError || (waiting ? (ui.networkSaving === 'manual' ? '正在验证线路…' : '正在比较可用线路…') : view?.message);
+  const disabled = waiting || ui.networkLoading ? 'disabled' : '';
+  const actions = available ? `<div class="network-setting-actions">
+      ${view.mode !== 'manual' ? `<button type="button" id="acu-network-check" class="button secondary" data-action="network-check" ${disabled}>重新测速</button>` : ''}
+      <button type="button" id="acu-network-edit" class="text-button" data-action="network-edit" aria-expanded="${Boolean(ui.networkDraft)}" aria-controls="acu-network-form" ${disabled}>连接选项</button>
+    </div>` : ui.networkError ? `<button type="button" id="acu-network-reload" class="button secondary" data-action="network-reload" ${disabled}>重试</button>` : '';
+  const draft = available && ui.networkDraft;
+  return `<div class="setting-row network-setting-row"><div><strong>${heading}</strong>
+      ${line ? `<p>${line}</p>` : ''}${message ? `<p role="status">${escapeHTML(message)}</p>` : ''}</div>${actions}</div>
+    <form id="acu-network-form" class="network-setting-form" ${draft ? '' : 'hidden'}>${draft ? `
+      <div class="network-setting-fields"><div><label for="acu-network-mode">连接方式</label><select id="acu-network-mode" name="mode" ${disabled}>
+        <option value="auto" ${draft.mode === 'auto' ? 'selected' : ''}>自动选择（推荐）</option>
+        <option value="manual" ${draft.mode === 'manual' ? 'selected' : ''}>手动指定</option>
+      </select></div>
+      ${draft.mode === 'manual' ? `<div><label for="acu-network-endpoint">入口</label><select id="acu-network-endpoint" name="base" ${disabled}>
+        ${networkEndpoints.map(item => `<option value="${item.base}" ${draft.base === item.base ? 'selected' : ''}>${item.label}</option>`).join('')}
+      </select></div>
+      <div><label for="acu-network-proxy">代理方式</label><select id="acu-network-proxy" name="proxy" ${disabled}>
+        <option value="direct" ${draft.proxy === 'direct' ? 'selected' : ''}>直连</option>
+        <option value="" ${draft.proxy === '' ? 'selected' : ''}>跟随全局网络</option>
+      </select></div>` : '<p>每次启动时在后台测速，选择当前网络下较快的线路。</p>'}</div>
+      <div class="network-setting-actions"><button type="button" id="acu-network-cancel" class="text-button" data-action="network-cancel" ${disabled}>取消</button>
+        <button type="submit" id="acu-network-save" class="button secondary" ${disabled}>保存</button></div>` : ''}</form>`;
+}
+
+function renderNetworkSettings() {
+  const panel = document.getElementById('acu-network-settings');
+  if (!panel) return;
+  const active = document.activeElement;
+  const focused = active && panel.contains(active) ? active.id : '';
+  panel.innerHTML = networkSettingsContent();
+  if (focused) document.getElementById(focused)?.focus({ preventScroll: true });
+}
+
+async function loadNetworkSettings() {
+  if (ui.page !== 'settings' || !ui.status?.desktop || !ui.status?.ready || ui.networkLoading || ui.networkSaving) return;
+  clearTimeout(loadNetworkSettings.timer);
+  ui.networkLoading = true;
+  ui.networkError = '';
+  renderNetworkSettings();
+  try {
+    const view = await request('/runtime/network', { timeout: 16000 });
+    // A busy response doesn't include a verified route. Keep the visible one.
+    ui.network = view.checking ? { ...ui.network, checking: true } : view;
+    if (view.checking && ui.page === 'settings') loadNetworkSettings.timer = setTimeout(loadNetworkSettings, 1000);
+  } catch (error) {
+    if (ui.network?.checking) ui.network = { ...ui.network, checking: false };
+    ui.networkError = error.status === 503 ? '暂时无法读取线路，请稍后重试。' : error.message;
+  } finally {
+    ui.networkLoading = false;
+    renderNetworkSettings();
+  }
+}
+
+async function saveNetworkSettings(draft) {
+  if (!ui.status?.ready || !ui.network?.managed || ui.network.checking || ui.networkSaving || ui.networkLoading) return;
+  const { mode, base, proxy } = draft;
+  ui.networkError = '';
+  ui.networkSaving = mode;
+  renderNetworkSettings();
+  try {
+    const payload = mode === 'manual' ? { mode, route: { base, proxy } } : { mode };
+    const view = await request('/runtime/network', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 16000 });
+    if (view.checking) {
+      ui.network = { ...ui.network, checking: true };
+      loadNetworkSettings.timer = setTimeout(loadNetworkSettings, 1000);
+    } else {
+      ui.network = view;
+      ui.networkDraft = null;
+    }
+  } catch (error) {
+    ui.networkError = error.message;
+    if (error.status === 409) {
+      ui.network = { ...ui.network, checking: true };
+      loadNetworkSettings.timer = setTimeout(loadNetworkSettings, 1000);
+    }
+  } finally {
+    ui.networkSaving = '';
+    renderNetworkSettings();
+  }
+  if (!ui.networkError && !ui.networkDraft && ui.page === 'settings') document.getElementById('acu-network-edit')?.focus({ preventScroll: true });
+}
+
+function toggleNetworkOptions(open) {
+  if (!ui.network?.managed || ui.network.checking || ui.networkSaving || ui.networkLoading) return;
+  const view = ui.network;
+  ui.networkDraft = open ? { mode: view.mode || 'auto', ...view.route } : null;
+  ui.networkError = '';
+  renderNetworkSettings();
+  document.getElementById(open ? 'acu-network-mode' : 'acu-network-edit')?.focus({ preventScroll: true });
+}
+
 function settingsPage() {
   const update = ui.status?.update || {};
   const updateLabel = ({ idle: `当前版本 ${update.current || ui.status?.version || ''}`, checking: '正在检查更新…', current: '已是最新版本', available: `发现 ACU Runtime ${update.release?.version || ''}`, downloading: update.total ? `正在下载 ${Math.round(update.downloaded / update.total * 100)}%` : '正在下载更新…', restarting: '正在更新并重新启动…', error: update.message || '检查更新失败' })[update.phase || 'idle'];
   return `${header('', '设置', '按你的习惯使用 ACU。')}${kernelBanner()}${setupResults()}
     <section class="panel settings-panel"><h2>图片、视频与搜索</h2><div class="setting-row"><div><strong>常用能力</strong><p>为 Agent 准备识图、生图与搜索工具，随时更换对应模型。</p></div><button class="button secondary" data-action="capabilities" ${!ui.status?.ready || !activeChoice() ? 'disabled' : ''}>管理能力</button></div></section>
+    ${ui.status?.desktop ? `<section class="panel settings-panel" aria-labelledby="acu-network-heading"><h2 id="acu-network-heading">网络</h2><div id="acu-network-settings">${networkSettingsContent()}</div></section>` : ''}
     <section class="panel settings-panel"><h2>外观</h2><div class="setting-row"><div><strong>跟随系统</strong><p>自动适配浅色与深色模式。</p></div><span class="theme-readout"><span class="theme-swatch" aria-hidden="true"></span><span data-system-theme>跟随系统</span></span></div></section>
     <section class="panel settings-panel"><h2>窗口与托盘</h2><div class="setting-row"><div><strong>关闭窗口后继续运行</strong><p>点击托盘图标打开快捷面板，随时查看或调整 Agent。</p></div>${ui.status?.desktop ? '<button class="button secondary" data-action="show-panel">打开快捷面板</button>' : ''}</div></section>
     ${ui.status?.desktop ? `<section class="panel settings-panel"><h2>应用更新</h2><div class="setting-row"><div><strong>ACU Runtime ${escapeHTML(update.current || ui.status?.version || '')}</strong><p role="status">${escapeHTML(update.supported ? updateLabel : '此平台暂未提供应用内更新安装包')}${update.kernel ? ` · 内置内核 ${escapeHTML(update.kernel)}` : ''}</p>${update.phase === 'available' ? '<p>Runtime 与兼容内核将一起更新；本机 Key 和 Agent 配置会保留。</p>' : ''}</div><div class="update-actions">${update.phase === 'available' ? '<button class="button primary" data-action="install-update">更新并重启</button>' : ''}<button class="button secondary" data-action="check-update" ${(!update.supported || ['checking', 'downloading', 'restarting'].includes(update.phase)) ? 'disabled' : ''}>${update.phase === 'checking' ? '检查中…' : '检查更新'}</button></div></div>${update.phase === 'error' ? '<p class="inventory-warning">更新失败；当前安装未变更。</p>' : ''}</section>` : ''}
@@ -939,8 +1050,12 @@ function render() {
     if (error) { error.textContent = ui.error; error.hidden = !ui.error; }
     return;
   }
+  const networkPanel = ui.page === 'settings' && document.getElementById('acu-network-settings');
+  const active = document.activeElement;
+  const focusedNetworkControl = active?.id && networkPanel && networkPanel.contains(active) ? active.id : '';
   queueMicrotask(() => window.dispatchEvent(new Event('acu:render')));
   app.innerHTML = `${navigation()}<div class="main-shell"><header class="topbar"><span>ACU Runtime <span class="top-divider">/</span> ${ui.page === 'settings' ? '设置' : '工作台'}</span><span class="top-status">${icon('shield')}本机配置</span></header><main class="content"><div id="home-error" role="alert" class="error-banner" ${ui.error ? '': 'hidden'}>${escapeHTML(ui.error)}</div>${ui.page === 'settings' ? settingsPage() : overviewPage()}</main></div>`;
+  if (focusedNetworkControl) document.getElementById(focusedNetworkControl)?.focus({ preventScroll: true });
 }
 
 function closeOverlay() {
@@ -1430,7 +1545,24 @@ app.addEventListener('click', event => {
   if (workReview?.click(event)) return;
   if (billing?.click(event)) return;
   const page = event.target.closest('[data-page]');
-  if (page) { const navigate = () => { ui.capabilityReturn = false; ui.frame = null; ui.page = page.dataset.page; if (['usage', 'routing'].includes(ui.page)) openNative(ui.page); else { app.innerHTML = ''; render(); } refresh(false, true); }; if (ui.page === 'capabilities') leaveCapabilities(navigate); else navigate(); return; }
+  if (page) {
+    const navigate = () => {
+      if (ui.page === 'settings' && page.dataset.page !== 'settings') {
+        clearTimeout(loadNetworkSettings.timer);
+        ui.networkDraft = null;
+      }
+      ui.capabilityReturn = false;
+      ui.frame = null;
+      ui.page = page.dataset.page;
+      if (['usage', 'routing'].includes(ui.page)) openNative(ui.page);
+      else { app.innerHTML = ''; render(); }
+      if (ui.page === 'settings') loadNetworkSettings();
+      refresh(false, true);
+    };
+    if (ui.page === 'capabilities') leaveCapabilities(navigate);
+    else navigate();
+    return;
+  }
   if (event.target.closest('[data-capability-back]')) { returnFromCapabilities(); return; }
   if (event.target.closest('[data-refresh-capability-models]')) { refreshCapabilityModels(); return; }
   if (event.target.closest('[data-save-capabilities]')) { event.preventDefault?.(); saveCapabilities(); return; }
@@ -1456,6 +1588,10 @@ app.addEventListener('click', event => {
     'update-agent': () => updateAgents([control.dataset.agentId]),
     'update-all': () => updateAgents(availableAgentUpdates().map(([id]) => id), true),
     'manage-connection': () => { ui.connectionOpen = !ui.connectionOpen; app.innerHTML = ''; render(); },
+    'network-check': () => saveNetworkSettings({ mode: 'auto' }),
+    'network-reload': loadNetworkSettings,
+    'network-edit': () => toggleNetworkOptions(!ui.networkDraft),
+    'network-cancel': () => toggleNetworkOptions(false),
     capabilities: openCapabilities,
     'configure-agent': () => configureAgent(control.dataset.agentId),
     'install-agent': () => installAgent(control.dataset.agentId),
@@ -1485,6 +1621,11 @@ app.addEventListener('click', event => {
 });
 app.addEventListener('input', event => { billing?.input(event); preferences?.input(event); });
 app.addEventListener('change', event => {
+  if (ui.networkDraft && ['acu-network-mode', 'acu-network-endpoint', 'acu-network-proxy'].includes(event.target.id)) {
+    ui.networkDraft[event.target.name] = event.target.value;
+    if (event.target.name === 'mode') renderNetworkSettings();
+    return;
+  }
   if (event.target.dataset?.videoEnabled !== undefined) { setVideoEnabled(event.target.checked); return; }
   if (event.target.dataset?.videoReadingEnabled !== undefined) { setVideoReadingEnabled(event.target.checked); return; }
   if (preferences?.change(event)) return;
@@ -1510,6 +1651,11 @@ app.addEventListener('change', event => {
   document.querySelector(`[data-select-agent="${id}"]`)?.focus();
 });
 app.addEventListener('submit', event => {
+  if (event.target.id === 'acu-network-form') {
+    event.preventDefault();
+    if (ui.networkDraft) saveNetworkSettings(ui.networkDraft);
+    return;
+  }
   if (billing?.submit(event)) return;
   if (event.target.matches('[data-capability-model-form]')) { event.preventDefault(); saveCapabilities(); return; }
   if (!event.target.matches('[data-connection-form]')) return;

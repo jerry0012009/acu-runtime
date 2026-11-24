@@ -68,6 +68,7 @@ type agentModelOption struct {
 
 type kernelState struct {
 	codexValidate  func(context.Context, string) error
+	onReady        func(context.Context)
 	stopRequested  bool
 	routeMu        sync.Mutex
 	mu             sync.Mutex
@@ -100,6 +101,10 @@ type server struct {
 	account          accountState
 	accountFile      string
 	accountFileMu    sync.Mutex
+	networkMu        sync.Mutex
+	networkFile      string
+	networkChecked   bool
+	networkMessage   string
 	prices           priceCache
 	modelProbes      billingProbeCache
 	loginRequests    chan loginTicket
@@ -286,12 +291,15 @@ func (kernel *kernelState) begin(ctx context.Context) {
 		defer cancel()
 		err := kernel.start(startup)
 		kernel.mu.Lock()
-		defer kernel.mu.Unlock()
 		kernel.starting = false
 		if err != nil {
 			kernel.lastErr, kernel.phase = err.Error(), "连接未完成"
 		} else {
 			kernel.lastErr, kernel.phase = "", "已连接"
+		}
+		kernel.mu.Unlock()
+		if err == nil && kernel.onReady != nil {
+			kernel.onReady(ctx)
 		}
 	}()
 }
@@ -726,6 +734,8 @@ func (host *server) ServeHTTP(response http.ResponseWriter, request *http.Reques
 			host.json(response, 200, map[string]bool{"ok": true})
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/connection":
 			host.configureACU(response, request)
+		case (request.Method == http.MethodGet || request.Method == http.MethodPost) && request.URL.Path == "/runtime/network":
+			host.networkSettings(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/agents/configure":
 			host.configureAgent(response, request)
 		case request.Method == http.MethodPost && request.URL.Path == "/runtime/models/prepare":
@@ -870,6 +880,10 @@ func main() {
 	service := &http.Server{Handler: host, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	host.lifecycle = ctx
+	if dataDirectory, err := os.UserConfigDir(); err == nil && kernel.enforceVersion {
+		host.networkFile = filepath.Join(dataDirectory, "ACURuntime", "network.json")
+		kernel.onReady = host.startNetworkCheck
+	}
 	defer stop()
 	var shutdownOnce sync.Once
 	shutdown := func() {

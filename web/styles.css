@@ -415,6 +415,18 @@ select {
 select:hover:not(:disabled) { border-color: var(--acu-hover-line); }
 select:focus-visible { outline: none; border-color: var(--acu-accent); box-shadow: 0 0 0 3px var(--acu-accent-soft); }
 select option, select optgroup { color: var(--acu-text); background: var(--acu-surface); }
+.network-setting-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.network-setting-actions .text-button { font-size: 11px; white-space: nowrap; }
+.network-setting-row { flex-wrap: wrap; gap: 8px 16px; }
+.network-setting-row .network-setting-actions { flex: 0 0 auto; }
+.network-setting-row .button { min-width: 0; }
+.network-setting-form:not([hidden]) { display: grid; gap: 14px; padding: 0 0 20px; }
+.network-setting-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,180px),1fr)); gap: 10px; }
+.network-setting-fields>div { display: grid; gap: 7px; min-width: 0; }
+.network-setting-fields label { color: var(--acu-muted); font-size: 12px; }
+.network-setting-fields select { min-width: 0; width: 100%; min-height: 36px; font-size: 12px; padding: 8px 30px 8px 10px; background-position: right 8px center; }
+.network-setting-fields p { align-self: center; font-size: 11px; }
+.network-setting-form .button { font-size: 11px; }
 .flow-path:has(select) { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 10px; }
 .flow-path:has(select) .flow-arrow { display: none; }
 .flow-path select { width: 100%; min-width: 0; min-height: 42px; padding: 10px 34px 10px 12px; font-size: 12px; font-weight: 500; }
